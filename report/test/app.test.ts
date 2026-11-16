@@ -1,17 +1,26 @@
 import request from 'supertest';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createReportApp } from '../src/app';
 import { loadConfig } from '../src/config';
 import { createPool } from '../src/db';
 import { createLogger } from '../src/logger';
 import { escapeCsvCell } from '../src/csv';
+import { createInvoiceRenderer, type InvoiceRenderer } from '../src/invoice';
 import { resetDb, seedCatalog, seedOrder } from './seed';
 
 const SECRET = 'test-report-secret-0123456789abcdef01';
 const config = loadConfig({ NODE_ENV: 'test', REPORT_DATABASE_URL: process.env.DATABASE_URL_TEST, REPORT_SERVICE_SECRET: SECRET });
 const pool = createPool(config.databaseUrl);
-const app = createReportApp({ config, pool, logger: createLogger('silent') });
-afterAll(() => pool.end());
+let invoices: InvoiceRenderer;
+let app: ReturnType<typeof createReportApp>;
+beforeAll(async () => {
+  invoices = await createInvoiceRenderer();
+  app = createReportApp({ config, pool, invoices, logger: createLogger('silent') });
+});
+afterAll(async () => {
+  await invoices?.close();
+  await pool.end();
+});
 const auth = { Authorization: `Bearer ${SECRET}` };
 
 describe('report service HTTP API', () => {

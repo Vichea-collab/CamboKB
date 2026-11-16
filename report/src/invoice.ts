@@ -1,5 +1,9 @@
 import { formatPhone, formatUsd, phnomPenhDate } from '@cambo/shared';
-import PDFDocument from 'pdfkit';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import jsreport from '@jsreport/jsreport-core';
+import chromePdf from '@jsreport/jsreport-chrome-pdf';
+import handlebars from '@jsreport/jsreport-handlebars';
 import type pg from 'pg';
 
 export type InvoiceData = {
@@ -48,95 +52,82 @@ export async function getInvoiceData(db: pg.Pool, orderId: string): Promise<Invo
   return { ...(rows[0] as Omit<InvoiceData, 'items'>), items: items.rows };
 }
 
-const COLORS = { ink: '#14171c', muted: '#5b6473', accent: '#e0a100', line: '#d9dde3' };
+export type InvoiceRenderer = {
+  render(data: InvoiceData, store: { name: string }): Promise<Buffer>;
+  close(): Promise<void>;
+};
 
-/** A4 printable invoice. Light background on purpose: it gets printed. */
-export function renderInvoicePdf(d: InvoiceData, store: { name: string }): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: `Invoice ${d.number}`, Author: store.name } });
-    const chunks: Buffer[] = [];
-    doc.on('data', (c: Buffer) => chunks.push(c));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+const TEMPLATE_PATH = fileURLToPath(new URL('../templates/invoice.html', import.meta.url));
 
-    const left = 50;
-    const right = doc.page.width - 50;
-    const width = right - left;
+/** Everything the template prints, pre-formatted: the template stays logic-free and Handlebars escapes it all. */
+export function invoiceView(d: InvoiceData, store: { name: string }) {
+  const [first = store.name, ...rest] = store.name.split(' ');
+  return {
+    storeName: store.name,
+    storeFirst: first,
+    storeRest: rest.join(' '),
+    number: d.number,
+    date: phnomPenhDate(new Date(d.createdAt)),
+    contactName: d.contactName,
+    phone: formatPhone(d.contactPhone),
+    region: REGION[d.region] ?? d.region,
+    service: SERVICE[d.deliveryService] ?? d.deliveryService,
+    addressLine: d.addressLine,
+    note: d.note,
+    items: d.items.map((i) => ({ name: i.name, quantity: i.quantity, price: formatUsd(i.priceCents), lineTotal: formatUsd(i.lineTotalCents) })),
+    subtotal: formatUsd(d.subtotalCents),
+    delivery: formatUsd(d.deliveryFeeCents),
+    discount: d.discountCents ? formatUsd(d.discountCents) : null,
+    promoCode: d.promoCode,
+    total: formatUsd(d.totalCents),
+    paymentMethod: d.paymentMethod ? (PAYMENT[d.paymentMethod] ?? d.paymentMethod) : '—',
+    paymentStatus: d.paymentStatus ? (PAYMENT_STATUS[d.paymentStatus] ?? d.paymentStatus) : '—',
+    isPaid: d.paymentStatus === 'PAID',
+    status: title(d.status),
+  };
+}
 
-    // Header
-    doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(22).text(store.name, left, 50);
-    doc.fillColor(COLORS.accent).fontSize(10).text('KEYBOARDS · MICE · DESK SETUP', left, 78);
-    doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(18).text('INVOICE', left, 50, { width, align: 'right' });
-    doc.font('Helvetica').fontSize(10).fillColor(COLORS.muted)
-      .text(d.number, left, 74, { width, align: 'right' })
-      .text(phnomPenhDate(new Date(d.createdAt)), left, 88, { width, align: 'right' });
-
-    doc.moveTo(left, 115).lineTo(right, 115).strokeColor(COLORS.line).stroke();
-
-    // Bill to / delivery
-    const col = left + width / 2;
-    doc.fillColor(COLORS.muted).fontSize(9).text('BILL TO', left, 130).text('DELIVERY', col, 130);
-    doc.fillColor(COLORS.ink).fontSize(11).font('Helvetica-Bold').text(d.contactName, left, 144, { width: width / 2 - 10 });
-    doc.font('Helvetica').fontSize(10).text(formatPhone(d.contactPhone), left, 160);
-    doc.text(`${REGION[d.region] ?? d.region} · ${SERVICE[d.deliveryService] ?? d.deliveryService}`, col, 144, { width: width / 2 });
-    doc.text(d.addressLine, col, 160, { width: width / 2 });
-
-    // Items table
-    let y = Math.max(doc.y, 190) + 15;
-    const cols = { item: left, qty: left + width * 0.6, price: left + width * 0.72, total: left + width * 0.86 };
-    doc.rect(left, y, width, 22).fill('#f3f4f6');
-    doc.fillColor(COLORS.muted).fontSize(9).font('Helvetica-Bold');
-    doc.text('ITEM', cols.item + 8, y + 7).text('QTY', cols.qty, y + 7).text('PRICE', cols.price, y + 7);
-    doc.text('TOTAL', cols.total, y + 7, { width: right - cols.total - 8, align: 'right' });
-    y += 30;
-    doc.font('Helvetica').fontSize(10).fillColor(COLORS.ink);
-    for (const i of d.items) {
-      const h = doc.heightOfString(i.name, { width: cols.qty - cols.item - 16 });
-      if (y + h > doc.page.height - 150) {
-        doc.addPage();
-        y = 50;
-      }
-      doc.text(i.name, cols.item + 8, y, { width: cols.qty - cols.item - 16 });
-      doc.text(String(i.quantity), cols.qty, y).text(formatUsd(i.priceCents), cols.price, y);
-      doc.text(formatUsd(i.lineTotalCents), cols.total, y, { width: right - cols.total - 8, align: 'right' });
-      y += Math.max(h, 14) + 8;
-      doc.moveTo(left, y - 4).lineTo(right, y - 4).strokeColor(COLORS.line).stroke();
-    }
-
-    // Totals
-    y += 10;
-    const line = (label: string, value: string, bold = false) => {
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 12 : 10).fillColor(bold ? COLORS.ink : COLORS.muted);
-      doc.text(label, cols.price - 40, y, { width: 120 });
-      doc.fillColor(COLORS.ink).text(value, cols.total - 20, y, { width: right - cols.total + 12, align: 'right' });
-      y += bold ? 22 : 18;
-    };
-    line('Subtotal', formatUsd(d.subtotalCents));
-    line('Delivery', formatUsd(d.deliveryFeeCents));
-    if (d.discountCents) line(`Discount${d.promoCode ? ` (${d.promoCode})` : ''}`, `-${formatUsd(d.discountCents)}`);
-    doc.moveTo(cols.price - 40, y - 4).lineTo(right, y - 4).strokeColor(COLORS.ink).stroke();
-    y += 4;
-    line('Total', formatUsd(d.totalCents), true);
-
-    // Payment and status
-    y += 10;
-    doc.font('Helvetica').fontSize(10).fillColor(COLORS.muted).text('Payment', left, y);
-    doc.fillColor(COLORS.ink).text(
-      `${d.paymentMethod ? (PAYMENT[d.paymentMethod] ?? d.paymentMethod) : '—'} · ${d.paymentStatus ? (PAYMENT_STATUS[d.paymentStatus] ?? d.paymentStatus) : '—'}`,
-      left + 80,
-      y,
-    );
-    doc.fillColor(COLORS.muted).text('Order status', left, y + 16);
-    doc.fillColor(COLORS.ink).text(title(d.status), left + 80, y + 16);
-    if (d.note) {
-      doc.fillColor(COLORS.muted).text('Note', left, y + 32);
-      doc.fillColor(COLORS.ink).text(d.note, left + 80, y + 32, { width: width - 80 });
-    }
-
-    doc.fontSize(9).fillColor(COLORS.muted).text(`Thank you for shopping with ${store.name}!`, left, doc.page.height - 80, {
-      width,
-      align: 'center',
-    });
-    doc.end();
+/**
+ * Start an embedded jsreport (Handlebars + headless Chrome). Start once per process;
+ * a small Chrome pool renders invoices concurrently.
+ */
+export async function createInvoiceRenderer(opts: { chromePath?: string; workers?: number } = {}): Promise<InvoiceRenderer> {
+  const template = await readFile(TEMPLATE_PATH, 'utf8');
+  const reporter = jsreport({
+    discover: false,
+    logger: { console: { transport: 'console', level: 'error' } },
+    store: { provider: 'memory' },
+    blobStorage: { provider: 'memory' },
+    reportTimeout: 30_000,
+    trustUserCode: false,
   });
+  reporter.use(handlebars());
+  reporter.use(
+    chromePdf({
+      strategy: 'chrome-pool',
+      numberOfWorkers: opts.workers ?? 2,
+      launchOptions: {
+        executablePath: opts.chromePath || undefined,
+        // Container-friendly flags; Chrome's sandbox needs privileges Docker doesn't grant by default.
+        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      },
+    }),
+  );
+  await reporter.init();
+
+  return {
+    async render(data, store) {
+      const res = await reporter.render({
+        template: {
+          content: template,
+          engine: 'handlebars',
+          recipe: 'chrome-pdf',
+          chrome: { format: 'A4', printBackground: true, marginTop: '0', marginBottom: '0', marginLeft: '0', marginRight: '0' },
+        },
+        data: invoiceView(data, store),
+      });
+      return res.content;
+    },
+    close: () => reporter.close(),
+  };
 }

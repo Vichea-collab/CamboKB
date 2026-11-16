@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Invoice {{number}}</title>
+<style>
+  /* Printed on white paper: light page, brand yellow as the one accent. Local fonts only (no network during rendering). */
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans', 'Noto Sans Khmer', 'Helvetica Neue', Arial, sans-serif;
+    color: #14171c;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page { padding: 18mm 16mm 22mm; min-height: 297mm; position: relative; }
+  .bar { position: absolute; inset: 0 0 auto 0; height: 6mm; background: #ffb703; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 4mm; }
+  .brand { font-family: 'Space Grotesk', 'Noto Sans', Arial, sans-serif; font-size: 22pt; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .brand span { color: #c98f00; }
+  .tagline { color: #5b6473; font-size: 9pt; margin-top: 2mm; }
+  .doc { text-align: right; }
+  .doc h1 { margin: 0; font-size: 18pt; letter-spacing: 0.02em; }
+  .doc .number { font-size: 11pt; font-weight: 700; margin-top: 1mm; }
+  .doc .date { color: #5b6473; }
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin: 10mm 0 8mm; padding: 6mm 0; border-top: 1px solid #d9dde3; border-bottom: 1px solid #d9dde3; }
+  .parties h2 { margin: 0 0 1.5mm; font-size: 8.5pt; color: #5b6473; font-weight: 600; }
+  .parties .name { font-weight: 700; font-size: 11.5pt; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 8.5pt; color: #5b6473; font-weight: 600; padding: 2.5mm 3mm; background: #f3f4f6; }
+  tbody td { padding: 3mm; border-bottom: 1px solid #e8eaee; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .qty { text-align: center; width: 16mm; }
+  tr { break-inside: avoid; }
+  .totals { margin-left: auto; width: 75mm; margin-top: 5mm; }
+  .totals div { display: flex; justify-content: space-between; padding: 1.2mm 0; color: #5b6473; }
+  .totals div span:last-child { color: #14171c; font-variant-numeric: tabular-nums; }
+  .totals .grand { border-top: 2px solid #14171c; margin-top: 2mm; padding-top: 2.5mm; font-size: 13pt; font-weight: 700; color: #14171c; }
+  .meta { margin-top: 9mm; display: grid; grid-template-columns: 32mm 1fr; row-gap: 1.5mm; }
+  .meta dt { color: #5b6473; }
+  .meta dd { margin: 0; }
+  .pill { display: inline-block; padding: 0.4mm 2.5mm; border-radius: 99px; background: #fff3cc; color: #7a5600; font-weight: 600; font-size: 9pt; }
+  .pill.paid { background: #d1fae5; color: #065f46; }
+  footer { position: absolute; left: 16mm; right: 16mm; bottom: 12mm; text-align: center; color: #5b6473; font-size: 9pt; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bar"></div>
+  <header>
+    <div>
+      <div class="brand">{{storeFirst}}<span>{{storeRest}}</span></div>
+      <div class="tagline">Keyboards, mice and desk setup — Phnom Penh, Cambodia</div>
+    </div>
+    <div class="doc">
+      <h1>Invoice</h1>
+      <div class="number">{{number}}</div>
+      <div class="date">{{date}}</div>
+    </div>
+  </header>
+
+  <section class="parties">
+    <div>
+      <h2>Bill to</h2>
+      <div class="name">{{contactName}}</div>
+      <div>{{phone}}</div>
+    </div>
+    <div>
+      <h2>Delivery</h2>
+      <div>{{region}} · {{service}}</div>
+      <div>{{addressLine}}</div>
+    </div>
+  </section>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th class="qty">Qty</th><th class="num">Price</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr><td>{{name}}</td><td class="qty">{{quantity}}</td><td class="num">{{price}}</td><td class="num">{{lineTotal}}</td></tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div><span>Subtotal</span><span>{{subtotal}}</span></div>
+    <div><span>Delivery</span><span>{{delivery}}</span></div>
+    {{#if discount}}<div><span>Discount{{#if promoCode}} ({{promoCode}}){{/if}}</span><span>-{{discount}}</span></div>{{/if}}
+    <div class="grand"><span>Total</span><span>{{total}}</span></div>
+  </div>
+
+  <dl class="meta">
+    <dt>Payment</dt><dd>{{paymentMethod}} <span class="pill {{#if isPaid}}paid{{/if}}">{{paymentStatus}}</span></dd>
+    <dt>Order status</dt><dd>{{status}}</dd>
+    {{#if note}}<dt>Note</dt><dd>{{note}}</dd>{{/if}}
+  </dl>
+
+  <footer>Thank you for shopping with {{storeName}}!</footer>
+</div>
+</body>
+</html>

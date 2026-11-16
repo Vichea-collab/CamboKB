@@ -141,7 +141,7 @@ cambo-supply/
   api/      Express 5 + Prisma — auth, catalog, orders   :4000  ← the only service the browser calls for data
   file/     Express 5 + sharp — uploads, image variants,
             serves /files/* (local) or writes to S3/R2   :4100
-  report/   Express 5 + pdfkit + pg — invoice PDFs,
+  report/   Express 5 + jsreport + pg — invoice PDFs,
             sales reports, CSV export                    :4200
   shared/   zod schemas, money/phone/delivery rules (used by all)
   docker/   one Dockerfile per service, nginx config
@@ -346,7 +346,9 @@ All money in **integer cents (USD)**. All tables have `createdAt`, `updatedAt`.
 
 Owner's decision: invoices and sales reports.
 
-- **Invoice PDF** per order (pdfkit, A4/printable, English): store name and
+- **Invoice PDF** per order (owner's decision: jsreport — an HTML/CSS Handlebars
+  template, `report/templates/invoice.html`, printed to A4 by headless Chrome,
+  embedded in the report service; English, Khmer addresses render correctly): store name and
   logo, order number and date, customer name and phone, delivery
   region/service/address, line items (qty, name, unit price, line total),
   subtotal, delivery fee, discount (with code), total, payment method and
@@ -406,6 +408,7 @@ Not built now, but the design leaves a clean slot:
   email.
 - Four separate services in top-level folders: web, api, file (storage),
   report (invoices + sales reports).
+- Invoices built with jsreport (HTML template → PDF).
 - Production quality, responsive, dark mode only like the current site.
 - Payment skipped for now; KHQR / Bakong later.
 

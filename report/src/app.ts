@@ -8,12 +8,12 @@ import { requireSecret } from './auth';
 import type { ReportConfig } from './config';
 import { toCsv } from './csv';
 import { ReportError } from './errors';
-import { getInvoiceData, renderInvoicePdf } from './invoice';
+import { getInvoiceData, type InvoiceRenderer } from './invoice';
 import type { Logger } from './logger';
 import { rangeSchema } from './range';
 import { breakdown, ordersForCsv, salesSummary, topProducts } from './sales';
 
-export type ReportDeps = { config: ReportConfig; pool: pg.Pool; logger: Logger };
+export type ReportDeps = { config: ReportConfig; pool: pg.Pool; invoices: InvoiceRenderer; logger: Logger };
 
 const parse = <T extends z.ZodType>(schema: T, value: unknown): z.infer<T> => {
   const r = schema.safeParse(value);
@@ -24,7 +24,7 @@ const parse = <T extends z.ZodType>(schema: T, value: unknown): z.infer<T> => {
 const CSV_COLUMNS = ['number', 'date', 'status', 'customer', 'phone', 'region', 'service', 'payment', 'paymentStatus', 'items', 'subtotal', 'delivery', 'discount', 'total'] as const;
 const dollars = (cents: number) => (cents / 100).toFixed(2);
 
-export function createReportApp({ config, pool, logger }: ReportDeps) {
+export function createReportApp({ config, pool, invoices, logger }: ReportDeps) {
   const app = express();
   app.disable('x-powered-by');
   app.use(pinoHttp({ logger, genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(), autoLogging: { ignore: (req) => req.url === '/healthz' } }));
@@ -43,7 +43,7 @@ export function createReportApp({ config, pool, logger }: ReportDeps) {
     if (!id) throw new ReportError(404, 'NOT_FOUND', 'Invoice not found');
     const data = await getInvoiceData(pool, id);
     if (!data) throw new ReportError(404, 'NOT_FOUND', 'Invoice not found');
-    const pdf = await renderInvoicePdf(data, { name: config.storeName });
+    const pdf = await invoices.render(data, { name: config.storeName });
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="invoice-${data.number}.pdf"`,
