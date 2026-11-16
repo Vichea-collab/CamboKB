@@ -83,3 +83,46 @@ export async function createTestApp(
   };
   return { app: createApp(deps), prisma: deps.prisma, telegram, storage, deps };
 }
+
+import request from 'supertest';
+import { hashPassword } from '../src/auth/password';
+import type { Role } from '@prisma/client';
+
+let phoneSeq = 0;
+/** Unique valid Cambodian mobile numbers for tests: +85512000001, +85512000002, ... */
+export function nextPhone(): string {
+  phoneSeq += 1;
+  return `+85512${String(phoneSeq).padStart(6, '0')}`;
+}
+
+export const TEST_PASSWORD = 'kb-store-2026';
+
+export async function createUser(
+  db: PrismaClient,
+  opts: { phone?: string; password?: string; role?: Role; name?: string; telegramUserId?: number } = {},
+) {
+  return db.user.create({
+    data: {
+      phone: opts.phone ?? nextPhone(),
+      passwordHash: await hashPassword(opts.password ?? TEST_PASSWORD),
+      name: opts.name ?? 'Test User',
+      role: opts.role ?? 'CUSTOMER',
+      telegramUserId: opts.telegramUserId !== undefined ? BigInt(opts.telegramUserId) : undefined,
+      telegramChatId: opts.telegramUserId !== undefined ? BigInt(opts.telegramUserId) : undefined,
+    },
+  });
+}
+
+export async function loginAs(app: Express, phone: string, password = TEST_PASSWORD) {
+  const agent = request.agent(app);
+  const res = await agent.post('/api/v1/auth/login').set('Origin', WEB_ORIGIN).send({ phone, password });
+  if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
+  return agent;
+}
+
+/** Create a user and return a logged-in supertest agent. */
+export async function signedInAgent(app: Express, db: PrismaClient, opts: Parameters<typeof createUser>[1] = {}) {
+  const user = await createUser(db, opts);
+  const agent = await loginAs(app, user.phone, opts.password);
+  return { user, agent };
+}

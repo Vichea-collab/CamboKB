@@ -7,6 +7,9 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { Config } from './config';
 import type { Logger } from './logger';
+import { adminRouter } from './admin';
+import { authRouter } from './auth/routes';
+import { loadUser } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
 import type { StorageAdapter } from './storage/types';
@@ -57,6 +60,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(originCheck(config.webOrigin));
 
   const api = express.Router();
+  api.use(loadUser(deps));
+  api.use('/auth', authRouter(deps));
+  api.use('/admin', adminRouter(deps));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
