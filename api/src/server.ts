@@ -4,6 +4,7 @@ import { createLogger } from './logger';
 import { createPrisma } from './prisma';
 import { createStorage } from './storage';
 import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './telegram/client';
+import { startPolling } from './telegram/poller';
 
 async function main() {
   const config = loadConfig();
@@ -33,8 +34,19 @@ async function main() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-/** Telegram polling / webhook registration; filled in by the telegram module. */
-async function startBackground(_deps: Parameters<typeof createApp>[0]): Promise<() => void> {
+/** Telegram: long polling in development, webhook registration in production. */
+async function startBackground(deps: Parameters<typeof createApp>[0]): Promise<() => void> {
+  const { telegram, config, logger } = deps;
+  if (config.telegram.mode === 'polling') {
+    logger.info('Telegram: polling for updates');
+    return startPolling(deps);
+  }
+  if (config.telegram.mode === 'webhook' && config.telegram.webhookUrl && config.telegram.webhookSecret) {
+    await telegram
+      .setWebhook(config.telegram.webhookUrl, config.telegram.webhookSecret)
+      .then(() => logger.info('Telegram: webhook registered'))
+      .catch((err) => logger.error({ err }, 'Telegram: webhook registration failed'));
+  }
   return () => {};
 }
 
