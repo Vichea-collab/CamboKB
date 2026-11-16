@@ -1,0 +1,105 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #14171c;
+  --color-surface: #181c24;
+  --color-card: #141820;
+  --color-raised: #242b35;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.14);
+  --color-ink: #f9fafb;
+  --color-muted: #8e98a8;
+  --color-yellow: #ffb703;
+  --color-yellow-hover: #e0a100;
+  --color-green: #10b981;
+  --color-danger: #f87171;
+
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+
+  --shadow-pop: 0 10px 30px rgb(0 0 0 / 0.45);
+  --shadow-glow: 0 6px 20px rgb(255 183 3 / 0.28);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@utility field {
+  @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[15px] text-ink transition-colors placeholder:text-muted/70;
+  &:focus {
+    @apply border-yellow/70 outline-none;
+  }
+  &[aria-invalid='true'] {
+    @apply border-danger/70;
+  }
+}
+
+@utility label {
+  @apply mb-1.5 block text-sm font-semibold text-ink/90;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[15px] font-bold transition-[background-color,transform,opacity] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-yellow text-bg shadow-glow hover:bg-yellow-hover;
+}
+
+@utility btn-ghost {
+  @apply btn border border-line bg-surface text-ink hover:bg-raised;
+}
+
+@utility btn-danger {
+  @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+}
+
+@utility panel {
+  @apply rounded-2xl border border-line bg-surface;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
