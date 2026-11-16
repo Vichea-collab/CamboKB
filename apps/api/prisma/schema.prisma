@@ -1,0 +1,333 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum Region {
+  PHNOM_PENH
+  PROVINCE
+}
+
+enum DeliveryService {
+  GRAB
+  VET
+  JNT
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PACKED
+  SHIPPING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  KHQR
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PromoType {
+  FIXED
+  PERCENT
+}
+
+enum TelegramAuthPurpose {
+  SIGNUP
+  RESET
+  CHANGE_PHONE
+}
+
+enum TelegramAuthStatus {
+  PENDING
+  VERIFIED
+  COMPLETED
+  EXPIRED
+}
+
+model User {
+  id                String    @id @default(uuid()) @db.Uuid
+  phone             String    @unique
+  passwordHash      String
+  name              String
+  role              Role      @default(CUSTOMER)
+  telegramUserId    BigInt?   @unique
+  telegramChatId    BigInt?
+  telegramUsername  String?
+  passwordChangedAt DateTime?
+  disabledAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions     Session[]
+  addresses    Address[]
+  orders       Order[]
+  statusEvents OrderStatusEvent[]
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  extendedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TelegramAuthRequest {
+  id               String              @id @default(uuid()) @db.Uuid
+  tokenHash        String              @unique
+  purpose          TelegramAuthPurpose
+  status           TelegramAuthStatus  @default(PENDING)
+  phone            String?
+  expectedPhone    String?
+  telegramUserId   BigInt?
+  telegramChatId   BigInt?
+  telegramUsername String?
+  firstName        String?
+  userId           String?             @db.Uuid
+  expiresAt        DateTime
+  verifiedAt       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([telegramUserId, status])
+}
+
+model Address {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  label       String   @default("Default")
+  region      Region
+  addressLine String
+  lat         Float?
+  lng         Float?
+  isDefault   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Category {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String    @unique
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id             String   @id @default(uuid()) @db.Uuid
+  slug           String   @unique
+  name           String
+  categoryId     String   @db.Uuid
+  specsLine      String   @default("")
+  description    String   @default("")
+  priceCents     Int
+  compareAtCents Int?
+  stock          Int      @default(0)
+  isSoldOut      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  category   Category       @relation(fields: [categoryId], references: [id])
+  specs      ProductSpec[]
+  images     ProductImage[]
+  orderItems OrderItem[]
+
+  @@index([isActive, sortOrder])
+  @@index([categoryId])
+}
+
+model ProductSpec {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  label     String
+  value     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @db.Uuid
+  storageKey String
+  width      Int
+  height     Int
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Banner {
+  id         String   @id @default(uuid()) @db.Uuid
+  storageKey String
+  width      Int
+  height     Int
+  linkUrl    String?
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PromoCode {
+  id               String    @id @default(uuid()) @db.Uuid
+  code             String    @unique
+  type             PromoType
+  value            Int
+  minSubtotalCents Int       @default(0)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  maxUses          Int?
+  maxUsesPerUser   Int?
+  usedCount        Int       @default(0)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  orders           Order[]
+}
+
+model Order {
+  id               String          @id @default(uuid()) @db.Uuid
+  number           String          @unique @default(dbgenerated("('CS-'::text || nextval('order_number_seq'::regclass))"))
+  userId           String          @db.Uuid
+  status           OrderStatus     @default(PENDING)
+  contactName      String
+  contactPhone     String
+  region           Region
+  deliveryService  DeliveryService
+  addressLine      String
+  lat              Float?
+  lng              Float?
+  distanceKm       Float?
+  subtotalCents    Int
+  deliveryFeeCents Int
+  discountCents    Int             @default(0)
+  totalCents       Int
+  promoCodeId      String?         @db.Uuid
+  note             String?
+  idempotencyKey   String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id])
+  promoCode PromoCode?         @relation(fields: [promoCodeId], references: [id])
+  items     OrderItem[]
+  events    OrderStatusEvent[]
+  payment   Payment?
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model OrderItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  productId      String   @db.Uuid
+  name           String
+  priceCents     Int
+  imageKey       String?
+  quantity       Int
+  lineTotalCents Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+model OrderStatusEvent {
+  id          String       @id @default(uuid()) @db.Uuid
+  orderId     String       @db.Uuid
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  note        String?
+  actorUserId String?      @db.Uuid
+  at          DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([orderId])
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @unique @db.Uuid
+  method      PaymentMethod
+  status      PaymentStatus @default(UNPAID)
+  amountCents Int
+  currency    String        @default("USD")
+  provider    String?
+  providerRef String?
+  qrString    String?
+  expiresAt   DateTime?
+  paidAt      DateTime?
+  rawPayload  Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([providerRef])
+}
+
+model StoreSetting {
+  id             Int      @id @default(1)
+  storeName      String   @default("Cambo Supply")
+  delivery       Json
+  telegramNotify Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
