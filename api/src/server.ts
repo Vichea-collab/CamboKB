@@ -2,7 +2,7 @@ import { createApp } from './app';
 import { loadConfig } from './config';
 import { createLogger } from './logger';
 import { createPrisma } from './prisma';
-import { createStorage } from './storage';
+import { HttpFileClient } from './files/client';
 import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './telegram/client';
 import { startPolling } from './telegram/poller';
 
@@ -14,8 +14,8 @@ async function main() {
     config.telegram.mode === 'off' || !config.telegram.botToken
       ? new NoopTelegramClient((m) => logger.info(m))
       : new HttpTelegramClient(config.telegram.botToken);
-  const storage = createStorage(config);
-  const deps = { config, prisma, storage, telegram, logger };
+  const files = new HttpFileClient(config.services.fileUrl, config.services.fileSecret, config.services.publicFilesUrl);
+  const deps = { config, prisma, files, telegram, logger };
 
   const app = createApp(deps);
   const server = app.listen(config.port, () => logger.info(`API listening on :${config.port}`));

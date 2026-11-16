@@ -21,14 +21,11 @@ const envSchema = z
     TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
     TELEGRAM_WEBHOOK_URL: z.url().optional(),
     TELEGRAM_ADMIN_CHAT_ID: z.string().optional(),
-    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
-    UPLOADS_DIR: z.string().default('./uploads'),
-    PUBLIC_UPLOADS_URL: z.string().optional(),
-    S3_BUCKET: z.string().optional(),
-    S3_REGION: z.string().default('auto'),
-    S3_ENDPOINT: z.string().optional(),
-    S3_ACCESS_KEY_ID: z.string().optional(),
-    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    FILE_SERVICE_URL: z.url().default('http://localhost:4100'),
+    FILE_SERVICE_SECRET: z.string().default('dev-file-secret-change-me-0123456789'),
+    PUBLIC_FILES_URL: z.url().optional(),
+    REPORT_SERVICE_URL: z.url().default('http://localhost:4200'),
+    REPORT_SERVICE_SECRET: z.string().default('dev-report-secret-change-me-0123456789'),
     RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
     SERVE_WEB_DIR: z.string().optional(),
@@ -42,9 +39,11 @@ const envSchema = z
     if (e.TELEGRAM_MODE === 'webhook' && !e.TELEGRAM_WEBHOOK_SECRET) {
       ctx.addIssue({ code: 'custom', path: ['TELEGRAM_WEBHOOK_SECRET'], message: 'required for webhook mode' });
     }
-    if (e.STORAGE_DRIVER === 's3') {
-      for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'PUBLIC_UPLOADS_URL'] as const) {
-        if (!e[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'required for s3 storage' });
+    if (e.NODE_ENV === 'production') {
+      for (const key of ['FILE_SERVICE_SECRET', 'REPORT_SERVICE_SECRET'] as const) {
+        if (e[key].length < 32 || e[key].startsWith('dev-')) {
+          ctx.addIssue({ code: 'custom', path: [key], message: 'set a random secret of at least 32 characters' });
+        }
       }
     }
   });
@@ -67,11 +66,12 @@ export type Config = {
     webhookUrl?: string;
     adminChatId?: string;
   };
-  storage: {
-    driver: 'local' | 's3';
-    localDir: string;
-    publicBaseUrl: string;
-    s3?: { bucket: string; region: string; endpoint?: string; accessKeyId: string; secretAccessKey: string };
+  services: {
+    fileUrl: string;
+    fileSecret: string;
+    publicFilesUrl: string;
+    reportUrl: string;
+    reportSecret: string;
   };
   rateLimit: { loginMax: number; windowMs: number };
   serveWeb?: string;
@@ -102,20 +102,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       webhookUrl: e.TELEGRAM_WEBHOOK_URL,
       adminChatId: e.TELEGRAM_ADMIN_CHAT_ID,
     },
-    storage: {
-      driver: e.STORAGE_DRIVER,
-      localDir: e.UPLOADS_DIR,
-      publicBaseUrl: (e.PUBLIC_UPLOADS_URL ?? `http://localhost:${e.PORT}/uploads`).replace(/\/$/, ''),
-      s3:
-        e.STORAGE_DRIVER === 's3'
-          ? {
-              bucket: e.S3_BUCKET!,
-              region: e.S3_REGION,
-              endpoint: e.S3_ENDPOINT,
-              accessKeyId: e.S3_ACCESS_KEY_ID!,
-              secretAccessKey: e.S3_SECRET_ACCESS_KEY!,
-            }
-          : undefined,
+    services: {
+      fileUrl: e.FILE_SERVICE_URL.replace(/\/$/, ''),
+      fileSecret: e.FILE_SERVICE_SECRET,
+      publicFilesUrl: (e.PUBLIC_FILES_URL ?? `${e.FILE_SERVICE_URL.replace(/\/$/, '')}/files`).replace(/\/$/, ''),
+      reportUrl: e.REPORT_SERVICE_URL.replace(/\/$/, ''),
+      reportSecret: e.REPORT_SERVICE_SECRET,
     },
     rateLimit: { loginMax: e.RATE_LIMIT_LOGIN_MAX, windowMs: e.RATE_LIMIT_WINDOW_MS },
     serveWeb: e.SERVE_WEB_DIR,

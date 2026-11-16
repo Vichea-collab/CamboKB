@@ -13,13 +13,14 @@ import { loadUser } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
 import { telegramRouter } from './telegram/routes';
-import type { StorageAdapter } from './storage/types';
+import { catalogRouter } from './catalog/routes';
+import type { FileClient } from './files/client';
 import type { TelegramClient } from './telegram/client';
 
 export type AppDeps = {
   config: Config;
   prisma: PrismaClient;
-  storage: StorageAdapter;
+  files: FileClient;
   telegram: TelegramClient;
   logger: Logger;
 };
@@ -63,6 +64,7 @@ export function createApp(deps: AppDeps): express.Express {
   const api = express.Router();
   api.use(loadUser(deps));
   api.use('/auth', authRouter(deps));
+  api.use(catalogRouter(deps));
   api.use('/admin', adminRouter(deps));
   api.use('/telegram', telegramRouter(deps));
   app.use('/api/v1', api);
