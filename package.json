@@ -3,14 +3,17 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "shared",
+    "api",
+    "file",
+    "report",
+    "web"
   ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "npm run dev --workspace @cambo/api & npm run dev --workspace @cambo/web",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
