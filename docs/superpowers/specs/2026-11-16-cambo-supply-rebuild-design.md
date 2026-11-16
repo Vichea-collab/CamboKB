@@ -121,7 +121,7 @@ From the current page's code:
 - **Categories:** name, slug, sort order.
 - **Promo codes:** code, type (fixed / percent), value, minimum subtotal,
   start/end date, usage limit total and per user, active toggle.
-- **Customers:** list, view orders, disable account.
+- **Customers:** list, view orders, disable account, change role (admin ↔ customer).
 - **Reports:** sales by day/month with chart, top products, payment and
   region breakdown, CSV export; invoice PDF on every order.
 - **Settings:** store name, store coordinates, delivery rates and distance
@@ -323,7 +323,9 @@ All money in **integer cents (USD)**. All tables have `createdAt`, `updatedAt`.
   type (jpeg/png/webp) and size (≤8 MB), filenames never trusted.
 - **First admin**: the owner signs up normally through Telegram, then a CLI
   script promotes that phone (`npm run admin:promote -w api -- +855…`).
-  Admin role is never granted through the public API.
+  After that, admins can make other accounts admin (or back to customer) from
+  Admin → Customers; nobody can change their own role and the last admin can't
+  be removed. Customer-facing endpoints never grant roles.
 - **Secrets** only in server env. The current site's exposed Telegram bot
   token and Firebase key should be rotated by the owner.
 

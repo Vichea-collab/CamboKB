@@ -4,7 +4,9 @@ import { Link, useParams } from 'react-router';
 import { FormError } from '../components/AuthCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { api } from '../lib/api';
+import { useMe } from '../lib/auth';
 import type { Order } from '../lib/types';
+import { RoleControl } from './components/RoleControl';
 import { fmtDate, Loading, PageHeader } from './components/ui';
 import type { Customer } from './types';
 
@@ -15,6 +17,14 @@ export default function CustomerDetail() {
   const toggle = useMutation({
     mutationFn: (disable: boolean) => api(`/admin/customers/${id}/${disable ? 'disable' : 'enable'}`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'customer', id] }),
+  });
+  const me = useMe();
+  const role = useMutation({
+    mutationFn: (next: 'ADMIN' | 'CUSTOMER') => api(`/admin/customers/${id}/role`, { method: 'POST', body: { role: next } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customer', id] });
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+    },
   });
   if (!c.data) return <Loading />;
   const u = c.data;
@@ -27,8 +37,12 @@ export default function CustomerDetail() {
         <Info label="Orders" value={String(u.orderCount)} />
         <Info label="Spent (delivered)" value={formatUsd(u.totalSpentCents)} />
       </section>
-      <FormError>{toggle.error ? (toggle.error as Error).message : undefined}</FormError>
       <div className="mb-5">
+        <RoleControl role={u.role} name={u.name} isSelf={me.data?.id === u.id} busy={role.isPending} onChange={(next) => role.mutate(next)} />
+        <FormError>{role.error ? (role.error as Error).message : undefined}</FormError>
+      </div>
+      <FormError>{toggle.error ? (toggle.error as Error).message : undefined}</FormError>
+      <div className={`mb-5 ${me.data?.id === u.id ? 'hidden' : ''}`}>
         {u.disabled ? (
           <button className="btn-ghost" onClick={() => toggle.mutate(false)}>Enable account</button>
         ) : (

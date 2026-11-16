@@ -30,6 +30,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           {label}
         </NavLink>
       ))}
+      <Link to="/" className="mt-3 flex items-center gap-2 rounded-xl border border-line px-3.5 py-2.5 text-sm font-semibold text-ink hover:bg-raised">
+        <span aria-hidden>🛒</span> Go to shop
+      </Link>
     </nav>
   );
   return (
@@ -41,9 +44,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       </aside>
       <header className="no-print sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-3 backdrop-blur lg:hidden">
         <Brand />
-        <button className="btn-ghost px-3 py-2 text-sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="admin-menu">
-          Menu
-        </button>
+        <div className="flex gap-2">
+          <Link to="/" className="btn-ghost px-3 py-2 text-sm">
+            Shop
+          </Link>
+          <button className="btn-ghost px-3 py-2 text-sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="admin-menu">
+            Menu
+          </button>
+        </div>
       </header>
       {open && (
         <div id="admin-menu" className="no-print border-b border-line bg-surface px-4 py-3 lg:hidden">

@@ -66,6 +66,25 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
       if (disabled) await revokeAllSessions(prisma, id);
       res.json({ ...toPublicUser(u), disabled });
     };
+  // Make someone an admin or a customer again. Takes effect on their next request
+  // (the role is read from the database every time).
+  r.post('/customers/:id/role', validate({ params: idParams, body: z.object({ role: z.enum(['ADMIN', 'CUSTOMER']) }) }), async (req, res) => {
+    const { id } = req.valid.params as { id: string };
+    const { role } = req.valid.body as { role: 'ADMIN' | 'CUSTOMER' };
+    if (id === req.user!.id) throw new AppError(400, 'CANNOT_CHANGE_OWN_ROLE', "You can't change your own role");
+    const user = await prisma.$transaction(async (tx) => {
+      // Lock the admin rows so two admins can't demote each other at the same moment.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE role = 'ADMIN' FOR UPDATE`;
+      const target = await tx.user.findUnique({ where: { id } });
+      if (!target) throw notFound('Customer');
+      if (target.role === 'ADMIN' && role === 'CUSTOMER' && (await tx.user.count({ where: { role: 'ADMIN' } })) <= 1) {
+        throw new AppError(409, 'LAST_ADMIN', 'The store needs at least one admin');
+      }
+      return tx.user.update({ where: { id }, data: { role } });
+    });
+    res.json({ ...toPublicUser(user), disabled: Boolean(user.disabledAt) });
+  });
+
   r.post('/customers/:id/disable', validate({ params: idParams }), setDisabled(true));
   r.post('/customers/:id/enable', validate({ params: idParams }), setDisabled(false));
 
