@@ -17,12 +17,15 @@ import { accountRouter } from './account/routes';
 import { catalogRouter } from './catalog/routes';
 import { checkoutRouter } from './checkout/routes';
 import type { FileClient } from './files/client';
+import type { ReportClient } from './reports/client';
+import { customerInvoiceRouter } from './reports/routes';
 import type { TelegramClient } from './telegram/client';
 
 export type AppDeps = {
   config: Config;
   prisma: PrismaClient;
   files: FileClient;
+  reports: ReportClient;
   telegram: TelegramClient;
   logger: Logger;
 };
@@ -67,6 +70,7 @@ export function createApp(deps: AppDeps): express.Express {
   api.use(loadUser(deps));
   api.use('/auth', authRouter(deps));
   api.use(catalogRouter(deps));
+  api.use(customerInvoiceRouter(deps));
   api.use(checkoutRouter(deps));
   api.use(accountRouter(deps));
   api.use('/admin', adminRouter(deps));

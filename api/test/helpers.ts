@@ -5,6 +5,7 @@ import { loadConfig, type Config } from '../src/config';
 import { createLogger } from '../src/logger';
 import { buildImageUrls, type FileClient } from '../src/files/client';
 import { AppError } from '../src/errors';
+import type { ReportClient } from '../src/reports/client';
 import type { TelegramClient } from '../src/telegram/client';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
@@ -68,6 +69,20 @@ export class FakeFileClient implements FileClient {
   }
 }
 
+/** Stands in for the report service: records calls, returns a fake PDF / JSON. */
+export class FakeReportClient implements ReportClient {
+  calls: { path: string; query: Record<string, string> }[] = [];
+  async invoicePdf(orderId: string) {
+    this.calls.push({ path: `/internal/invoices/${orderId}.pdf`, query: {} });
+    return Buffer.from(`%PDF-1.7 fake invoice ${orderId}`);
+  }
+  async get(path: string, query: Record<string, string>) {
+    this.calls.push({ path, query });
+    if (path.endsWith('.csv')) return { body: Buffer.from('number,total\r\n'), contentType: 'text/csv; charset=utf-8' };
+    return { body: Buffer.from(JSON.stringify({ path, query })), contentType: 'application/json; charset=utf-8' };
+  }
+}
+
 /** Smallest valid PNG header bytes, enough for FakeFileClient's signature check. */
 export const TINY_PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
@@ -84,18 +99,20 @@ export async function resetDb(db: PrismaClient = testPrisma()) {
 
 export async function createTestApp(
   overrides: Partial<AppDeps> = {},
-): Promise<{ app: Express; prisma: PrismaClient; telegram: FakeTelegramClient; files: FakeFileClient; deps: AppDeps }> {
+): Promise<{ app: Express; prisma: PrismaClient; telegram: FakeTelegramClient; files: FakeFileClient; reports: FakeReportClient; deps: AppDeps }> {
   const telegram = new FakeTelegramClient();
   const files = new FakeFileClient();
+  const reports = new FakeReportClient();
   const deps: AppDeps = {
     config: testConfig(),
     prisma: testPrisma(),
     files,
+    reports,
     telegram,
     logger: createLogger('silent'),
     ...overrides,
   };
-  return { app: createApp(deps), prisma: deps.prisma, telegram, files, deps };
+  return { app: createApp(deps), prisma: deps.prisma, telegram, files, reports, deps };
 }
 
 import request from 'supertest';

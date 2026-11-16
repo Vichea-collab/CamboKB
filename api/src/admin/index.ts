@@ -7,6 +7,7 @@ import { adminCustomersRouter } from './customers';
 import { adminOrdersRouter } from './orders';
 import { adminProductsRouter } from './products';
 import { adminPromosRouter } from './promos';
+import { adminReportsRouter } from '../reports/routes';
 import { adminSettingsRouter } from './settings';
 import { adminStatsRouter } from './stats';
 
@@ -21,5 +22,6 @@ export function adminRouter(deps: AppDeps): Router {
   r.use(adminCustomersRouter(deps));
   r.use(adminSettingsRouter(deps));
   r.use(adminStatsRouter(deps));
+  r.use(adminReportsRouter(deps));
   return r;
 }

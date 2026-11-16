@@ -13,3 +13,14 @@ describe('normalizePhone', () => {
     expect(normalizePhone(input)).toBeNull();
   });
 });
+
+import { formatPhone } from './phone';
+
+describe('formatPhone', () => {
+  it('formats E.164 for display', () => {
+    expect(formatPhone('+85512345678')).toBe('+855 12 345 678');
+  });
+  it('returns the input when it cannot be parsed', () => {
+    expect(formatPhone('n/a')).toBe('n/a');
+  });
+});

@@ -18,3 +18,9 @@ export function maskPhone(e164: string): string {
   const cc = e164.startsWith('+855') ? '+855' : e164.slice(0, e164.length - 8);
   return `${cc} •• ••• ${tail}`;
 }
+
+/** "+85512345678" → "+855 12 345 678" */
+export function formatPhone(e164: string): string {
+  const parsed = parsePhoneNumberFromString(e164);
+  return parsed ? parsed.formatInternational() : e164;
+}
