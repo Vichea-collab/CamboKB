@@ -63,6 +63,11 @@ export const t = {
     resetStart: 'Verify with Telegram',
     resetSave: 'Save new password',
     phoneTaken: 'This number already has an account. Log in or reset your password.',
+    invalidPhone: 'Enter a valid Cambodian phone number.',
+    passwordShort: 'Use at least 8 characters.',
+    passwordCommon: 'That password is too common. Pick another.',
+    openTelegramHint: 'Telegram didn’t open?',
+    verifiedReset: 'Verified. Choose a new password.',
   },
   account: {
     title: 'Account',
