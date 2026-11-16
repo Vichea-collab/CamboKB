@@ -1,0 +1,67 @@
+# Local stack: Postgres + all four services.
+#   docker compose up --build        → shop on http://localhost:8080
+#   docker compose up db             → just Postgres, for `npm run dev`
+# Development secrets only. Production: see docker-compose.prod.yml.
+
+name: cambo-supply
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cambo
+      POSTGRES_PASSWORD: cambo
+      POSTGRES_DB: cambo_supply
+    ports: ['5432:5432']
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_supply']
+      interval: 5s
+      retries: 10
+
+  file:
+    build: { context: ., dockerfile: docker/file.Dockerfile }
+    environment:
+      FILE_SERVICE_SECRET: dev-file-secret-change-me-0123456789
+      CORS_ORIGIN: http://localhost:8080
+    volumes: [uploads:/data/uploads]
+
+  report:
+    build: { context: ., dockerfile: docker/report.Dockerfile }
+    environment:
+      REPORT_DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
+      REPORT_SERVICE_SECRET: dev-report-secret-change-me-0123456789
+    depends_on: { db: { condition: service_healthy } }
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    environment:
+      DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
+      WEB_ORIGIN: http://localhost:8080
+      TRUST_PROXY: 'true'
+      FILE_SERVICE_URL: http://file:4100
+      FILE_SERVICE_SECRET: dev-file-secret-change-me-0123456789
+      PUBLIC_FILES_URL: http://localhost:8080/files
+      REPORT_SERVICE_URL: http://report:4200
+      REPORT_SERVICE_SECRET: dev-report-secret-change-me-0123456789
+      # Telegram: copy your bot settings from api/.env (never commit the token)
+      TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+    depends_on:
+      db: { condition: service_healthy }
+      file: { condition: service_started }
+      report: { condition: service_started }
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args: { VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME:-}' }
+    ports: ['8080:80']
+    depends_on: [api, file]
+
+volumes:
+  db-data:
+  uploads:

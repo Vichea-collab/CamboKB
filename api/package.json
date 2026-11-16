@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "prisma:migrate": "prisma migrate deploy",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
-    "admin:promote": "tsx --env-file-if-exists=.env scripts/promote-admin.ts"
+    "admin:promote": "tsx --env-file-if-exists=.env scripts/promote-admin.ts",
+    "db:seed:prod": "node dist/seed.js",
+    "admin:promote:prod": "node dist/promote-admin.js"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
@@ -23,7 +25,6 @@
     "@types/multer": "2.3.0",
     "@types/supertest": "7.2.1",
     "pino-pretty": "13.2.0",
-    "prisma": "6.19.3",
     "supertest": "7.3.2",
     "tsup": "8.5.1",
     "tsx": "4.23.15"
@@ -40,6 +41,7 @@
     "multer": "2.5.0",
     "pino": "10.4.0",
     "pino-http": "11.0.0",
+    "prisma": "6.19.3",
     "zod": "4.6.7"
   }
 }
