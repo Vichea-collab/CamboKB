@@ -13,7 +13,9 @@ import { loadUser } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
 import { telegramRouter } from './telegram/routes';
+import { accountRouter } from './account/routes';
 import { catalogRouter } from './catalog/routes';
+import { checkoutRouter } from './checkout/routes';
 import type { FileClient } from './files/client';
 import type { TelegramClient } from './telegram/client';
 
@@ -65,6 +67,8 @@ export function createApp(deps: AppDeps): express.Express {
   api.use(loadUser(deps));
   api.use('/auth', authRouter(deps));
   api.use(catalogRouter(deps));
+  api.use(checkoutRouter(deps));
+  api.use(accountRouter(deps));
   api.use('/admin', adminRouter(deps));
   api.use('/telegram', telegramRouter(deps));
   app.use('/api/v1', api);
