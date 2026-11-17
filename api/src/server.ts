@@ -1,12 +1,12 @@
-import { createApp } from './app';
+import { createApp } from './http/app';
 import { loadConfig } from './config';
-import { createLogger } from './logger';
-import { createPrisma } from './prisma';
-import { HttpFileClient } from './files/client';
-import { HttpReportClient } from './reports/client';
-import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './telegram/client';
-import { startPolling } from './telegram/poller';
-import { setupBot } from './telegram/setup';
+import { createLogger } from './lib/logger';
+import { createPrisma } from './db/prisma';
+import { HttpFileClient } from './integrations/files/client';
+import { HttpReportClient } from './integrations/reports/client';
+import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './integrations/telegram/client';
+import { startPolling } from './modules/bot/poller';
+import { setupBot } from './modules/bot/setup';
 
 async function main() {
   const config = loadConfig();

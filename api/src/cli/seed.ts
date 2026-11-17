@@ -2,8 +2,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
-import { slugify, uniqueProductSlug } from '../admin/products';
-import type { FileClient } from '../files/client';
+import { slugify, uniqueProductSlug } from '../modules/catalog/admin-products';
+import type { FileClient } from '../integrations/files/client';
 
 type ScrapedProduct = {
   n: number;

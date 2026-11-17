@@ -1,12 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import type { Express } from 'express';
-import { createApp, type AppDeps } from '../src/app';
+import { createApp, type AppDeps } from '../src/http/app';
 import { loadConfig, type Config } from '../src/config';
-import { createLogger } from '../src/logger';
-import { buildImageUrls, type FileClient } from '../src/files/client';
-import { AppError } from '../src/errors';
-import type { ReportClient } from '../src/reports/client';
-import type { TelegramClient } from '../src/telegram/client';
+import { createLogger } from '../src/lib/logger';
+import { buildImageUrls, type FileClient } from '../src/integrations/files/client';
+import { AppError } from '../src/http/errors';
+import type { ReportClient } from '../src/integrations/reports/client';
+import type { TelegramClient } from '../src/integrations/telegram/client';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
 export const WEB_ORIGIN = 'http://localhost:5173';
@@ -127,7 +127,7 @@ export async function createTestApp(
 }
 
 import request from 'supertest';
-import { hashPassword } from '../src/auth/password';
+import { hashPassword } from '../src/modules/auth/password';
 import type { Role } from '@prisma/client';
 
 let phoneSeq = 0;

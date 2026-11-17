@@ -1,6 +1,6 @@
 import { promoteAdmin } from '../src/cli/promote';
 import { loadConfig } from '../src/config';
-import { createPrisma } from '../src/prisma';
+import { createPrisma } from '../src/db/prisma';
 
 // Usage: npm run admin:promote -w api -- +85512345678
 const phone = process.argv[2];

@@ -2,8 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { seedCatalog } from '../src/cli/seed';
 import { loadConfig } from '../src/config';
-import { HttpFileClient } from '../src/files/client';
-import { createPrisma } from '../src/prisma';
+import { HttpFileClient } from '../src/integrations/files/client';
+import { createPrisma } from '../src/db/prisma';
 
 // Usage: npm run db:seed  (needs the file service running: npm run dev -w file)
 const here = path.dirname(fileURLToPath(import.meta.url));
