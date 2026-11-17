@@ -56,9 +56,22 @@ export const deliverySettingsSchema = z.object({
   grabBeyondFeeCents: cents,
 });
 
+/** Public contact details and policy text shown on the info pages and in the footer. */
+export const storeInfoSchema = z.object({
+  phone: z.string().trim().max(40).default(''),
+  telegram: z.string().trim().regex(/^$|^@?[A-Za-z0-9_]{3,32}$/, 'Use a Telegram username like Cambo_KB_Bot').transform((v) => v.replace(/^@/, '')).default(''),
+  facebook: z.string().trim().max(200).refine((v) => v === '' || /^https:\/\//i.test(v), 'Link must start with https://').default(''),
+  address: z.string().trim().max(300).default(''),
+  hours: z.string().trim().max(200).default(''),
+  warranty: z.string().trim().max(4000).default(''),
+});
+export type StoreInfo = z.infer<typeof storeInfoSchema>;
+export const EMPTY_STORE_INFO: StoreInfo = { phone: '', telegram: '', facebook: '', address: '', hours: '', warranty: '' };
+
 export const settingsInputSchema = z.object({
   storeName: z.string().trim().min(1).max(60),
   delivery: deliverySettingsSchema,
+  info: storeInfoSchema.default(EMPTY_STORE_INFO),
   telegramNotify: z.boolean(),
 });
 

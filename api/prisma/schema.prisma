@@ -327,6 +327,7 @@ model StoreSetting {
   id             Int      @id @default(1)
   storeName      String   @default("Cambo Supply")
   delivery       Json
+  info           Json     @default("{}")
   telegramNotify Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

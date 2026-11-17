@@ -12,6 +12,7 @@ import { authRouter } from './auth/routes';
 import { loadUser } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
+import { storeRouter } from './store/routes';
 import { telegramRouter } from './telegram/routes';
 import { accountRouter } from './account/routes';
 import { catalogRouter } from './catalog/routes';
@@ -70,6 +71,7 @@ export function createApp(deps: AppDeps): express.Express {
   api.use(loadUser(deps));
   api.use('/auth', authRouter(deps));
   api.use(catalogRouter(deps));
+  api.use(storeRouter(deps));
   api.use(customerInvoiceRouter(deps));
   api.use(checkoutRouter(deps));
   api.use(accountRouter(deps));
