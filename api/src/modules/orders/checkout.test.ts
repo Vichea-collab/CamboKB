@@ -124,13 +124,10 @@ describe('checkout', () => {
     expect((await ctx.prisma.product.findUniqueOrThrow({ where: { id: mouse.id } })).stock).toBe(3);
   });
 
-  it('offers cash on delivery only in Phnom Penh, and not KHQR yet', async () => {
+  it('offers cash on delivery only in Phnom Penh', async () => {
     const province = await order(agent, orderBody({ region: 'PROVINCE' }));
     expect(province.status).toBe(422);
     expect(province.body.error.code).toBe('PAYMENT_METHOD_UNAVAILABLE');
-    const khqr = await order(agent, orderBody({ paymentMethod: 'KHQR' }));
-    expect(khqr.status).toBe(422);
-    expect(khqr.body.error.code).toBe('PAYMENT_METHOD_UNAVAILABLE');
   });
 
   it('sells the last unit to exactly one of two simultaneous buyers', async () => {

@@ -6,6 +6,7 @@ import { createLogger } from '../src/lib/logger';
 import { buildImageUrls, type FileClient } from '../src/integrations/files/client';
 import { AppError } from '../src/http/errors';
 import type { ReportClient } from '../src/integrations/reports/client';
+import { BakongError, type BakongCheck, type BakongClient } from '../src/integrations/bakong/client';
 import type { TelegramClient } from '../src/integrations/telegram/client';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
@@ -27,6 +28,8 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     TELEGRAM_WEBHOOK_SECRET: 'test-webhook-secret',
     TELEGRAM_ADMIN_CHAT_ID: '5000',
     TELEGRAM_MODE: 'webhook',
+    BAKONG_ACCOUNT_ID: 'cambosupply@aclb',
+    BAKONG_TOKEN: 'test-bakong-token',
   });
   return { ...base, ...overrides };
 }
@@ -94,6 +97,32 @@ export class FakeReportClient implements ReportClient {
   }
 }
 
+/** Stands in for the Bakong Open API: pay a QR with `pay(md5)`; every lookup is recorded. */
+export class FakeBakongClient implements BakongClient {
+  paid = new Map<string, Extract<BakongCheck, { found: true }>>();
+  calls: string[] = [];
+  failWith: BakongError | null = null;
+  pay(md5: string, over: Partial<Extract<BakongCheck, { found: true }>> = {}) {
+    this.paid.set(md5, {
+      found: true,
+      hash: `hash-${md5.slice(0, 8)}`,
+      amount: 0,
+      currency: 'USD',
+      fromAccountId: 'customer@aba',
+      toAccountId: 'cambosupply@aclb',
+      paidAt: new Date(),
+      raw: { md5 },
+      ...over,
+    });
+  }
+  async checkByMd5(md5: string): Promise<BakongCheck> {
+    this.calls.push(md5);
+    if (this.failWith) throw this.failWith;
+    return this.paid.get(md5) ?? { found: false };
+  }
+}
+export { BakongError };
+
 /** Smallest valid PNG header bytes, enough for FakeFileClient's signature check. */
 export const TINY_PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
@@ -110,20 +139,22 @@ export async function resetDb(db: PrismaClient = testPrisma()) {
 
 export async function createTestApp(
   overrides: Partial<AppDeps> = {},
-): Promise<{ app: Express; prisma: PrismaClient; telegram: FakeTelegramClient; files: FakeFileClient; reports: FakeReportClient; deps: AppDeps }> {
+): Promise<{ app: Express; prisma: PrismaClient; telegram: FakeTelegramClient; files: FakeFileClient; reports: FakeReportClient; bakong: FakeBakongClient; deps: AppDeps }> {
   const telegram = new FakeTelegramClient();
   const files = new FakeFileClient();
   const reports = new FakeReportClient();
+  const bakong = new FakeBakongClient();
   const deps: AppDeps = {
     config: testConfig(),
     prisma: testPrisma(),
     files,
     reports,
+    bakong,
     telegram,
     logger: createLogger('silent'),
     ...overrides,
   };
-  return { app: createApp(deps), prisma: deps.prisma, telegram, files, reports, deps };
+  return { app: createApp(deps), prisma: deps.prisma, telegram, files, reports, bakong: deps.bakong as FakeBakongClient, deps };
 }
 
 import request from 'supertest';

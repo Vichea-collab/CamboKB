@@ -18,6 +18,7 @@ import { cancelOrder, orderInclude, toOrderDto } from './orders';
 import { AppError, notFound } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
 import { notifyCustomer } from '../bot/notify';
+import { checkKhqrPayment } from '../payments/khqr';
 
 const idParams = z.object({ id: uuidSchema });
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -83,6 +84,14 @@ export function adminOrdersRouter(deps: AppDeps): Router {
       await tx.orderStatusEvent.create({ data: { orderId: id, fromStatus: order.status, toStatus: status, note: note ?? null, actorUserId: req.user!.id } });
     });
     void notifyCustomer(deps, id, status);
+    res.json(await detail(id));
+  });
+
+  r.post('/orders/:id/payment/check', validate({ params: idParams }), async (req, res) => {
+    const { id } = req.valid.params as { id: string };
+    const payment = await prisma.payment.findUnique({ where: { orderId: id } });
+    if (!payment) throw notFound('Payment');
+    if (payment.method === 'KHQR') await checkKhqrPayment(deps, payment.id, { force: true });
     res.json(await detail(id));
   });
 

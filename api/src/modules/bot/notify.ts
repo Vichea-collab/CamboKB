@@ -55,8 +55,12 @@ export async function notifyNewOrder(deps: AppDeps, orderId: string, backoffMs: 
   }
 }
 
-const STATUS_MESSAGE: Record<OrderStatus, string> = {
+export type CustomerEvent = OrderStatus | 'PAID' | 'PAYMENT_EXPIRED';
+
+const STATUS_MESSAGE: Record<CustomerEvent, string> = {
   PENDING: '✅ We received your order {n}. Total {total}. We will confirm it shortly.',
+  PAID: '💳 Payment received for order {n} ({total}). Your order is confirmed.',
+  PAYMENT_EXPIRED: "⏰ Order {n} was cancelled because it wasn't paid within {hold} minutes. You can order again any time.",
   CONFIRMED: '👍 Your order {n} is confirmed.',
   PACKED: '📦 Your order {n} is packed and ready.',
   SHIPPING: '🚚 Your order {n} is on the way.',
@@ -70,14 +74,20 @@ const STATUS_MESSAGE: Record<OrderStatus, string> = {
  * and the admin's status change always succeed even when Telegram is down. Internal
  * admin notes are never included.
  */
-export async function notifyCustomer(deps: AppDeps, orderId: string, status: OrderStatus, backoffMs: number[] = [1000]): Promise<void> {
+export async function notifyCustomer(deps: AppDeps, orderId: string, status: CustomerEvent, backoffMs: number[] = [1000]): Promise<void> {
   const { prisma, telegram, config, logger } = deps;
   try {
-    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { user: true } });
+    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { user: true, payment: true } });
     const chatId = order?.user.telegramChatId;
     if (!order || !chatId || order.user.disabledAt) return;
     const text = [
-      STATUS_MESSAGE[status].replace('{n}', order.number).replace('{total}', formatUsd(order.totalCents)),
+      (status === 'PENDING' && order.payment?.method === 'KHQR' && order.payment.status === 'PENDING'
+        ? '🧾 We received your order {n}. Pay {total} with KHQR within {hold} minutes to confirm it.'
+        : STATUS_MESSAGE[status]
+      )
+        .replace('{n}', order.number)
+        .replace('{total}', formatUsd(order.totalCents))
+        .replace('{hold}', String(config.bakong.holdMinutes)),
       '',
       `${config.webOrigin[0] ?? ''}/account/orders/${order.number}`,
     ].join('\n');
@@ -92,5 +102,19 @@ export async function notifyCustomer(deps: AppDeps, orderId: string, status: Ord
     }
   } catch (err) {
     logger.warn({ err, orderId, status }, 'customer Telegram message failed');
+  }
+}
+
+/** A plain message to the admin chat (if set up and alerts are on). Never throws. */
+export async function notifyAdmin(deps: AppDeps, text: string): Promise<void> {
+  const { prisma, telegram, config, logger } = deps;
+  try {
+    const chatId = config.telegram.adminChatId;
+    if (!chatId) return;
+    const settings = await prisma.storeSetting.findUnique({ where: { id: 1 } });
+    if (settings && !settings.telegramNotify) return;
+    await telegram.sendMessage(chatId, text);
+  } catch (err) {
+    logger.warn({ err }, 'admin Telegram message failed');
   }
 }

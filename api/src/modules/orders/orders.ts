@@ -51,7 +51,7 @@ export function toOrderDto(o: OrderWithRelations, files: FileClient) {
     })),
     events: o.events.map((e) => ({ fromStatus: e.fromStatus, toStatus: e.toStatus, note: e.note, at: e.at })),
     payment: o.payment
-      ? { method: o.payment.method, status: o.payment.status, amountCents: o.payment.amountCents, paidAt: o.payment.paidAt }
+      ? { method: o.payment.method, status: o.payment.status, amountCents: o.payment.amountCents, paidAt: o.payment.paidAt, payBefore: o.payment.expiresAt }
       : null,
   };
 }
@@ -71,11 +71,11 @@ export async function createOrder(
     if (existing) return { order: existing, created: false };
   }
   const provider = getPaymentProvider(input.paymentMethod);
-  if (!provider.isAvailable({ region: input.region })) {
+  if (!provider.isAvailable(deps, { region: input.region })) {
     throw new AppError(
       422,
       'PAYMENT_METHOD_UNAVAILABLE',
-      input.paymentMethod === 'KHQR' ? 'KHQR payment is coming soon' : 'Cash on delivery is only available in Phnom Penh',
+      input.paymentMethod === 'KHQR' ? 'KHQR payment is not available right now' : 'Cash on delivery is only available in Phnom Penh',
     );
   }
 
@@ -119,7 +119,7 @@ export async function createOrder(
             events: { create: { fromStatus: null, toStatus: 'PENDING', actorUserId: userId } },
           },
         });
-        await provider.createPayment(tx, created);
+        await provider.createPayment(deps, tx, created);
         return tx.order.findUniqueOrThrow({ where: { id: created.id }, include: orderInclude });
       },
       { maxWait: 10_000, timeout: 20_000 },
@@ -142,7 +142,8 @@ export async function createOrder(
 export async function cancelOrder(
   tx: Prisma.TransactionClient,
   order: Order & { items: OrderItem[] },
-  actorUserId: string,
+  /** null when the system cancels (e.g. an unpaid KHQR order). */
+  actorUserId: string | null,
   note?: string,
 ) {
   for (const item of order.items) {

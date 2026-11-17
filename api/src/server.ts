@@ -2,11 +2,13 @@ import { createApp } from './http/app';
 import { loadConfig } from './config';
 import { createLogger } from './lib/logger';
 import { createPrisma } from './db/prisma';
+import { HttpBakongClient } from './integrations/bakong/client';
 import { HttpFileClient } from './integrations/files/client';
 import { HttpReportClient } from './integrations/reports/client';
 import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './integrations/telegram/client';
 import { startPolling } from './modules/bot/poller';
 import { setupBot } from './modules/bot/setup';
+import { startKhqrSweeper } from './modules/payments/khqr';
 
 async function main() {
   const config = loadConfig();
@@ -18,15 +20,19 @@ async function main() {
       : new HttpTelegramClient(config.telegram.botToken);
   const files = new HttpFileClient(config.services.fileUrl, config.services.fileSecret, config.services.publicFilesUrl);
   const reports = new HttpReportClient(config.services.reportUrl, config.services.reportSecret);
-  const deps = { config, prisma, files, reports, telegram, logger };
+  const bakong = new HttpBakongClient(config.bakong.apiUrl, config.bakong.token);
+  const deps = { config, prisma, files, reports, bakong, telegram, logger };
 
   const app = createApp(deps);
   const server = app.listen(config.port, () => logger.info(`API listening on :${config.port}`));
   const stopBackground = await startBackground(deps);
+  const stopSweeper = config.bakong.enabled ? startKhqrSweeper(deps) : () => {};
+  if (!config.bakong.enabled) logger.info('KHQR payments off (set BAKONG_ACCOUNT_ID and BAKONG_TOKEN to turn them on)');
 
   const shutdown = (signal: string) => {
     logger.info(`${signal} received, shutting down`);
     stopBackground();
+    stopSweeper();
     server.close(async () => {
       await prisma.$disconnect();
       process.exit(0);

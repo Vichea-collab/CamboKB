@@ -392,15 +392,37 @@ Owner's decision: invoices and sales reports.
 - **Docs**: README (setup, env vars, deploy, creating an admin) and
   `.env.example` for each app.
 
-## 13. Payment readiness (for the KHQR / Bakong phase)
+## 13. KHQR payments (Bakong)
 
-Not built now, but the design leaves a clean slot:
-- `Payment` table already holds provider ref, QR string, expiry, raw payload.
-- A `PaymentProvider` interface in the API (`createCharge`, `checkStatus`,
-  `handleWebhook`) with a `CodProvider` implemented now; `KhqrProvider` added
-  later (generate KHQR via Bakong, poll/check transaction by md5, mark PAID).
-- Checkout UI already has the payment-method step; KHQR option is shown as
-  "coming soon".
+Owner's decisions (2026-11-17): unpaid KHQR orders are cancelled after 30
+minutes; a confirmed payment auto-confirms the order.
+
+- **QR:** generated server-side with NBC's official `bakong-khqr` SDK as an
+  *individual* KHQR to the store's Bakong account (`BAKONG_ACCOUNT_ID`, e.g.
+  `name@aclb`), USD, exact order total, bill number = order number. Dynamic
+  KHQR must carry an expiry: each QR lives 10 minutes (`KHQR_QR_TTL_MINUTES`)
+  and never past the order's 30-minute hold (`KHQR_ORDER_HOLD_MINUTES`), so no
+  valid QR exists once an order can be cancelled. The customer can ask for a
+  new QR; every QR's md5 is kept (`KhqrCode` table) and checked, so paying an
+  older, still-valid QR is never missed.
+- **Verification:** the api asks the Bakong Open API
+  (`POST /v1/check_transaction_by_md5`, bearer `BAKONG_TOKEN`) — while the
+  customer waits on the payment page (polled, throttled to one Bakong call per
+  payment every 5 s) and from a background sweep every 20 s. A transaction only
+  counts if amount, currency (USD) and receiving account match.
+- **Paid:** payment → PAID (hash, payer account, raw response kept), order
+  PENDING → CONFIRMED (system event "Paid with KHQR"), Telegram to customer and
+  admin. Paid after the order was already cancelled → payment PAID, order left
+  cancelled, admin alerted to refund or restore by hand.
+- **Unpaid:** at hold expiry plus a 2-minute grace, one last Bakong check;
+  still unpaid → payment EXPIRED, order CANCELLED, stock and promo use given
+  back, customer told on Telegram.
+- **Where it's offered:** everywhere (Phnom Penh and provinces) when both
+  `BAKONG_ACCOUNT_ID` and `BAKONG_TOKEN` are set; COD stays Phnom Penh only.
+- **Operational:** the Bakong token expires every 90 days; a rejected token
+  alerts the admin chat (at most hourly) and payments fall back to "waiting".
+  The Bakong API may only answer requests from Cambodian IP addresses:
+  `BAKONG_API_URL` can point at a relay if the api is hosted abroad.
 
 ## 14. Decided by the owner
 

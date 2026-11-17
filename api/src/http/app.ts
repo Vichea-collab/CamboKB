@@ -19,7 +19,9 @@ import { accountRouter } from '../modules/account/routes';
 import { catalogRouter } from '../modules/catalog/routes';
 import { checkoutRouter } from '../modules/orders/routes';
 import type { FileClient } from '../integrations/files/client';
+import type { BakongClient } from '../integrations/bakong/client';
 import type { ReportClient } from '../integrations/reports/client';
+import { paymentRouter } from '../modules/payments/routes';
 import { customerInvoiceRouter } from '../modules/reports/routes';
 import type { TelegramClient } from '../integrations/telegram/client';
 
@@ -28,6 +30,7 @@ export type AppDeps = {
   prisma: PrismaClient;
   files: FileClient;
   reports: ReportClient;
+  bakong: BakongClient;
   telegram: TelegramClient;
   logger: Logger;
 };
@@ -75,6 +78,7 @@ export function createApp(deps: AppDeps): express.Express {
   api.use(catalogRouter(deps));
   api.use(storeRouter(deps));
   api.use(customerInvoiceRouter(deps));
+  api.use(paymentRouter(deps));
   api.use(checkoutRouter(deps));
   api.use(accountRouter(deps));
   api.use('/admin', adminRouter(deps));

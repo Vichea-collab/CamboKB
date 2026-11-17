@@ -4,7 +4,7 @@ import type { AppDeps } from '../../http/app';
 import { getDeliverySettings } from '../orders/quote';
 
 /** Public store details for the footer and info pages. Never exposes the exact store location. */
-export function storeRouter({ prisma }: AppDeps): Router {
+export function storeRouter({ prisma, config }: AppDeps): Router {
   const r = Router();
   r.get('/store', async (_req, res) => {
     const [row, delivery] = await Promise.all([prisma.storeSetting.findUnique({ where: { id: 1 } }), getDeliverySettings(prisma)]);
@@ -13,6 +13,7 @@ export function storeRouter({ prisma }: AppDeps): Router {
       storeName: row?.storeName ?? 'Cambo Supply',
       info: storeInfoSchema.catch(EMPTY_STORE_INFO).parse(row?.info ?? {}),
       delivery: rates,
+      payments: { cod: true, khqr: config.bakong.enabled },
     });
   });
   return r;

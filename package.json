@@ -40,5 +40,10 @@
     "argon2": false,
     "fsevents": false,
     "puppeteer@25.17.0": true
+  },
+  "overrides": {
+    "bakong-khqr": {
+      "axios": "1.21.1"
+    }
   }
 }

@@ -1,0 +1,222 @@
+import type { KhqrCode, Order, Payment, Prisma, PrismaClient } from '@prisma/client';
+import { formatUsd } from '@cambo/shared';
+import type { AppDeps } from '../../http/app';
+import { AppError } from '../../http/errors';
+import { BakongError, type BakongCheck } from '../../integrations/bakong/client';
+import { createKhqr } from '../../integrations/bakong/khqr';
+import { notifyAdmin, notifyCustomer } from '../bot/notify';
+import { cancelOrder } from '../orders/orders';
+
+/** Customer polling asks Bakong at most this often per payment. */
+const CHECK_EVERY_MS = 5_000;
+/** The background sweep re-checks an open payment at most this often. */
+const SWEEP_RECHECK_MS = 15_000;
+/** After the payment window closes, wait this long for in-flight payments before cancelling. */
+const GRACE_MS = 2 * 60_000;
+/** Minimum time left in the window for a new QR to be worth issuing. */
+const MIN_QR_LIFETIME_MS = 30_000;
+
+type Db = PrismaClient | Prisma.TransactionClient;
+type CheckOutcome = 'paid' | 'unpaid' | 'mismatch' | 'throttled' | 'skipped' | 'error';
+
+/**
+ * Generate a QR for the payment. It never outlives the payment window, so once an
+ * order can be cancelled for non-payment no valid QR for it exists.
+ */
+export async function issueKhqr(deps: AppDeps, db: Db, payment: Payment & { order: Order }): Promise<KhqrCode> {
+  const { bakong } = deps.config;
+  const now = Date.now();
+  const windowEnd = payment.expiresAt?.getTime() ?? now + bakong.holdMinutes * 60_000;
+  const expiresAt = new Date(Math.min(now + bakong.qrTtlMinutes * 60_000, windowEnd));
+  if (expiresAt.getTime() - now < MIN_QR_LIFETIME_MS) {
+    throw new AppError(409, 'PAYMENT_WINDOW_CLOSED', 'The time to pay for this order has run out');
+  }
+  const { qr, md5 } = createKhqr({
+    accountId: bakong.accountId,
+    merchantName: bakong.merchantName,
+    merchantCity: bakong.merchantCity,
+    amountCents: payment.amountCents,
+    billNumber: payment.order.number,
+    expiresAt,
+  });
+  return db.khqrCode.create({ data: { paymentId: payment.id, md5, qrString: qr, expiresAt } });
+}
+
+/** What the customer's payment page needs. The QR is only included while it can still be paid. */
+export function paymentView(p: Payment & { khqrCodes: KhqrCode[] }) {
+  const now = Date.now();
+  const latest = [...p.khqrCodes].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  const open = p.status === 'PENDING';
+  return {
+    method: p.method,
+    status: p.status,
+    amountCents: p.amountCents,
+    currency: p.currency,
+    payBefore: p.expiresAt,
+    paidAt: p.paidAt,
+    canRenew: open && p.method === 'KHQR' && !!p.expiresAt && p.expiresAt.getTime() - now > MIN_QR_LIFETIME_MS,
+    khqr: open && latest && latest.expiresAt.getTime() > now ? { qr: latest.qrString, expiresAt: latest.expiresAt } : null,
+  };
+}
+
+// Per-app memory for alerts we don't want to repeat every few seconds.
+const alertState = new WeakMap<object, { tokenAlertAt: number; mismatches: Set<string> }>();
+const alerts = (deps: AppDeps) => {
+  let s = alertState.get(deps.config);
+  if (!s) alertState.set(deps.config, (s = { tokenAlertAt: 0, mismatches: new Set() }));
+  return s;
+};
+
+function onBakongError(deps: AppDeps, err: unknown) {
+  if (err instanceof BakongError && err.kind === 'UNAUTHORIZED') {
+    const state = alerts(deps);
+    if (Date.now() - state.tokenAlertAt > 60 * 60_000) {
+      state.tokenAlertAt = Date.now();
+      void notifyAdmin(deps, '⚠️ Bakong token was rejected, so KHQR payments cannot be confirmed. Renew the token at api-bakong.nbc.gov.kh and update BAKONG_TOKEN.');
+    }
+  }
+  deps.logger.warn({ err }, 'Bakong check failed');
+}
+
+/**
+ * Ask Bakong whether any QR of this payment was paid. Throttled unless `force`.
+ * Safe to call concurrently: claiming the check and marking paid are both atomic.
+ */
+export async function checkKhqrPayment(deps: AppDeps, paymentId: string, opts: { force?: boolean } = {}): Promise<CheckOutcome> {
+  const { prisma } = deps;
+  const now = new Date();
+  const claim = await prisma.payment.updateMany({
+    where: {
+      id: paymentId,
+      method: 'KHQR',
+      status: 'PENDING',
+      ...(opts.force ? {} : { OR: [{ lastCheckedAt: null }, { lastCheckedAt: { lt: new Date(now.getTime() - CHECK_EVERY_MS) } }] }),
+    },
+    data: { lastCheckedAt: now },
+  });
+  if (claim.count === 0) {
+    const p = await prisma.payment.findUnique({ where: { id: paymentId }, select: { status: true, method: true } });
+    return p?.status === 'PENDING' && p.method === 'KHQR' ? 'throttled' : 'skipped';
+  }
+  const codes = await prisma.khqrCode.findMany({ where: { paymentId }, orderBy: { createdAt: 'desc' } });
+  for (const code of codes) {
+    let result: BakongCheck;
+    try {
+      result = await deps.bakong.checkByMd5(code.md5);
+    } catch (err) {
+      onBakongError(deps, err);
+      return 'error';
+    }
+    if (result.found) return markPaid(deps, paymentId, code.md5, result);
+  }
+  return 'unpaid';
+}
+
+async function markPaid(deps: AppDeps, paymentId: string, md5: string, tx: Extract<BakongCheck, { found: true }>): Promise<CheckOutcome> {
+  const { prisma, config, logger } = deps;
+  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { order: true } });
+  const amountOk = Math.round(tx.amount * 100) === payment.amountCents && tx.currency.toUpperCase() === 'USD';
+  const accountOk = !tx.toAccountId || tx.toAccountId.toLowerCase() === config.bakong.accountId.toLowerCase();
+  if (!amountOk || !accountOk) {
+    logger.error({ paymentId, md5, tx: { amount: tx.amount, currency: tx.currency, toAccountId: tx.toAccountId } }, 'KHQR transaction does not match the order');
+    const key = `${paymentId}:${tx.hash}:${tx.amount}:${tx.toAccountId}`;
+    if (!alerts(deps).mismatches.has(key)) {
+      alerts(deps).mismatches.add(key);
+      void notifyAdmin(
+        deps,
+        `⚠️ A KHQR payment for order ${payment.order.number} didn't match: received ${tx.amount} ${tx.currency} to ${tx.toAccountId || 'unknown account'}, expected ${formatUsd(payment.amountCents)} to ${config.bakong.accountId}. The order was not confirmed. Check it in your bank app.`,
+      );
+    }
+    return 'mismatch';
+  }
+
+  const outcome = await prisma.$transaction(async (db) => {
+    const claimed = await db.payment.updateMany({
+      where: { id: paymentId, status: 'PENDING' },
+      data: {
+        status: 'PAID',
+        paidAt: tx.paidAt,
+        providerRef: md5,
+        // Kept for your records and refunds: Bakong's transaction hash and who paid.
+        rawPayload: { ...tx.raw, hash: tx.hash, fromAccountId: tx.fromAccountId, toAccountId: tx.toAccountId, amount: tx.amount, currency: tx.currency } as Prisma.InputJsonValue,
+      },
+    });
+    if (claimed.count === 0) return 'already' as const;
+    await db.$queryRaw`SELECT id FROM "Order" WHERE id = ${payment.orderId}::uuid FOR UPDATE`;
+    const order = await db.order.findUniqueOrThrow({ where: { id: payment.orderId } });
+    if (order.status === 'PENDING') {
+      await db.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
+      await db.orderStatusEvent.create({ data: { orderId: order.id, fromStatus: 'PENDING', toStatus: 'CONFIRMED', note: 'Paid with KHQR', actorUserId: null } });
+      return 'confirmed' as const;
+    }
+    return order.status === 'CANCELLED' ? ('paid-after-cancel' as const) : ('paid' as const);
+  });
+
+  const n = payment.order.number;
+  if (outcome === 'confirmed') {
+    void notifyCustomer(deps, payment.orderId, 'PAID');
+    void notifyAdmin(deps, `💰 Payment received: order ${n}, ${formatUsd(payment.amountCents)} via KHQR. The order is confirmed.`);
+  } else if (outcome === 'paid-after-cancel') {
+    void notifyAdmin(deps, `⚠️ Order ${n} was paid (${formatUsd(payment.amountCents)} via KHQR) but it is cancelled: please refund the customer, or restore the order by hand.`);
+  }
+  return 'paid';
+}
+
+/** Close an unpaid payment and cancel its order (stock and promo use go back). */
+async function expirePayment(deps: AppDeps, paymentId: string): Promise<boolean> {
+  const { prisma, config } = deps;
+  const cancelledOrderId = await prisma.$transaction(async (db) => {
+    const claimed = await db.payment.updateMany({ where: { id: paymentId, status: 'PENDING' }, data: { status: 'EXPIRED' } });
+    if (claimed.count === 0) return null;
+    const p = await db.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    await db.$queryRaw`SELECT id FROM "Order" WHERE id = ${p.orderId}::uuid FOR UPDATE`;
+    const order = await db.order.findUniqueOrThrow({ where: { id: p.orderId }, include: { items: true } });
+    if (order.status !== 'PENDING') return null;
+    await cancelOrder(db, order, null, `Not paid within ${config.bakong.holdMinutes} minutes`);
+    return order.id;
+  });
+  if (cancelledOrderId) void notifyCustomer(deps, cancelledOrderId, 'PAYMENT_EXPIRED');
+  return Boolean(cancelledOrderId);
+}
+
+/**
+ * One background pass: confirm paid KHQR orders the customer stopped watching, and
+ * cancel those whose window closed (after one last check with Bakong). An order is
+ * never cancelled while Bakong can't be reached: it might have been paid.
+ */
+export async function sweepKhqrPayments(deps: AppDeps): Promise<{ paid: number; expired: number }> {
+  const now = Date.now();
+  const open = await deps.prisma.payment.findMany({
+    where: { method: 'KHQR', status: 'PENDING' },
+    select: { id: true, expiresAt: true, lastCheckedAt: true },
+  });
+  let paid = 0;
+  let expired = 0;
+  for (const p of open) {
+    const windowClosed = !!p.expiresAt && p.expiresAt.getTime() < now - GRACE_MS;
+    if (!windowClosed && p.lastCheckedAt && now - p.lastCheckedAt.getTime() < SWEEP_RECHECK_MS) continue;
+    const outcome = await checkKhqrPayment(deps, p.id, { force: true });
+    if (outcome === 'paid') paid++;
+    else if (windowClosed && outcome === 'unpaid' && (await expirePayment(deps, p.id))) expired++;
+  }
+  return { paid, expired };
+}
+
+/** Run the sweep every `intervalMs`. Returns a stop function. */
+export function startKhqrSweeper(deps: AppDeps, intervalMs = 20_000): () => void {
+  let running = false;
+  const timer = setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
+      const r = await sweepKhqrPayments(deps);
+      if (r.paid || r.expired) deps.logger.info(r, 'KHQR sweep');
+    } catch (err) {
+      deps.logger.error({ err }, 'KHQR sweep failed');
+    } finally {
+      running = false;
+    }
+  }, intervalMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}

@@ -29,6 +29,14 @@ const envSchema = z
     RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
     SERVE_WEB_DIR: z.string().optional(),
+    // Bakong KHQR. Payments are offered only when both the account and the token are set.
+    BAKONG_ACCOUNT_ID: z.string().trim().regex(/^[^@\s]+@[a-z0-9]+$/i, 'Use a Bakong account ID like name@aclb').optional(),
+    BAKONG_TOKEN: z.string().optional(),
+    BAKONG_API_URL: z.url().default('https://api-bakong.nbc.gov.kh'),
+    BAKONG_MERCHANT_NAME: z.string().trim().min(1).max(25).default('Cambo Supply'),
+    BAKONG_MERCHANT_CITY: z.string().trim().min(1).max(15).default('Phnom Penh'),
+    KHQR_QR_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+    KHQR_ORDER_HOLD_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
   })
   .superRefine((e, ctx) => {
     if (e.TELEGRAM_MODE !== 'off') {
@@ -75,6 +83,16 @@ export type Config = {
   };
   rateLimit: { loginMax: number; windowMs: number };
   serveWeb?: string;
+  bakong: {
+    enabled: boolean;
+    accountId: string;
+    token: string;
+    apiUrl: string;
+    merchantName: string;
+    merchantCity: string;
+    qrTtlMinutes: number;
+    holdMinutes: number;
+  };
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -111,5 +129,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     rateLimit: { loginMax: e.RATE_LIMIT_LOGIN_MAX, windowMs: e.RATE_LIMIT_WINDOW_MS },
     serveWeb: e.SERVE_WEB_DIR,
+    bakong: {
+      enabled: Boolean(e.BAKONG_ACCOUNT_ID && e.BAKONG_TOKEN),
+      accountId: e.BAKONG_ACCOUNT_ID ?? '',
+      token: e.BAKONG_TOKEN ?? '',
+      apiUrl: e.BAKONG_API_URL.replace(/\/$/, ''),
+      merchantName: e.BAKONG_MERCHANT_NAME,
+      merchantCity: e.BAKONG_MERCHANT_CITY,
+      qrTtlMinutes: e.KHQR_QR_TTL_MINUTES,
+      holdMinutes: e.KHQR_ORDER_HOLD_MINUTES,
+    },
   };
 }

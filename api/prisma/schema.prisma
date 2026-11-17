@@ -315,12 +315,31 @@ model Payment {
   expiresAt   DateTime?
   paidAt      DateTime?
   rawPayload  Json?
+  /// Last time we asked the payment provider (throttles polling).
+  lastCheckedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  khqrCodes KhqrCode[]
 
   @@index([providerRef])
+  @@index([method, status, expiresAt])
+}
+
+/// Every KHQR generated for a payment. Each is checked with Bakong, so paying an
+/// older (still valid) QR after asking for a new one is never missed.
+model KhqrCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  paymentId String   @db.Uuid
+  md5       String   @unique
+  qrString  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
 }
 
 model StoreSetting {
