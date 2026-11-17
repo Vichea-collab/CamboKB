@@ -48,3 +48,8 @@ export async function processImage(
 export async function deleteImage(storage: StorageAdapter, storageKey: string) {
   await Promise.all(IMAGE_WIDTHS.map((w) => storage.delete(`${storageKey}-${w}.webp`)));
 }
+
+/** 1200x630 JPEG, cover-cropped on the dark store background. */
+export async function shareImage(source: Buffer): Promise<Buffer> {
+  return sharp(source).resize(1200, 630, { fit: 'cover', position: 'attention' }).flatten({ background: '#14171c' }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+}

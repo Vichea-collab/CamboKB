@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { requireSecret } from './auth';
 import type { FileConfig } from './config';
 import { FileError } from './errors';
-import { deleteImage, IMAGE_PREFIXES, processImage } from './images';
+import { deleteImage, IMAGE_PREFIXES, IMAGE_WIDTHS, processImage, shareImage } from './images';
 import type { Logger } from './logger';
 import { isSafeKey, type StorageAdapter } from './storage/types';
 
@@ -72,6 +72,22 @@ export function createFileApp({ config, storage, logger }: FileDeps) {
     res.json({ ok: true });
   });
   app.use('/internal', internal);
+
+  // 1200x630 JPEG for link previews (Telegram, Facebook, WhatsApp don't all read WebP).
+  // Built on first request from the stored WebP and cached for a year (the key never changes).
+  app.get('/files/og/:prefix/:file', cors({ origin: config.corsOrigin }), async (req, res) => {
+    const prefix = z.enum(IMAGE_PREFIXES).safeParse(req.params.prefix);
+    const id = /^([0-9a-f-]{36})\.jpg$/i.exec(req.params.file ?? '')?.[1];
+    if (!prefix.success || !id || !z.uuid().safeParse(id).success) throw new FileError(404, 'NOT_FOUND', 'Not found');
+    let source: Buffer | null = null;
+    for (const w of [...IMAGE_WIDTHS].reverse()) {
+      source = (await storage.get(`${prefix.data}/${id}-${w}.webp`))?.body ?? null;
+      if (source) break;
+    }
+    if (!source) throw new FileError(404, 'NOT_FOUND', 'Not found');
+    res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' });
+    res.send(await shareImage(source));
+  });
 
   app.get('/files/*key', cors({ origin: config.corsOrigin }), async (req, res) => {
     const segments = (req.params as { key: string[] }).key;

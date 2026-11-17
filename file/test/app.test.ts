@@ -92,3 +92,42 @@ describe('file service HTTP API', () => {
     expect(() => loadConfig({ NODE_ENV: 'production', FILE_SERVICE_SECRET: 'short' })).toThrow(/FILE_SERVICE_SECRET/);
   });
 });
+
+describe('share-preview images (/files/og)', () => {
+  let storage: MemoryStorage;
+  let app: ReturnType<typeof createFileApp>;
+  beforeEach(() => {
+    storage = new MemoryStorage();
+    app = createFileApp({ config: loadConfig({ NODE_ENV: 'test', FILE_SERVICE_SECRET: SECRET }), storage, logger: createLogger('silent') });
+  });
+
+  const upload = async () =>
+    (
+      await request(app)
+        .post('/internal/images')
+        .set('Authorization', `Bearer ${SECRET}`)
+        .field('prefix', 'products')
+        .attach('file', await png(1600, 1200), 'photo.png')
+    ).body.storageKey as string;
+
+  it('serves a 1200x630 JPEG that Telegram, Facebook and WhatsApp can preview', async () => {
+    const key = await upload();
+    const res = await request(app).get(`/files/og/${key}.jpg`).buffer(true).parse((r, cb) => {
+      const chunks: Buffer[] = [];
+      r.on('data', (c: Buffer) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('image/jpeg');
+    expect(res.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    const sharp = (await import('sharp')).default;
+    const meta = await sharp(res.body as Buffer).metadata();
+    expect(meta).toMatchObject({ format: 'jpeg', width: 1200, height: 630 });
+  });
+
+  it('404s for images that do not exist or paths that are not images', async () => {
+    expect((await request(app).get('/files/og/products/00000000-0000-4000-8000-000000000000.jpg')).status).toBe(404);
+    expect((await request(app).get('/files/og/..%2F..%2Fetc%2Fpasswd.jpg')).status).toBe(404);
+    expect((await request(app).get('/files/og/misc/00000000-0000-4000-8000-000000000000.jpg')).status).toBe(404);
+  });
+});
