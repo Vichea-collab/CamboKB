@@ -49,7 +49,16 @@ export async function deleteImage(storage: StorageAdapter, storageKey: string) {
   await Promise.all(IMAGE_WIDTHS.map((w) => storage.delete(`${storageKey}-${w}.webp`)));
 }
 
-/** 1200x630 JPEG, cover-cropped on the dark store background. */
+/**
+ * 1200x630 JPEG for link previews. The whole product stays visible (photos are often
+ * portrait), centred on a darkened, blurred copy of itself.
+ */
 export async function shareImage(source: Buffer): Promise<Buffer> {
-  return sharp(source).resize(1200, 630, { fit: 'cover', position: 'attention' }).flatten({ background: '#14171c' }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+  const background = await sharp(source).resize(1200, 630, { fit: 'cover' }).blur(28).modulate({ brightness: 0.45 }).toBuffer();
+  const product = await sharp(source).resize(1200, 630, { fit: 'inside', withoutEnlargement: false }).toBuffer();
+  return sharp(background)
+    .composite([{ input: product, gravity: 'centre' }])
+    .flatten({ background: '#14171c' })
+    .jpeg({ quality: 84, mozjpeg: true })
+    .toBuffer();
 }

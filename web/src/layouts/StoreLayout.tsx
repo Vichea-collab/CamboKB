@@ -1,4 +1,5 @@
 import { Outlet, ScrollRestoration } from 'react-router';
+import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { Toast } from '../components/Toast';
 import { CartDrawer } from '../components/CartDrawer';
@@ -10,6 +11,7 @@ export function StoreLayout() {
       <main>
         <Outlet />
       </main>
+      <Footer />
       <CartDrawer />
       <Toast />
       <ScrollRestoration />

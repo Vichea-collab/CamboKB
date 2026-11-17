@@ -6,9 +6,11 @@ import { dollars, Loading, PageHeader, toCents, Toggle } from './components/ui';
 
 const MapPicker = lazy(() => import('../components/MapPicker'));
 
+type Info = { phone: string; telegram: string; facebook: string; address: string; hours: string; warranty: string };
 type Settings = {
   storeName: string;
   telegramNotify: boolean;
+  info: Info;
   delivery: { store: { lat: number; lng: number }; provinceFeeCents: number; phnomPenhStandardFeeCents: number; grabTiers: { maxKm: number; feeCents: number }[]; grabBeyondFeeCents: number };
 };
 
@@ -24,6 +26,7 @@ export default function SettingsPage() {
   if (!s) return <Loading />;
   const d = s.delivery;
   const setD = (patch: Partial<Settings['delivery']>) => setS({ ...s, delivery: { ...d, ...patch } });
+  const setInfo = (patch: Partial<Info>) => setS({ ...s, info: { ...s.info, ...patch } });
   const fee = (cents: number, onChange: (c: number) => void, label: string) => (
     <label className="block">
       <span className="label">{label}</span>
@@ -53,6 +56,26 @@ export default function SettingsPage() {
           </span>
           <Toggle checked={s.telegramNotify} onChange={(v) => setS({ ...s, telegramNotify: v })} label="Telegram alerts" />
         </div>
+      </section>
+      <section className="panel space-y-4 p-5">
+        <div>
+          <h2 className="font-display text-lg font-bold">Contact and policies</h2>
+          <p className="text-sm text-muted">Shown in the shop footer and on the Contact and Warranty pages. Leave a field empty to hide it.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoField label="Phone" value={s.info.phone} onChange={(v) => setInfo({ phone: v })} placeholder="087 522 210" />
+          <InfoField label="Telegram username" value={s.info.telegram} onChange={(v) => setInfo({ telegram: v })} placeholder="Cambo_KB_Bot" />
+          <InfoField label="Facebook page link" value={s.info.facebook} onChange={(v) => setInfo({ facebook: v })} placeholder="https://facebook.com/…" />
+          <InfoField label="Opening hours" value={s.info.hours} onChange={(v) => setInfo({ hours: v })} placeholder="Daily 8:00–20:00" />
+        </div>
+        <label className="block">
+          <span className="label">Address</span>
+          <textarea className="field resize-none" rows={2} value={s.info.address} onChange={(e) => setInfo({ address: e.target.value })} maxLength={300} />
+        </label>
+        <label className="block">
+          <span className="label">Warranty and returns</span>
+          <textarea className="field" rows={6} value={s.info.warranty} onChange={(e) => setInfo({ warranty: e.target.value })} maxLength={4000} placeholder="Leave empty to show a short general message. Separate paragraphs with a blank line." />
+        </label>
       </section>
       <section className="panel space-y-4 p-5">
         <h2 className="font-display text-lg font-bold">Delivery fees</h2>
@@ -87,5 +110,14 @@ export default function SettingsPage() {
         </div>
       </section>
     </form>
+  );
+}
+
+function InfoField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <label className="block">
+      <span className="label">{label}</span>
+      <input className="field" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={200} />
+    </label>
   );
 }

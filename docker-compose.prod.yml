@@ -72,8 +72,13 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-      args: { VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME}' }
+      args:
+        VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME}'
+        VITE_SITE_URL: ${PUBLIC_ORIGIN}
     restart: unless-stopped
+    environment:
+      # Extra image origin for the Content-Security-Policy when STORAGE_DRIVER=s3 serves from a CDN
+      CSP_EXTRA_IMG: ${CSP_EXTRA_IMG:-}
     ports: ['80:80']
     depends_on: [api, file]
 

@@ -14,6 +14,10 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const Profile = lazy(() => import('./pages/account/Profile'));
 const Orders = lazy(() => import('./pages/account/Orders'));
 const OrderDetail = lazy(() => import('./pages/account/OrderDetail'));
+const Contact = lazy(() => import('./pages/info/Contact'));
+const Delivery = lazy(() => import('./pages/info/Delivery'));
+const Warranty = lazy(() => import('./pages/info/Warranty'));
+const Privacy = lazy(() => import('./pages/info/Privacy'));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 
 const page = (node: ReactNode) => <Suspense fallback={<p className="py-10 text-center text-muted">{t.common.loading}</p>}>{node}</Suspense>;
@@ -49,6 +53,10 @@ export const router = createBrowserRouter([
       { path: 'account', element: authed(<Profile />) },
       { path: 'account/orders', element: authed(<Orders />) },
       { path: 'account/orders/:number', element: authed(<OrderDetail />) },
+      { path: 'contact', element: page(<Contact />) },
+      { path: 'delivery', element: page(<Delivery />) },
+      { path: 'warranty', element: page(<Warranty />) },
+      { path: 'privacy', element: page(<Privacy />) },
       { path: '*', element: <ErrorPage /> },
     ],
   },

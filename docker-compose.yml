@@ -58,7 +58,9 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-      args: { VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME:-}' }
+      args:
+        VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME:-}'
+        VITE_SITE_URL: http://localhost:8080
     ports: ['8080:80']
     depends_on: [api, file]
 
