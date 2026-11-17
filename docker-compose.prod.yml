@@ -65,6 +65,11 @@ services:
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
       TELEGRAM_WEBHOOK_URL: ${PUBLIC_ORIGIN}/api/v1/telegram/webhook
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+      # KHQR payments (on when both are set)
+      BAKONG_ACCOUNT_ID: ${BAKONG_ACCOUNT_ID:-}
+      BAKONG_TOKEN: ${BAKONG_TOKEN:-}
+      BAKONG_API_URL: ${BAKONG_API_URL:-https://api-bakong.nbc.gov.kh}
+      BAKONG_MERCHANT_NAME: ${STORE_NAME:-Cambo Supply}
     depends_on:
       db: { condition: service_healthy }
 

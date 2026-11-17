@@ -7,6 +7,7 @@ import Home from '../features/catalog/HomePage';
 import ProductDetail from '../features/catalog/ProductPage';
 
 const Checkout = lazy(() => import('../features/checkout/CheckoutPage'));
+const PayPage = lazy(() => import('../features/payments/PayPage'));
 const OrderSuccess = lazy(() => import('../features/checkout/OrderSuccessPage'));
 const Login = lazy(() => import('../features/auth/LoginPage'));
 const Signup = lazy(() => import('../features/auth/SignupPage'));
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: 'products/:slug', element: <ProductDetail /> },
       { path: 'checkout', element: authed(<Checkout />) },
+      { path: 'orders/:number/pay', element: authed(<PayPage />) },
       { path: 'orders/:number/success', element: authed(<OrderSuccess />) },
       { path: 'login', element: page(<Login />) },
       { path: 'signup', element: page(<Signup />) },

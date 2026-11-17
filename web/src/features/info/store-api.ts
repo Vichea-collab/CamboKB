@@ -11,6 +11,7 @@ export type StoreData = {
     grabTiers: { maxKm: number; feeCents: number }[];
     grabBeyondFeeCents: number;
   };
+  payments: { cod: boolean; khqr: boolean };
 };
 
 export const useStore = () => useQuery({ queryKey: ['store'], queryFn: () => api<StoreData>('/store'), staleTime: 5 * 60_000 });

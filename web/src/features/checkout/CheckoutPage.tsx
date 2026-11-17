@@ -12,6 +12,7 @@ import { t } from '../../shared/lib/strings';
 import type { Order } from '../../shared/lib/types';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useCart } from '../cart/cart-store';
+import { useStore } from '../info/store-api';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
 
@@ -56,14 +57,17 @@ export default function Checkout() {
     }
   }, [me.data, profile.data]);
 
+  const store = useStore();
+  const khqrAvailable = store.data?.payments?.khqr ?? false;
   const chooseRegion = (r: Region) => {
     setRegion(r);
-    if (r === 'PROVINCE') {
-      if (service === 'GRAB') setService('VET');
-      setPayment('COD');
-    }
+    if (r === 'PROVINCE' && service === 'GRAB') setService('VET');
   };
   const codAvailable = region === 'PHNOM_PENH';
+  // Cash on delivery isn't offered outside Phnom Penh: switch province orders to KHQR.
+  useEffect(() => {
+    if (!codAvailable && payment === 'COD' && khqrAvailable) setPayment('KHQR');
+  }, [codAvailable, payment, khqrAvailable]);
 
   const quoteInput: QuoteInput = { items: cartItems, region, deliveryService: service, pin: region === 'PHNOM_PENH' ? pin : null, promoCode: promo };
   const quote = useQuote(quoteInput);
@@ -110,7 +114,7 @@ export default function Checkout() {
 
   if (cartItems.length === 0 && !placing) return <Navigate to="/" replace />;
 
-  const canSubmit = Boolean(quote.data) && !quote.isFetching && name.trim() && phone.trim() && address.trim() && !placing && (payment !== 'COD' || codAvailable);
+  const canSubmit = Boolean(quote.data) && !quote.isFetching && name.trim() && phone.trim() && address.trim() && !placing && (payment === 'COD' ? codAvailable : khqrAvailable);
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -179,7 +183,14 @@ export default function Checkout() {
           <Section title={t.checkout.payment}>
             <div className="space-y-2" role="radiogroup" aria-label={t.checkout.payment}>
               <PaymentOption checked={payment === 'COD'} disabled={!codAvailable} onSelect={() => setPayment('COD')} label={t.checkout.cod} hint={!codAvailable ? t.checkout.codProvinceHint : undefined} />
-              <PaymentOption checked={false} disabled onSelect={() => undefined} label={t.checkout.khqr} badge={t.checkout.comingSoon} />
+              <PaymentOption
+                checked={payment === 'KHQR'}
+                disabled={!khqrAvailable}
+                onSelect={() => setPayment('KHQR')}
+                label={t.checkout.khqr}
+                hint={khqrAvailable ? t.checkout.khqrHint : undefined}
+                badge={khqrAvailable ? undefined : t.checkout.comingSoon}
+              />
             </div>
           </Section>
         </div>
@@ -268,7 +279,7 @@ function usePlaceOrder() {
       clear();
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['products'] });
-      navigate(`/orders/${order.number}/success`, { replace: true });
+      navigate(order.payment?.method === 'KHQR' ? `/orders/${order.number}/pay` : `/orders/${order.number}/success`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.code === 'OUT_OF_STOCK') {
         for (const i of (err.details as { items: { productId: string; available: number }[] }).items) setQty(i.productId, i.available);

@@ -21,9 +21,16 @@ export default function OrderDetailPage() {
       <OrderSummary
         order={order.data}
         actions={
-          <a href={apiUrl(`/orders/${encodeURIComponent(number)}/invoice.pdf`)} target="_blank" rel="noopener" className="btn-ghost w-full">
-            📄 {t.account.invoice}
-          </a>
+          <div className="space-y-3">
+            {order.data.payment?.method === 'KHQR' && order.data.payment.status === 'PENDING' && order.data.status === 'PENDING' && (
+              <Link to={`/orders/${encodeURIComponent(number)}/pay`} className="btn-primary w-full">
+                {t.pay.payNow}
+              </Link>
+            )}
+            <a href={apiUrl(`/orders/${encodeURIComponent(number)}/invoice.pdf`)} target="_blank" rel="noopener" className="btn-ghost w-full">
+              📄 {t.account.invoice}
+            </a>
+          </div>
         }
       />
     </div>

@@ -57,5 +57,16 @@ export type Order = {
   promoCode: string | null;
   items: { productId: string; name: string; priceCents: number; quantity: number; lineTotalCents: number; image: string | null }[];
   events: { fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; at: string }[];
-  payment: { method: 'COD' | 'KHQR'; status: string; amountCents: number; paidAt: string | null } | null;
+  payment: { method: 'COD' | 'KHQR'; status: string; amountCents: number; paidAt: string | null; payBefore: string | null } | null;
+};
+
+export type PaymentView = {
+  method: 'COD' | 'KHQR';
+  status: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+  amountCents: number;
+  currency: string;
+  payBefore: string | null;
+  paidAt: string | null;
+  canRenew: boolean;
+  khqr: { qr: string; expiresAt: string } | null;
 };

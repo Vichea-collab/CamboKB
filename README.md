@@ -132,15 +132,53 @@ Hosting the web app on a CDN (e.g. Cloudflare Pages) instead: build `web` with
   If images come from a CDN (S3/R2 on its own domain), set `CSP_EXTRA_IMG=https://your-cdn-domain` for the `web` service.
 - **Install as an app:** the web manifest and icons let phones add the shop to the home screen.
 
-## Payments (next step: KHQR / Bakong)
+## Payments: KHQR (Bakong)
 
-Checkout currently offers cash on delivery (Phnom Penh) and shows KHQR as
-"coming soon". The slot is ready:
+Customers can pay by scanning a KHQR with any Cambodian bank app (ABA, ACLEDA, Wing, Bakong…), in
+Phnom Penh and the provinces. Cash on delivery stays Phnom Penh only.
 
-- `api/src/checkout/payments.ts` — implement `KhqrProvider` (`isAvailable`, `createPayment`):
-  generate the KHQR string via Bakong, save `qrString`, `providerRef` (md5) and `expiresAt` on `Payment`.
-- Add a status check (poll Bakong by md5, or a callback route) that sets `Payment.status = PAID`.
-- The `Payment` table, admin payment status and invoices already handle `KHQR`.
+**How it works:** checkout creates the order (stock is held) and shows a QR for the exact total,
+valid 10 minutes ("Get a new QR" if it runs out). The api asks Bakong whether it was paid, every few
+seconds while the customer watches and every 20 s in the background. When paid, the order confirms
+itself and you and the customer get Telegram messages. Unpaid after 30 minutes → cancelled, stock back,
+customer told. Every QR ever shown for an order is checked, and no QR outlives the 30 minutes.
+
+**Turn it on:**
+
+1. Your Bakong account ID — shown in your bank app's Bakong/KHQR section (looks like `yourname@aclb`).
+2. A Bakong Open API token: register your email at https://api-bakong.nbc.gov.kh. It expires every
+   **90 days**; renew it there and update the setting. If it expires, the bot warns you (once an hour)
+   and paid orders wait until you renew (nothing is lost, they're re-checked).
+3. In `api/.env` (or your production secrets): `BAKONG_ACCOUNT_ID=…` and `BAKONG_TOKEN=…`, then restart the api.
+   KHQR appears at checkout only when both are set.
+4. **Test with a small real order** (e.g. a $0.50 test product) and pay it from your phone before announcing it.
+
+Optional: `BAKONG_MERCHANT_NAME`/`CITY` (what the payer's app shows), `KHQR_QR_TTL_MINUTES`,
+`KHQR_ORDER_HOLD_MINUTES`. Bakong's API may refuse requests from outside Cambodia; if your server is
+abroad, set `BAKONG_API_URL` to a small relay hosted in Cambodia.
+
+Admins see "Waiting for KHQR payment" and a **Check payment now** button on the order. Payments that
+don't match (wrong amount or account) are never accepted and are reported to you. Money that arrives
+after an order was cancelled is recorded as paid and flagged for a refund.
+
+## Project layout
+
+```
+web/src/
+  app/            router, store layout, header and footer
+  features/       one folder per feature: catalog, cart, checkout, payments, auth,
+                  account, orders, info, admin (pages, components, hooks and tests together)
+  shared/         ui (buttons, drawer, inputs, map) and lib (api client, strings, types)
+api/src/
+  modules/        one folder per feature: auth, account, catalog, orders, payments,
+                  promos, customers, store, dashboard, reports, seo, bot (routes, logic, tests)
+  integrations/   outside services: bakong, telegram, files, reports
+  http/           express app, middleware, errors
+  db/ lib/ cli/   prisma client, logger, seed and admin scripts
+file/  report/    the image and invoice/report services (small, flat)
+shared/           rules every service shares: money, phone numbers, delivery fees, validation
+docker/ scripts/ docs/
+```
 
 ## Project scripts
 

@@ -25,6 +25,7 @@ export default function OrderDetail() {
     mutationFn: (to: OrderStatus) => api<AdminOrder>(`/admin/orders/${id}/status`, { method: 'POST', body: { status: to, note: note.trim() || undefined } }),
     onSuccess: onDone,
   });
+  const check = useMutation({ mutationFn: () => api<AdminOrder>(`/admin/orders/${id}/payment/check`, { method: 'POST' }), onSuccess: onDone });
   const payment = useMutation({ mutationFn: (s: string) => api<AdminOrder>(`/admin/orders/${id}/payment`, { method: 'POST', body: { status: s } }), onSuccess: onDone });
 
   if (!order.data) return <Loading />;
@@ -64,6 +65,17 @@ export default function OrderDetail() {
               {(o.status === 'DELIVERED' || o.status === 'CANCELLED') && <p className="text-sm text-muted">This order is closed.</p>}
             </section>
             <section className="panel p-5">
+              {o.payment?.method === 'KHQR' && o.payment.status === 'PENDING' && (
+                <div className="mb-4 rounded-xl border border-yellow/30 bg-yellow/5 p-3 text-sm">
+                  <p className="font-semibold text-yellow">Waiting for KHQR payment</p>
+                  {o.payment.payBefore && (
+                    <p className="mt-0.5 text-muted">Cancelled automatically if unpaid by {new Date(o.payment.payBefore).toLocaleTimeString('en-GB', { timeZone: 'Asia/Phnom_Penh', hour: '2-digit', minute: '2-digit' })}.</p>
+                  )}
+                  <button className="btn-ghost mt-3 w-full px-3 py-2 text-sm" onClick={() => check.mutate()} disabled={check.isPending}>
+                    {check.isPending ? 'Checking with Bakong…' : 'Check payment now'}
+                  </button>
+                </div>
+              )}
               <label htmlFor="pay" className="label">
                 Payment status
               </label>
