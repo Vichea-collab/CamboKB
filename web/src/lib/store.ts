@@ -1,4 +1,4 @@
-import { normalizePhone, type StoreInfo } from '@cambo/shared';
+import type { StoreInfo } from '@cambo/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
@@ -15,5 +15,15 @@ export type StoreData = {
 
 export const useStore = () => useQuery({ queryKey: ['store'], queryFn: () => api<StoreData>('/store'), staleTime: 5 * 60_000 });
 
-/** A tel: link target from a number as typed by the owner ("087 522 210" → "+85587522210"). */
-export const telHref = (phone: string) => `tel:${normalizePhone(phone) ?? phone.replace(/[^\d+]/g, '')}`;
+/**
+ * A tel: link target from a number as the owner typed it ("087 522 210" → "tel:+85587522210").
+ * Deliberately not using the phone-number library: this runs on every page (footer) and
+ * that library is large.
+ */
+export function telHref(phone: string): string {
+  const d = phone.replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) return `tel:${d}`;
+  if (d.startsWith('855')) return `tel:+${d}`;
+  if (d.startsWith('0')) return `tel:+855${d.slice(1)}`;
+  return `tel:${d}`;
+}
