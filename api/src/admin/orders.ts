@@ -17,6 +17,7 @@ import { toPublicUser } from '../auth/sessions';
 import { cancelOrder, orderInclude, toOrderDto } from '../checkout/orders';
 import { AppError, notFound } from '../errors';
 import { validate } from '../middleware/validate';
+import { notifyCustomer } from '../telegram/notify';
 
 const idParams = z.object({ id: uuidSchema });
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -81,6 +82,7 @@ export function adminOrdersRouter(deps: AppDeps): Router {
       await tx.order.update({ where: { id }, data: { status } });
       await tx.orderStatusEvent.create({ data: { orderId: id, fromStatus: order.status, toStatus: status, note: note ?? null, actorUserId: req.user!.id } });
     });
+    void notifyCustomer(deps, id, status);
     res.json(await detail(id));
   });
 

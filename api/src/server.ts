@@ -6,6 +6,7 @@ import { HttpFileClient } from './files/client';
 import { HttpReportClient } from './reports/client';
 import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './telegram/client';
 import { startPolling } from './telegram/poller';
+import { setupBot } from './telegram/setup';
 
 async function main() {
   const config = loadConfig();
@@ -39,6 +40,7 @@ async function main() {
 /** Telegram: long polling in development, webhook registration in production. */
 async function startBackground(deps: Parameters<typeof createApp>[0]): Promise<() => void> {
   const { telegram, config, logger } = deps;
+  if (config.telegram.mode !== 'off') await setupBot(deps);
   if (config.telegram.mode === 'polling') {
     logger.info('Telegram: polling for updates');
     return startPolling(deps);

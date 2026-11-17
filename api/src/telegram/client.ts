@@ -15,6 +15,10 @@ export interface TelegramClient {
   sendMessage(chatId: number | string, text: string, opts?: SendOptions): Promise<void>;
   getUpdates(offset: number, timeoutSec: number): Promise<TgUpdate[]>;
   setWebhook(url: string, secret: string): Promise<void>;
+  /** The "/" command menu shown in the chat. */
+  setCommands(commands: { command: string; description: string }[]): Promise<void>;
+  /** Replace the chat menu button with one that opens the store as a Telegram app (https only). */
+  setMenuButton(url: string, text: string): Promise<void>;
 }
 
 /** Talks to the Telegram Bot API over HTTPS. The token never leaves the server. */
@@ -50,6 +54,14 @@ export class HttpTelegramClient implements TelegramClient {
   async setWebhook(url: string, secret: string) {
     await this.call('setWebhook', { url, secret_token: secret, allowed_updates: ['message'], drop_pending_updates: false });
   }
+
+  async setCommands(commands: { command: string; description: string }[]) {
+    await this.call('setMyCommands', { commands });
+  }
+
+  async setMenuButton(url: string, text: string) {
+    await this.call('setChatMenuButton', { menu_button: { type: 'web_app', text, web_app: { url } } });
+  }
 }
 
 /** Used when TELEGRAM_MODE=off: messages are logged instead of sent. */
@@ -62,4 +74,6 @@ export class NoopTelegramClient implements TelegramClient {
     return [];
   }
   async setWebhook() {}
+  async setCommands() {}
+  async setMenuButton() {}
 }

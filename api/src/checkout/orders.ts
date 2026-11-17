@@ -3,7 +3,7 @@ import type { CreateOrderInput } from '@cambo/shared';
 import type { AppDeps } from '../app';
 import { AppError } from '../errors';
 import type { FileClient } from '../files/client';
-import { notifyNewOrder } from '../telegram/notify';
+import { notifyCustomer, notifyNewOrder } from '../telegram/notify';
 import { getPaymentProvider } from './payments';
 import { buildQuote } from './quote';
 
@@ -134,6 +134,7 @@ export async function createOrder(
   }
 
   void notifyNewOrder(deps, order.id);
+  void notifyCustomer(deps, order.id, 'PENDING');
   return { order, created: true };
 }
 

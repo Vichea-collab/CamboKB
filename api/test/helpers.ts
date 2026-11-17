@@ -42,6 +42,14 @@ export class FakeTelegramClient implements TelegramClient {
     return [];
   }
   async setWebhook() {}
+  commands: { command: string; description: string }[] = [];
+  menuButton: { url: string; text: string } | null = null;
+  async setCommands(commands: { command: string; description: string }[]) {
+    this.commands = commands;
+  }
+  async setMenuButton(url: string, text: string) {
+    this.menuButton = { url, text };
+  }
 }
 
 const IMAGE_SIGNATURES = ['89504e47', 'ffd8ff', '52494646'];

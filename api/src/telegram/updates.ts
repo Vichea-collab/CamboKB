@@ -1,6 +1,6 @@
 import type { AppDeps } from '../app';
 import { sha256 } from '../auth/sessions';
-import { normalizePhone } from '@cambo/shared';
+import { formatUsd, normalizePhone } from '@cambo/shared';
 import type { TgMessage, TgUpdate } from './client';
 
 export const BOT_TEXT = {
@@ -23,7 +23,54 @@ export async function handleTelegramUpdate(deps: AppDeps, update: TgUpdate): Pro
   if (!msg?.from || msg.from.is_bot || msg.chat.type !== 'private') return;
   if (msg.text?.startsWith('/start')) return handleStart(deps, msg);
   if (msg.contact) return handleContact(deps, msg);
+  const command = /^\/(\w+)(?:@\w+)?/.exec(msg.text ?? '')?.[1]?.toLowerCase();
+  if (command === 'orders') return handleOrders(deps, msg);
+  if (command === 'shop') return handleShop(deps, msg);
+  if (command === 'help') return handleHelp(deps, msg);
   await deps.telegram.sendMessage(msg.chat.id, `${BOT_TEXT.noPending}\n${deps.config.webOrigin[0] ?? ''}`);
+}
+
+const STATUS_LABEL: Record<string, string> = { PENDING: 'Pending', CONFIRMED: 'Confirmed', PACKED: 'Packed', SHIPPING: 'On the way', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' };
+
+export const COMMANDS = [
+  { command: 'shop', description: 'Open the store' },
+  { command: 'orders', description: 'See my latest orders' },
+  { command: 'help', description: 'What this bot can do' },
+] as const;
+
+const origin = (deps: AppDeps) => deps.config.webOrigin[0] ?? '';
+
+async function handleHelp(deps: AppDeps, msg: TgMessage) {
+  await deps.telegram.sendMessage(
+    msg.chat.id,
+    ['Cambo Supply bot', '', ...COMMANDS.map((c) => `/${c.command} — ${c.description}`), '', 'We message you here when your order is confirmed, on the way and delivered.'].join('\n'),
+  );
+}
+
+async function handleShop(deps: AppDeps, msg: TgMessage) {
+  const url = origin(deps);
+  // Telegram only opens Mini Apps from https links.
+  if (url.startsWith('https://')) {
+    await deps.telegram.sendMessage(msg.chat.id, 'Tap below to open the store.', { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }]] } });
+  } else {
+    await deps.telegram.sendMessage(msg.chat.id, `Shop at ${url}`);
+  }
+}
+
+async function handleOrders(deps: AppDeps, msg: TgMessage) {
+  const { prisma, telegram } = deps;
+  const user = await prisma.user.findUnique({ where: { telegramUserId: BigInt(msg.from!.id) } });
+  if (!user) {
+    await telegram.sendMessage(msg.chat.id, `You don't have an account yet. Create one here: ${origin(deps)}/signup`);
+    return;
+  }
+  const orders = await prisma.order.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, take: 5 });
+  if (!orders.length) {
+    await telegram.sendMessage(msg.chat.id, `You haven't ordered anything yet. Start here: ${origin(deps)}`);
+    return;
+  }
+  const lines = orders.map((o) => `${o.number} · ${STATUS_LABEL[o.status] ?? o.status} · ${formatUsd(o.totalCents)}`);
+  await telegram.sendMessage(msg.chat.id, ['Your latest orders:', '', ...lines, '', `Details: ${origin(deps)}/account/orders`].join('\n'));
 }
 
 async function handleStart(deps: AppDeps, msg: TgMessage) {

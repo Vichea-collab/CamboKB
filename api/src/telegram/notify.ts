@@ -1,3 +1,4 @@
+import type { OrderStatus } from '@prisma/client';
 import { formatUsd } from '@cambo/shared';
 import type { AppDeps } from '../app';
 
@@ -51,5 +52,45 @@ export async function notifyNewOrder(deps: AppDeps, orderId: string, backoffMs: 
     }
   } catch (err) {
     logger.error({ err, orderId }, 'new-order Telegram alert failed');
+  }
+}
+
+const STATUS_MESSAGE: Record<OrderStatus, string> = {
+  PENDING: '✅ We received your order {n}. Total {total}. We will confirm it shortly.',
+  CONFIRMED: '👍 Your order {n} is confirmed.',
+  PACKED: '📦 Your order {n} is packed and ready.',
+  SHIPPING: '🚚 Your order {n} is on the way.',
+  DELIVERED: '🎉 Your order {n} was delivered. Thank you for shopping with us!',
+  CANCELLED: '❌ Your order {n} was cancelled. Message us if this is a surprise.',
+};
+
+/**
+ * Tell the customer about their order on Telegram, in the chat they signed up from.
+ * Needs no extra setup: customers have already started the bot. Never throws; the order
+ * and the admin's status change always succeed even when Telegram is down. Internal
+ * admin notes are never included.
+ */
+export async function notifyCustomer(deps: AppDeps, orderId: string, status: OrderStatus, backoffMs: number[] = [1000]): Promise<void> {
+  const { prisma, telegram, config, logger } = deps;
+  try {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { user: true } });
+    const chatId = order?.user.telegramChatId;
+    if (!order || !chatId || order.user.disabledAt) return;
+    const text = [
+      STATUS_MESSAGE[status].replace('{n}', order.number).replace('{total}', formatUsd(order.totalCents)),
+      '',
+      `${config.webOrigin[0] ?? ''}/account/orders/${order.number}`,
+    ].join('\n');
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await telegram.sendMessage(Number(chatId), text);
+        return;
+      } catch (err) {
+        if (attempt >= backoffMs.length) throw err;
+        await sleep(backoffMs[attempt]!);
+      }
+    }
+  } catch (err) {
+    logger.warn({ err, orderId, status }, 'customer Telegram message failed');
   }
 }
