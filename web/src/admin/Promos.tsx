@@ -95,7 +95,7 @@ export default function Promos() {
               </td>
               <td className={`${td} tabular-nums`}>{p.usedCount}{p.maxUses ? ` / ${p.maxUses}` : ''}</td>
               <td className={td}><Toggle checked={p.isActive} onChange={() => toggle.mutate(p)} label={`${p.code} active`} /></td>
-              <td className={`${td} text-right`}><button className="text-sm font-semibold text-yellow hover:underline" onClick={() => (setEditing(p.id), setD(fromPromo(p)), window.scrollTo({ top: 0, behavior: 'smooth' }))}>Edit</button></td>
+              <td className={`${td} text-right`}><button className="inline-block px-2 py-2 text-sm font-semibold text-yellow hover:underline" onClick={() => (setEditing(p.id), setD(fromPromo(p)), window.scrollTo({ top: 0, behavior: 'smooth' }))}>Edit</button></td>
             </tr>
           ))}
         </Table>

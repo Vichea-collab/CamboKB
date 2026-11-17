@@ -27,7 +27,7 @@ export function Header() {
       <BrandMark />
       <nav className="flex items-center gap-2">
         {me.data?.role === 'ADMIN' && (
-          <Link to="/admin" className="rounded-full border border-yellow/40 px-3 py-2 text-xs font-semibold text-yellow hover:bg-yellow/10 sm:px-3.5 sm:text-sm">
+          <Link to="/admin" className="hidden rounded-full border border-yellow/40 px-3.5 py-2 text-sm font-semibold text-yellow hover:bg-yellow/10 sm:block">
             {t.nav.admin}
           </Link>
         )}

@@ -62,15 +62,11 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
         })}
       </div>
       {count > 1 && (
-        <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
+        <div className="absolute inset-x-0 bottom-0.5 flex justify-center">
           {banners.map((b, i) => (
-            <button
-              key={b.id}
-              onClick={() => go(i)}
-              aria-label={`Show banner ${i + 1} of ${count}`}
-              aria-current={i === index}
-              className={`h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-yellow' : 'w-1.5 bg-white/45 hover:bg-white/70'}`}
-            />
+            <button key={b.id} onClick={() => go(i)} aria-label={`Show banner ${i + 1} of ${count}`} aria-current={i === index} className="group grid size-6 place-items-center">
+              <span className={`block h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-yellow' : 'w-1.5 bg-white/45 group-hover:bg-white/70'}`} />
+            </button>
           ))}
         </div>
       )}

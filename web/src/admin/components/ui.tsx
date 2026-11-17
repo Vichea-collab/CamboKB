@@ -20,10 +20,11 @@ export function Loading() {
   return <p className="py-10 text-center text-muted">Loading…</p>;
 }
 
-export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
+/** `compact` tables are narrow enough for a phone (few short columns); others scroll sideways inside their box. */
+export function Table({ head, children, compact }: { head: ReactNode; children: ReactNode; compact?: boolean }) {
   return (
     <div className="panel overflow-x-auto">
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <table className={`w-full text-left text-sm ${compact ? '' : 'min-w-[640px]'}`}>
         <thead className="border-b border-line text-xs text-muted">
           <tr>{head}</tr>
         </thead>

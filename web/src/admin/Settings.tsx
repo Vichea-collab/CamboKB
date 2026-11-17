@@ -88,13 +88,18 @@ export default function SettingsPage() {
           <p className="label">Grab by distance from the store</p>
           <div className="space-y-2">
             {d.grabTiers.map((tier, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-sm text-muted">Up to</span>
-                <input className="field w-20 tabular-nums" inputMode="decimal" value={tier.maxKm} onChange={(e) => setD({ grabTiers: d.grabTiers.map((x, j) => (j === i ? { ...x, maxKm: Number(e.target.value) || 0 } : x)) })} aria-label={`Tier ${i + 1} km`} />
-                <span className="text-sm text-muted">km →</span>
-                <input className="field w-24 tabular-nums" inputMode="decimal" defaultValue={dollars(tier.feeCents)} onChange={(e) => setD({ grabTiers: d.grabTiers.map((x, j) => (j === i ? { ...x, feeCents: toCents(e.target.value) } : x)) })} aria-label={`Tier ${i + 1} fee`} />
-                <span className="text-sm text-muted">$</span>
-                <button type="button" className="ml-auto rounded-lg px-2 py-1 text-danger hover:bg-danger/10" onClick={() => setD({ grabTiers: d.grabTiers.filter((_, j) => j !== i) })} aria-label={`Remove tier ${i + 1}`}>✕</button>
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted">Up to (km)</span>
+                  <input className="field tabular-nums" inputMode="decimal" value={tier.maxKm} onChange={(e) => setD({ grabTiers: d.grabTiers.map((x, j) => (j === i ? { ...x, maxKm: Number(e.target.value) || 0 } : x)) })} aria-label={`Tier ${i + 1} km`} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted">Fee ($)</span>
+                  <input className="field tabular-nums" inputMode="decimal" defaultValue={dollars(tier.feeCents)} onChange={(e) => setD({ grabTiers: d.grabTiers.map((x, j) => (j === i ? { ...x, feeCents: toCents(e.target.value) } : x)) })} aria-label={`Tier ${i + 1} fee`} />
+                </label>
+                <button type="button" className="inline-grid size-11 place-items-center rounded-xl text-danger hover:bg-danger/10" onClick={() => setD({ grabTiers: d.grabTiers.filter((_, j) => j !== i) })} aria-label={`Remove tier ${i + 1}`}>
+                  ✕
+                </button>
               </div>
             ))}
             <button type="button" className="btn-ghost px-3 py-2 text-sm" onClick={() => setD({ grabTiers: [...d.grabTiers, { maxKm: (d.grabTiers.at(-1)?.maxKm ?? 0) + 2, feeCents: d.grabBeyondFeeCents }] })}>

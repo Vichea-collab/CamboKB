@@ -33,13 +33,13 @@ export default function ProductDetail() {
   const max = Math.min(MAX_QTY, Math.max(1, p.stock));
   return (
     <div className="pb-24 md:pb-0">
-      <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink">
+      <Link to="/" className="-ml-1 mb-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-muted hover:text-ink">
         ← {t.common.back}
       </Link>
       <div className="grid gap-6 md:grid-cols-2 md:gap-10">
         <ImageGallery images={p.images} name={p.name} />
         <div>
-          <Link to={`/?category=${p.category.slug}`} className="text-sm font-bold text-yellow hover:underline">
+          <Link to={`/?category=${p.category.slug}`} className="inline-block py-2 text-sm font-bold text-yellow hover:underline">
             {p.category.name}
           </Link>
           <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-tight tracking-[-0.02em] md:text-4xl">{p.name}</h1>

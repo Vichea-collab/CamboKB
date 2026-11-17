@@ -1,12 +1,12 @@
 import { formatPhone, type PublicUser } from '@cambo/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { FormError } from '../../components/AuthCard';
 import { TelegramStep } from '../../components/TelegramStep';
 import { useTelegramVerification } from '../../hooks/useTelegramVerification';
 import { api, isApiError } from '../../lib/api';
-import { ME_KEY, useLogout, useSetMe } from '../../lib/auth';
+import { ME_KEY, useLogout, useMe, useSetMe } from '../../lib/auth';
 import { passwordProblem } from '../../lib/passwordCheck';
 import { t } from '../../lib/strings';
 import { useDocumentTitle } from '../../lib/useDocumentTitle';
@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const profile = useQuery({ queryKey: ['profile'], queryFn: () => api<Profile>('/me') });
   const logout = useLogout();
   const navigate = useNavigate();
+  const me = useMe();
 
   if (!profile.data) return <p className="py-10 text-center text-muted">{t.common.loading}</p>;
   return (
@@ -27,6 +28,12 @@ export default function ProfilePage() {
       <h1 className="mb-4 font-display text-2xl font-bold">{t.account.title}</h1>
       <AccountNav />
       <div className="space-y-4">
+        {me.data?.role === 'ADMIN' && (
+          <Link to="/admin" className="panel flex items-center justify-between gap-3 border-yellow/40 p-4 font-semibold text-yellow hover:bg-yellow/5">
+            <span>Open the admin dashboard</span>
+            <span aria-hidden>→</span>
+          </Link>
+        )}
         <NameForm profile={profile.data} />
         <PhoneSection phone={profile.data.user.phone} />
         <PasswordForm />

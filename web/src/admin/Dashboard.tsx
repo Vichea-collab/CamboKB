@@ -24,21 +24,25 @@ export default function Dashboard() {
         <Tile label="Low stock" value={String(s.lowStock.length)} sub="products with 3 or fewer" />
       </div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_340px]">
-        <section className="panel p-5">
+        <section className="panel min-w-0 p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-lg font-bold">Latest orders</h2>
-            <Link to="/admin/orders" className="text-sm font-semibold text-yellow hover:underline">
+            <Link to="/admin/orders" className="inline-block py-2 text-sm font-semibold text-yellow hover:underline">
               All orders
             </Link>
           </div>
           <ul className="divide-y divide-line">
             {latest.data?.items.map((o) => (
               <li key={o.id}>
-                <Link to={`/admin/orders/${o.id}`} className="flex items-center gap-3 py-3 hover:text-yellow">
-                  <span className="w-24 font-display font-bold">{o.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{o.contactName}</span>
-                  <StatusBadge status={o.status} />
-                  <span className="w-20 text-right font-bold tabular-nums">{formatUsd(o.totalCents)}</span>
+                <Link to={`/admin/orders/${o.id}`} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 py-3 hover:text-yellow">
+                  <span className="flex min-w-0 items-baseline gap-3">
+                    <span className="font-display font-bold">{o.number}</span>
+                    <span className="min-w-0 truncate text-sm text-muted">{o.contactName}</span>
+                  </span>
+                  <span className="text-right font-bold tabular-nums">{formatUsd(o.totalCents)}</span>
+                  <span className="col-span-2">
+                    <StatusBadge status={o.status} />
+                  </span>
                 </Link>
               </li>
             ))}

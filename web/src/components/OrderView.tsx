@@ -81,7 +81,7 @@ export function OrderSummary({ order, actions }: { order: Order; actions?: React
             </p>
             <p className="text-ink/85">{order.addressLine}</p>
             {order.lat !== null && order.lng !== null && (
-              <a className="mt-1 inline-block font-semibold text-yellow hover:underline" href={`https://maps.google.com/?q=${order.lat},${order.lng}`} target="_blank" rel="noopener noreferrer">
+              <a className="-my-1 mt-0 inline-block py-2 font-semibold text-yellow hover:underline" href={`https://maps.google.com/?q=${order.lat},${order.lng}`} target="_blank" rel="noopener noreferrer">
                 Open map pin
               </a>
             )}

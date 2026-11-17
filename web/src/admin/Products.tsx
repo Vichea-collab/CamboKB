@@ -73,10 +73,10 @@ export default function Products() {
               <td className={`${td} text-right tabular-nums ${p.stock <= 3 ? 'text-yellow' : ''} ${p.stock === 0 ? 'text-danger' : ''}`}>{p.stock}</td>
               {canReorder && (
                 <td className={`${td} text-right`}>
-                  <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised hover:text-ink disabled:opacity-30" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)} aria-label={`Move ${p.name} up`}>
+                  <button className="inline-grid size-9 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink disabled:opacity-30" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)} aria-label={`Move ${p.name} up`}>
                     ↑
                   </button>
-                  <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised hover:text-ink disabled:opacity-30" disabled={i === products.data.items.length - 1 || reorder.isPending} onClick={() => move(i, 1)} aria-label={`Move ${p.name} down`}>
+                  <button className="inline-grid size-9 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink disabled:opacity-30" disabled={i === products.data.items.length - 1 || reorder.isPending} onClick={() => move(i, 1)} aria-label={`Move ${p.name} down`}>
                     ↓
                   </button>
                 </td>

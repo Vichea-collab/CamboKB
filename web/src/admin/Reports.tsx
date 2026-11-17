@@ -92,7 +92,7 @@ export default function Reports() {
             <Tile label="Items sold" value={String(summary.data.totals.units)} />
             <Tile label="Average order" value={formatUsd(summary.data.totals.averageOrderCents)} />
           </div>
-          <section className="panel mt-5 p-5">
+          <section className="panel mt-5 min-w-0 p-5">
             <h2 className="mb-1 font-display text-lg font-bold">Revenue by {groupBy}</h2>
             <p className="mb-3 text-xs text-muted">Excludes cancelled orders. Days are Phnom Penh time.</p>
             <RevenueChart buckets={summary.data.buckets} groupBy={groupBy} />
@@ -125,12 +125,13 @@ export default function Reports() {
         </>
       )}
       <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_340px]">
-        <section>
+        <section className="min-w-0">
           <h2 className="mb-3 font-display text-lg font-bold">Top products</h2>
           {top.data && top.data.items.length === 0 ? (
             <p className="panel p-6 text-center text-sm text-muted">No sales in this period.</p>
           ) : (
             <Table
+              compact
               head={
                 <>
                   <th className={th}>Product</th>
@@ -149,7 +150,7 @@ export default function Reports() {
             </Table>
           )}
         </section>
-        <section className="space-y-5">
+        <section className="min-w-0 space-y-5">
           <Split title="By payment" rows={split.data?.byPaymentMethod.map((r) => ({ key: r.method, label: t.payment[r.method] ?? r.method, ...r })) ?? []} />
           <Split title="By delivery area" rows={split.data?.byRegion.map((r) => ({ key: r.region, label: t.region[r.region] ?? r.region, ...r })) ?? []} />
         </section>

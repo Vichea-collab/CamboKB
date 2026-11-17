@@ -27,19 +27,19 @@ export function ImageUploader({ images, onUpload, onReorder, onDelete }: { image
   };
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         {images.map((img, i) => (
           <figure key={img.id} className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-[#090c10]">
             <img src={img.sm} alt="" className="size-full object-cover" />
             {i === 0 && <span className="absolute left-1.5 top-1.5 rounded-full bg-yellow px-2 py-0.5 text-[10px] font-bold text-bg">Cover</span>}
             <div className="absolute inset-x-1.5 bottom-1.5 flex justify-between gap-1">
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="grid size-7 place-items-center rounded-lg bg-bg/85 text-xs disabled:opacity-30" aria-label={`Move photo ${i + 1} left`}>
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="grid size-8 place-items-center rounded-lg bg-bg/85 text-xs disabled:opacity-30" aria-label={`Move photo ${i + 1} left`}>
                 ←
               </button>
-              <button type="button" onClick={() => onDelete(img.id)} className="grid size-7 place-items-center rounded-lg bg-bg/85 text-xs text-danger" aria-label={`Delete photo ${i + 1}`}>
+              <button type="button" onClick={() => onDelete(img.id)} className="grid size-8 place-items-center rounded-lg bg-bg/85 text-xs text-danger" aria-label={`Delete photo ${i + 1}`}>
                 ✕
               </button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === images.length - 1} className="grid size-7 place-items-center rounded-lg bg-bg/85 text-xs disabled:opacity-30" aria-label={`Move photo ${i + 1} right`}>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === images.length - 1} className="grid size-8 place-items-center rounded-lg bg-bg/85 text-xs disabled:opacity-30" aria-label={`Move photo ${i + 1} right`}>
                 →
               </button>
             </div>

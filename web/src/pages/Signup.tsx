@@ -23,7 +23,7 @@ export default function Signup() {
       footer={
         <>
           {t.auth.haveAccount}{' '}
-          <Link to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-semibold text-yellow hover:underline">
+          <Link to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="inline-block py-2 font-semibold text-yellow hover:underline">
             {t.auth.loginButton}
           </Link>
         </>

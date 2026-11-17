@@ -34,7 +34,7 @@ export default function OrderDetail() {
       <PageHeader
         title={o.number}
         back={
-          <Link to="/admin/orders" className="no-print mb-2 inline-block text-sm font-semibold text-muted hover:text-ink">
+          <Link to="/admin/orders" className="no-print -ml-1 mb-1 inline-flex min-h-10 items-center rounded-lg px-1 text-sm font-semibold text-muted hover:text-ink">
             ← Orders
           </Link>
         }

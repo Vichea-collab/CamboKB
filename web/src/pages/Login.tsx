@@ -42,7 +42,7 @@ export default function Login() {
       footer={
         <>
           {t.auth.noAccount}{' '}
-          <Link to={`/signup${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="font-semibold text-yellow hover:underline">
+          <Link to={`/signup${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="inline-block py-2 font-semibold text-yellow hover:underline">
             {t.auth.signupLink}
           </Link>
         </>
@@ -62,7 +62,7 @@ export default function Login() {
             <label htmlFor="password" className="label">
               {t.auth.password}
             </label>
-            <Link to="/forgot-password" className="text-sm font-semibold text-muted hover:text-ink">
+            <Link to="/forgot-password" className="inline-block py-2 text-sm font-semibold text-muted hover:text-ink">
               {t.auth.forgot}
             </Link>
           </div>

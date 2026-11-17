@@ -22,7 +22,7 @@ export default function ForgotPassword() {
       title={t.auth.resetTitle}
       intro={tg.status === 'verified' ? t.auth.verifiedReset : t.auth.resetIntro}
       footer={
-        <Link to="/login" className="font-semibold text-yellow hover:underline">
+        <Link to="/login" className="inline-block py-2 font-semibold text-yellow hover:underline">
           {t.auth.loginButton}
         </Link>
       }

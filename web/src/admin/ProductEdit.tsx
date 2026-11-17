@@ -91,7 +91,7 @@ export default function ProductEdit() {
       <PageHeader
         title={isNew ? 'New product' : form.name || 'Product'}
         back={
-          <Link to="/admin/products" className="mb-2 inline-block text-sm font-semibold text-muted hover:text-ink">
+          <Link to="/admin/products" className="-ml-1 mb-1 inline-flex min-h-10 items-center rounded-lg px-1 text-sm font-semibold text-muted hover:text-ink">
             ← Products
           </Link>
         }

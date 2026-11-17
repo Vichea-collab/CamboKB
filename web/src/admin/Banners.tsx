@@ -68,13 +68,13 @@ export default function Banners() {
                   <Toggle checked={b.isActive} onChange={(v) => patch.mutate({ id: b.id, isActive: v })} label="Show banner" />
                   <span className="text-sm text-muted">{b.isActive ? 'Showing' : 'Hidden'}</span>
                   <span className="flex-1" />
-                  <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move banner up">
+                  <button className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move banner up">
                     ↑
                   </button>
-                  <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === banners.data.length - 1} aria-label="Move banner down">
+                  <button className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === banners.data.length - 1} aria-label="Move banner down">
                     ↓
                   </button>
-                  <button className="rounded-lg px-2 py-1 text-danger hover:bg-danger/10" onClick={() => confirm('Delete this banner?') && remove.mutate(b.id)} aria-label="Delete banner">
+                  <button className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-danger hover:bg-danger/10" onClick={() => confirm('Delete this banner?') && remove.mutate(b.id)} aria-label="Delete banner">
                     ✕
                   </button>
                 </div>

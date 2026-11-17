@@ -30,7 +30,7 @@ export default function CustomerDetail() {
   const u = c.data;
   return (
     <div className="max-w-3xl">
-      <PageHeader title={u.name} back={<Link to="/admin/customers" className="mb-2 inline-block text-sm font-semibold text-muted hover:text-ink">← Customers</Link>} />
+      <PageHeader title={u.name} back={<Link to="/admin/customers" className="-ml-1 mb-1 inline-flex min-h-10 items-center rounded-lg px-1 text-sm font-semibold text-muted hover:text-ink">← Customers</Link>} />
       <section className="panel mb-5 grid gap-4 p-5 sm:grid-cols-4">
         <Info label="Phone" value={formatPhone(u.phone)} />
         <Info label="Telegram" value={u.telegramUsername ? `@${u.telegramUsername}` : '—'} />

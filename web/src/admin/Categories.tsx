@@ -41,14 +41,14 @@ export default function Categories() {
               onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.name && rename.mutate({ id: c.id, name: e.target.value.trim() })}
             />
             <span className="w-24 shrink-0 text-right text-sm text-muted">{c.productCount} products</span>
-            <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${c.name} up`}>
+            <button className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${c.name} up`}>
               ↑
             </button>
-            <button className="rounded-lg px-2 py-1 text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === cats.data.length - 1} aria-label={`Move ${c.name} down`}>
+            <button className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-raised disabled:opacity-30" onClick={() => move(i, 1)} disabled={i === cats.data.length - 1} aria-label={`Move ${c.name} down`}>
               ↓
             </button>
             <button
-              className="rounded-lg px-2 py-1 text-danger hover:bg-danger/10 disabled:opacity-30"
+              className="inline-grid size-9 shrink-0 place-items-center rounded-lg text-danger hover:bg-danger/10 disabled:opacity-30"
               disabled={c.productCount > 0}
               title={c.productCount > 0 ? 'Move or archive its products first' : undefined}
               onClick={() => confirm(`Delete “${c.name}”?`) && remove.mutate(c.id)}

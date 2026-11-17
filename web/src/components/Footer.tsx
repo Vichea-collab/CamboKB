@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useMe } from '../lib/auth';
 import { telHref, useStore } from '../lib/store';
 import { t } from '../lib/strings';
 
@@ -12,6 +13,7 @@ const LINKS = [
 export function Footer() {
   const store = useStore();
   const info = store.data?.info;
+  const me = useMe();
   return (
     <footer className="mt-14 border-t border-line pt-8 text-sm text-muted">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
@@ -27,12 +29,17 @@ export function Footer() {
           )}
           {info?.hours && <p className="whitespace-pre-line">{info.hours}</p>}
         </div>
-        <nav aria-label="Store information" className="flex flex-wrap gap-x-6 gap-y-2">
+        <nav aria-label="Store information" className="-my-2 flex flex-wrap gap-x-6">
           {LINKS.map(([to, label]) => (
-            <Link key={to} to={to} className="hover:text-ink">
+            <Link key={to} to={to} className="inline-flex min-h-11 items-center hover:text-ink">
               {label}
             </Link>
           ))}
+          {me.data?.role === 'ADMIN' && (
+            <Link to="/admin" className="inline-flex min-h-11 items-center font-semibold text-yellow hover:underline">
+              {t.nav.admin}
+            </Link>
+          )}
         </nav>
       </div>
       <p className="mt-8 text-xs">© {new Date().getFullYear()} {store.data?.storeName ?? t.brand.name}</p>
