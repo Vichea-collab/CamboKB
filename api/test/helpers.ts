@@ -75,6 +75,9 @@ export class FakeFileClient implements FileClient {
   imageUrls(storageKey: string, width: number) {
     return buildImageUrls('http://localhost:4100/files', storageKey, width);
   }
+  publicBase() {
+    return 'http://localhost:4100/files';
+  }
 }
 
 /** Stands in for the report service: records calls, returns a fake PDF / JSON. */

@@ -12,6 +12,7 @@ import { authRouter } from './auth/routes';
 import { loadUser } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
+import { seoRouter } from './seo/routes';
 import { storeRouter } from './store/routes';
 import { telegramRouter } from './telegram/routes';
 import { accountRouter } from './account/routes';
@@ -66,6 +67,7 @@ export function createApp(deps: AppDeps): express.Express {
   });
 
   app.use(originCheck(config.webOrigin));
+  app.use(seoRouter(deps));
 
   const api = express.Router();
   api.use(loadUser(deps));

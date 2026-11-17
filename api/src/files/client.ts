@@ -8,6 +8,8 @@ export interface FileClient {
   deleteImage(storageKey: string): Promise<void>;
   /** Public URLs for the variants the file service wrote (it never upscales). */
   imageUrls(storageKey: string, width: number): ImageUrls;
+  /** Public base of the file service, e.g. https://shop.example.com/files */
+  publicBase(): string;
 }
 
 export function buildImageUrls(publicBase: string, storageKey: string, width: number): ImageUrls {
@@ -22,7 +24,7 @@ export class HttpFileClient implements FileClient {
   constructor(
     private readonly baseUrl: string,
     private readonly secret: string,
-    private readonly publicBase: string,
+    private readonly publicBaseUrl: string,
   ) {}
 
   private async request(path: string, init: RequestInit): Promise<Response> {
@@ -57,6 +59,11 @@ export class HttpFileClient implements FileClient {
   }
 
   imageUrls(storageKey: string, width: number) {
-    return buildImageUrls(this.publicBase, storageKey, width);
+    return buildImageUrls(this.publicBaseUrl, storageKey, width);
+  }
+
+
+  publicBase() {
+    return this.publicBaseUrl;
   }
 }
