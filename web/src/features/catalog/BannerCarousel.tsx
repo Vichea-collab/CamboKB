@@ -22,7 +22,7 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
     <section
       aria-roledescription="carousel"
       aria-label="Promotions"
-      className="relative mx-auto max-w-[920px] overflow-hidden rounded-[20px] border border-line bg-surface shadow-[0_4px_18px_rgb(0_0_0/0.35)]"
+      className="relative overflow-hidden rounded-[20px] border border-line bg-surface shadow-[0_4px_18px_rgb(0_0_0/0.35)]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
