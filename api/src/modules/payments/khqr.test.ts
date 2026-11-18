@@ -56,8 +56,9 @@ describe('KHQR payments with Bakong', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ method: 'KHQR', status: 'PENDING', amountCents: 4400, currency: 'USD' });
     const payBefore = new Date(res.body.payBefore).getTime();
-    expect(payBefore).toBeGreaterThan(Date.now() + 29 * MIN);
-    expect(payBefore).toBeLessThan(Date.now() + 31 * MIN);
+    // Unpaid KHQR orders are cancelled after 10 minutes, and the QR lasts exactly that long.
+    expect(payBefore).toBeGreaterThan(Date.now() + 9 * MIN);
+    expect(payBefore).toBeLessThanOrEqual(Date.now() + 10 * MIN + 1000);
 
     const qr: string = res.body.khqr.qr;
     expect(BakongKHQR.verify(qr).isValid).toBe(true);
@@ -75,11 +76,11 @@ describe('KHQR payments with Bakong', () => {
     expect((await ctx.prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(3);
   });
 
-  it('tells the customer to pay within 30 minutes when the order is placed', async () => {
+  it('tells the customer to pay within 10 minutes when the order is placed', async () => {
     const o = await placeKhqr();
     await vi.waitFor(() => expect(toCustomer()).toHaveLength(1));
     expect(toCustomer()[0]).toContain(o.number);
-    expect(toCustomer()[0]).toContain('KHQR within 30 minutes');
+    expect(toCustomer()[0]).toContain('KHQR within 10 minutes');
   });
 
   it('confirms the order as soon as Bakong reports the payment', async () => {
@@ -131,7 +132,7 @@ describe('KHQR payments with Bakong', () => {
     expect((await payment(o.number)).body.status).toBe('PAID');
   });
 
-  it('never lets a new QR outlive the 30-minute payment window', async () => {
+  it('never lets a new QR outlive the payment window', async () => {
     const o = await placeKhqr();
     const windowEnd = new Date(Date.now() + 4 * MIN);
     await ctx.prisma.payment.updateMany({ where: { orderId: o.id }, data: { expiresAt: windowEnd } });
@@ -148,7 +149,7 @@ describe('KHQR payments with Bakong', () => {
     expect(saved.status).toBe('CANCELLED');
     expect(saved.payment!.status).toBe('EXPIRED');
     expect((await ctx.prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(5);
-    await vi.waitFor(() => expect(toCustomer().some((t) => t.includes("wasn't paid within 30 minutes"))).toBe(true));
+    await vi.waitFor(() => expect(toCustomer().some((t) => t.includes("wasn't paid within 10 minutes"))).toBe(true));
     expect((await payment(o.number)).body).toMatchObject({ status: 'EXPIRED', khqr: null });
   });
 

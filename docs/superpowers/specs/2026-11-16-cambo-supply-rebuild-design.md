@@ -394,14 +394,14 @@ Owner's decision: invoices and sales reports.
 
 ## 13. KHQR payments (Bakong)
 
-Owner's decisions (2026-11-17): unpaid KHQR orders are cancelled after 30
-minutes; a confirmed payment auto-confirms the order.
+Owner's decisions (2026-11-17, window shortened 2026-11-18): unpaid KHQR orders
+are cancelled after 10 minutes; a confirmed payment auto-confirms the order.
 
 - **QR:** generated server-side with NBC's official `bakong-khqr` SDK as an
   *individual* KHQR to the store's Bakong account (`BAKONG_ACCOUNT_ID`, e.g.
   `name@aclb`), USD, exact order total, bill number = order number. Dynamic
   KHQR must carry an expiry: each QR lives 10 minutes (`KHQR_QR_TTL_MINUTES`)
-  and never past the order's 30-minute hold (`KHQR_ORDER_HOLD_MINUTES`), so no
+  and never past the order's 10-minute hold (`KHQR_ORDER_HOLD_MINUTES`), so no
   valid QR exists once an order can be cancelled. The customer can ask for a
   new QR; every QR's md5 is kept (`KhqrCode` table) and checked, so paying an
   older, still-valid QR is never missed.

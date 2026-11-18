@@ -36,7 +36,7 @@ const envSchema = z
     BAKONG_MERCHANT_NAME: z.string().trim().min(1).max(25).default('Cambo Supply'),
     BAKONG_MERCHANT_CITY: z.string().trim().min(1).max(15).default('Phnom Penh'),
     KHQR_QR_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
-    KHQR_ORDER_HOLD_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    KHQR_ORDER_HOLD_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(10),
   })
   .superRefine((e, ctx) => {
     if (e.TELEGRAM_MODE !== 'off') {

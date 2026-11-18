@@ -140,8 +140,8 @@ Phnom Penh and the provinces. Cash on delivery stays Phnom Penh only.
 **How it works:** checkout creates the order (stock is held) and shows a QR for the exact total,
 valid 10 minutes ("Get a new QR" if it runs out). The api asks Bakong whether it was paid, every few
 seconds while the customer watches and every 20 s in the background. When paid, the order confirms
-itself and you and the customer get Telegram messages. Unpaid after 30 minutes → cancelled, stock back,
-customer told. Every QR ever shown for an order is checked, and no QR outlives the 30 minutes.
+itself and you and the customer get Telegram messages. Unpaid after 10 minutes → cancelled, stock back,
+customer told. Every QR ever shown for an order is checked, and no QR outlives the 10 minutes.
 
 **Turn it on:**
 
