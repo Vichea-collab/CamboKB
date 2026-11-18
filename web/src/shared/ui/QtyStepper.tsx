@@ -1,17 +1,23 @@
+import { Minus, Plus } from 'lucide-react';
 import { MAX_QTY } from '../../features/cart/cart-store';
 
-export function QtyStepper({ value, onChange, max = MAX_QTY, label }: { value: number; onChange: (n: number) => void; max?: number; label: string }) {
-  const btn = 'grid size-8 place-items-center rounded-lg text-lg font-bold text-ink hover:bg-raised disabled:opacity-35';
+/** − 1 + control. `compact` is the pill used on product cards. */
+export function QtyStepper({ value, onChange, max = MAX_QTY, label, compact }: { value: number; onChange: (n: number) => void; max?: number; label: string; compact?: boolean }) {
+  const btn = `grid place-items-center text-ink transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-35 ${compact ? 'size-9' : 'size-10'}`;
   return (
-    <div className="inline-flex items-center rounded-xl border border-line bg-bg" role="group" aria-label={`Quantity for ${label}`}>
+    <div
+      className={`inline-flex items-center overflow-hidden rounded-xl ${compact ? 'bg-yellow/10 ring-1 ring-yellow/50' : 'bg-surface ring-1 ring-line-strong'}`}
+      role="group"
+      aria-label={`Quantity for ${label}`}
+    >
       <button type="button" className={btn} onClick={() => onChange(value - 1)} aria-label="Decrease quantity">
-        −
+        <Minus className="size-4" strokeWidth={2.5} aria-hidden />
       </button>
-      <span className="w-7 text-center text-sm font-bold tabular-nums" aria-live="polite">
+      <span className={`text-center text-sm font-bold tabular-nums ${compact ? 'w-7 text-yellow' : 'w-9'}`} aria-live="polite">
         {value}
       </span>
       <button type="button" className={btn} onClick={() => onChange(value + 1)} disabled={value >= max} aria-label="Increase quantity">
-        +
+        <Plus className="size-4" strokeWidth={2.5} aria-hidden />
       </button>
     </div>
   );

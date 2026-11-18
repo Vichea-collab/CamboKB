@@ -13,10 +13,11 @@ export function adminStatsRouter({ prisma }: AppDeps): Router {
       const agg = await prisma.order.aggregate({ where: { createdAt: { gte }, status: { not: 'CANCELLED' } }, _count: { _all: true }, _sum: { totalCents: true } });
       return { orders: agg._count._all, revenueCents: agg._sum.totalCents ?? 0 };
     };
-    const [todayStats, week, pendingCount, lowStock] = await Promise.all([
+    const [todayStats, week, pendingCount, khqrWaitingCount, lowStock] = await Promise.all([
       window(today),
       window(weekStart),
       prisma.order.count({ where: { status: 'PENDING' } }),
+      prisma.payment.count({ where: { method: 'KHQR', status: 'PENDING', order: { status: 'PENDING' } } }),
       prisma.product.findMany({
         where: { isActive: true, stock: { lte: 3 } },
         select: { id: true, name: true, stock: true },
@@ -24,7 +25,7 @@ export function adminStatsRouter({ prisma }: AppDeps): Router {
         take: 20,
       }),
     ]);
-    res.json({ today: todayStats, week, pendingCount, lowStock });
+    res.json({ today: todayStats, week, pendingCount, khqrWaitingCount, lowStock });
   });
   return r;
 }

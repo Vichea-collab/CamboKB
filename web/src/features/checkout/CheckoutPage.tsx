@@ -1,6 +1,7 @@
 import { DEFAULT_DELIVERY_SETTINGS, formatUsd } from '@cambo/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router';
 import { FormError } from '../../shared/ui/FormCard';
 import { PhoneInput } from '../../shared/ui/PhoneInput';
@@ -123,10 +124,34 @@ export default function Checkout() {
 
   return (
     <form onSubmit={onSubmit} className="pb-28 lg:pb-0" noValidate>
-      <h1 className="mb-5 font-display text-2xl font-bold">{t.checkout.title}</h1>
+      <h1 className="mb-4 font-display text-[1.7rem] font-extrabold tracking-[-0.03em]">{t.checkout.title}</h1>
+
+      {/* Phones: the order stays in view at the top, folded away until you want to check it. */}
+      <details className="group mb-5 overflow-hidden rounded-2xl bg-surface ring-1 ring-line lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            {t.checkout.summary}
+            <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+          </span>
+          <span className="font-display text-lg font-extrabold tabular-nums">{quote.data ? formatUsd(quote.data.totalCents) : '—'}</span>
+        </summary>
+        <ul className="divide-y divide-line border-t border-line px-4">
+          {lines.map((l) => (
+            <li key={l.productId} className="flex items-center gap-3 py-3">
+              <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-[#090c10]">{l.product.image && <img src={l.product.image.sm} alt="" className="size-full object-cover" />}</div>
+              <p className="min-w-0 flex-1 text-sm leading-snug">
+                <span className="line-clamp-2 font-semibold">{l.product.name}</span>
+                <span className="text-xs text-muted">× {l.quantity}</span>
+              </p>
+              <span className="text-sm font-bold tabular-nums">{formatUsd(l.product.priceCents * l.quantity)}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+
       <div className="grid gap-5 lg:grid-cols-[1fr_380px] lg:items-start">
         <div className="space-y-4">
-          <Section title={t.checkout.contact}>
+          <Section step={1} title={t.checkout.contact} done={Boolean(name.trim() && phone.trim())}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="contact-name" label={t.checkout.name}>
                 <input id="contact-name" className="field" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
@@ -137,7 +162,7 @@ export default function Checkout() {
             </div>
           </Section>
 
-          <Section title={t.checkout.delivery}>
+          <Section step={2} title={t.checkout.delivery} done={Boolean(address.trim())}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="region" label={t.checkout.region}>
                 <select id="region" className="field" value={region} onChange={(e) => chooseRegion(e.target.value as Region)}>
@@ -180,7 +205,7 @@ export default function Checkout() {
             </div>
           </Section>
 
-          <Section title={t.checkout.payment}>
+          <Section step={3} title={t.checkout.payment} done>
             <div className="space-y-2" role="radiogroup" aria-label={t.checkout.payment}>
               <PaymentOption checked={payment === 'COD'} disabled={!codAvailable} onSelect={() => setPayment('COD')} label={t.checkout.cod} hint={!codAvailable ? t.checkout.codProvinceHint : undefined} />
               <PaymentOption
@@ -197,7 +222,7 @@ export default function Checkout() {
 
         <aside className="lg:sticky lg:top-4">
           <Section title={t.checkout.summary}>
-            <ul className="divide-y divide-line">
+            <ul className="hidden divide-y divide-line lg:block">
               {lines.map((l) => (
                 <li key={l.productId} className="flex items-center gap-3 py-2.5 first:pt-0">
                   <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-[#090c10]">{l.product.image && <img src={l.product.image.sm} alt="" className="size-full object-cover" />}</div>
@@ -296,10 +321,22 @@ function usePlaceOrder() {
   return { submit, placing, error };
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, step, done }: { title: string; children: ReactNode; step?: number; done?: boolean }) {
   return (
-    <section className="panel p-5">
-      <h2 className="mb-4 font-display text-lg font-bold">{title}</h2>
+    <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
+      <h2 className="mb-4 flex items-center gap-3 font-display text-lg font-extrabold tracking-[-0.02em]">
+        {step && (
+          <span
+            className={`grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold transition-colors ${
+              done ? 'bg-green/15 text-green ring-1 ring-green/40' : 'bg-raised text-muted ring-1 ring-line-strong'
+            }`}
+            aria-label={`Step ${step}${done ? ', complete' : ''}`}
+          >
+            {done ? <Check className="size-4" strokeWidth={3} aria-hidden /> : step}
+          </span>
+        )}
+        {title}
+      </h2>
       {children}
     </section>
   );

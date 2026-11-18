@@ -49,6 +49,21 @@ describe('ProductCard', () => {
 
   it('shows the photo count when there are several photos', () => {
     renderCard(product({ imageCount: 4 }));
-    expect(screen.getByText('📷 4')).toBeInTheDocument();
+    expect(screen.getByLabelText('4 photos')).toBeInTheDocument();
+  });
+
+  it('turns into a quantity stepper once the item is in the cart', async () => {
+    const { useCart } = await import('../cart/cart-store');
+    useCart.setState({ items: [{ productId: '7f1c1f5e-3b0a-4f53-9d0e-2a7a1f6c9b11', quantity: 2 }] });
+    renderCard(product());
+    expect(screen.queryByRole('button', { name: /Add Aula F75/ })).not.toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Increase quantity' }));
+    expect(useCart.getState().items[0]!.quantity).toBe(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Decrease quantity' }));
+    expect(useCart.getState().items).toEqual([]);
+    useCart.setState({ items: [] });
   });
 });

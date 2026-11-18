@@ -136,6 +136,28 @@ describe('admin operations', () => {
     expect(res.body.lowStock).toEqual([{ id: product.id, name: 'Attack Shark X11 White', stock: 2 }]);
   });
 
+  it('counts orders per status for the Orders tabs', async () => {
+    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 20 } });
+    const a = await placeOrder();
+    await placeOrder();
+    await placeOrder();
+    await setStatus(a.id, 'CONFIRMED');
+    const res = await admin.get('/api/v1/admin/orders/counts');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ all: 3, PENDING: 2, CONFIRMED: 1, PACKED: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 });
+  });
+
+  it('keeps the order counts for admins only', async () => {
+    expect((await customer.get('/api/v1/admin/orders/counts')).status).toBe(403);
+  });
+
+  it('shows how many KHQR payments are waiting for money', async () => {
+    expect((await admin.get('/api/v1/admin/stats')).body.khqrWaitingCount).toBe(0);
+    await placeOrder({ region: 'PROVINCE', deliveryService: 'VET', pin: undefined, paymentMethod: 'KHQR' });
+    await placeOrder(); // cash on delivery doesn't count
+    expect((await admin.get('/api/v1/admin/stats')).body.khqrWaitingCount).toBe(1);
+  });
+
   it('alerts the admin chat about a new order, escaping customer text', async () => {
     const o = await placeOrder({ note: '<b>ring twice</b>' });
     await vi.waitFor(() => expect(ctx.telegram.sent.some((m) => m.chatId === '5000')).toBe(true));

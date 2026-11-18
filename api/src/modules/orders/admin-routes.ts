@@ -40,6 +40,14 @@ export function adminOrdersRouter(deps: AppDeps): Router {
     return { ...toOrderDto(o, files), customer: toPublicUser(o.user) };
   };
 
+  // Counts per status for the Orders tabs (registered before /orders/:id).
+  r.get('/orders/counts', async (_req, res) => {
+    const rows = await prisma.order.groupBy({ by: ['status'], _count: { _all: true } });
+    const counts: Record<string, number> = { PENDING: 0, CONFIRMED: 0, PACKED: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 };
+    for (const row of rows) counts[row.status] = row._count._all;
+    res.json({ all: Object.values(counts).reduce((a, b) => a + b, 0), ...counts });
+  });
+
   r.get('/orders', validate({ query: listQuery }), async (req, res) => {
     const { status, q, from, to, page, pageSize } = req.valid.query as z.infer<typeof listQuery>;
     const where: Prisma.OrderWhereInput = {};

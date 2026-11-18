@@ -1,59 +1,93 @@
+import { ShoppingBag, UserRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useMe } from '../features/auth/auth';
-import { t } from '../shared/lib/strings';
 import { useCart } from '../features/cart/cart-store';
+import { t } from '../shared/lib/strings';
 import { useUi } from '../shared/lib/ui-store';
 
-export function BrandMark() {
+export function BrandMark({ tagline = true }: { tagline?: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-3 rounded-xl" aria-label={`${t.brand.name} home`}>
-      <img src="/logo.svg" alt="" className="size-12 rounded-[14px] border border-line shadow-pop sm:size-[54px]" />
+    <Link to="/" className="flex items-center gap-2.5 rounded-xl" aria-label={`${t.brand.name} home`}>
+      <img src="/logo.svg" alt="" className="size-10 rounded-xl border border-line shadow-pop sm:size-11" />
       <span className="flex flex-col">
-        <span className="font-display text-[1.45rem] font-bold leading-none tracking-[-0.03em] sm:text-[1.6rem]">
+        <span className="font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.03em] sm:text-[1.5rem]">
           Cambo<span className="text-yellow">Supply</span>
         </span>
-        <span className="mt-1 text-[0.72rem] font-semibold text-muted">{t.brand.tagline}</span>
+        {tagline && <span className="mt-1 hidden text-[0.72rem] font-semibold text-muted sm:block">{t.brand.tagline}</span>}
       </span>
     </Link>
   );
+}
+
+/**
+ * Hides when scrolling down, comes back when scrolling up: more room for products on a phone,
+ * the cart is never more than a flick away. Publishes its visible height as --hdr so the
+ * filter bar can sit right under it.
+ */
+function useHideOnScroll() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        const delta = y - last;
+        if (Math.abs(delta) < 8) return;
+        setHidden(y > 160 && delta > 0);
+        last = y;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  useEffect(() => {
+    document.documentElement.style.setProperty('--hdr', hidden ? '0px' : '64px');
+  }, [hidden]);
+  return hidden;
 }
 
 export function Header() {
   const count = useCart((s) => s.count());
   const openCart = useUi((s) => s.openCart);
   const me = useMe();
+  const hidden = useHideOnScroll();
   return (
-    <header className="flex items-center justify-between gap-3 py-4">
-      <BrandMark />
-      <nav className="flex items-center gap-2">
-        {me.data?.role === 'ADMIN' && (
-          <Link to="/admin" className="hidden rounded-full border border-yellow/40 px-3.5 py-2 text-sm font-semibold text-yellow hover:bg-yellow/10 sm:block">
-            {t.nav.admin}
+    <header
+      className={`sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none ${hidden ? '-translate-y-full' : ''}`}
+    >
+      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <BrandMark />
+        <nav className="flex items-center gap-2">
+          {me.data?.role === 'ADMIN' && (
+            <Link to="/admin" className="hidden rounded-full border border-yellow/40 px-3.5 py-2 text-sm font-semibold text-yellow hover:bg-yellow/10 sm:block">
+              {t.nav.admin}
+            </Link>
+          )}
+          <Link
+            to={me.data ? '/account' : '/login'}
+            className="grid size-10 place-items-center rounded-full border border-line bg-surface text-muted transition-colors hover:text-ink"
+            aria-label={me.data ? t.nav.account : t.nav.login}
+          >
+            <UserRound className="size-[18px]" strokeWidth={2.2} aria-hidden />
           </Link>
-        )}
-        <Link
-          to={me.data ? '/account' : '/login'}
-          className="grid size-10 place-items-center rounded-full border border-line bg-surface text-muted hover:text-ink"
-          aria-label={me.data ? t.nav.account : t.nav.login}
-        >
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-          </svg>
-        </Link>
-        <button
-          onClick={openCart}
-          className="flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-bold text-yellow shadow-pop hover:bg-raised"
-          aria-label={`${t.nav.cart}, ${count} items`}
-        >
-          <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-            <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" />
-            <circle cx="10" cy="20.5" r="1.3" />
-            <circle cx="17" cy="20.5" r="1.3" />
-          </svg>
-          <span className="tabular-nums">{count}</span>
-        </button>
-      </nav>
+          <button
+            onClick={openCart}
+            className="relative grid size-10 place-items-center rounded-full border border-yellow/40 bg-yellow/10 text-yellow transition-colors hover:bg-yellow/20"
+            aria-label={`${t.nav.cart}, ${count} items`}
+          >
+            <ShoppingBag className="size-[18px]" strokeWidth={2.2} aria-hidden />
+            {count > 0 && (
+              <span key={count} className="bump absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-yellow px-1 text-[11px] font-extrabold leading-5 text-yellow-ink tabular-nums">
+                {count}
+              </span>
+            )}
+          </button>
+        </nav>
+      </div>
     </header>
   );
 }

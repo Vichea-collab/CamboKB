@@ -71,7 +71,8 @@ describe('Checkout', () => {
     expect(screen.queryByRole('option', { name: /Grab/ })).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Cash on delivery/ })).toBeDisabled();
     expect(screen.getByText('Cash on delivery is only available in Phnom Penh.')).toBeInTheDocument();
-    expect(await screen.findByText('$23')).toBeInTheDocument();
+    // The total appears in the phone summary bar and in the order summary panel.
+    expect((await screen.findAllByText('$23')).length).toBeGreaterThan(0);
   });
 
   it('explains an invalid promo code', async () => {

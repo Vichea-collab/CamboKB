@@ -3,7 +3,11 @@ export const t = {
   brand: { name: 'Cambo Supply', tagline: 'Keyboards · mice · desk setup' },
   nav: { cart: 'Cart', account: 'Account', login: 'Log in', admin: 'Admin', orders: 'My orders', logout: 'Log out' },
   home: {
-    searchPlaceholder: 'Search keyboards, switches, mice…',
+    searchPlaceholder: 'Search keyboards, mice…',
+    sort: 'Sort',
+    sortFeatured: 'Featured',
+    sortPriceAsc: 'Price: low to high',
+    sortPriceDesc: 'Price: high to low',
     all: 'All',
     count: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
     empty: 'Nothing matches that search. Try another word or pick a category.',
