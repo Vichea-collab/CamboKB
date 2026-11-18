@@ -28,6 +28,53 @@ export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
   }, []);
   useEffect(() => stop, [stop]);
 
+  /** Ask every 2 s whether the number was shared, until verified, expired or given up. */
+  const poll = useCallback(
+    (requestId: string) => {
+      startedAt.current = Date.now();
+      timer.current = setInterval(async () => {
+        if (Date.now() - startedAt.current > GIVE_UP_MS) {
+          stop();
+          setState((s) => ({ ...s, status: 'expired' }));
+          return;
+        }
+        try {
+          const st = await api<StatusResponse>(`/auth/telegram/${requestId}/status`);
+          if (st.status === 'VERIFIED') {
+            stop();
+            setState((s) => ({ ...s, status: 'verified', maskedPhone: st.phone, firstName: st.firstName }));
+          } else if (st.status === 'EXPIRED' || st.status === 'COMPLETED') {
+            stop();
+            setState((s) => ({ ...s, status: 'expired' }));
+          }
+        } catch {
+          // Transient network error: keep polling until the give-up time.
+        }
+      }, POLL_MS);
+    },
+    [stop],
+  );
+
+  // A reload, or a phone that suspended the page while the customer was in Telegram, must not
+  // lose a verification that already happened: ask the server what this browser has open.
+  useEffect(() => {
+    let live = true;
+    api<{ request: (StatusResponse & { requestId: string }) | null }>(`/auth/telegram/current?purpose=${purpose}`)
+      .then(({ request }) => {
+        if (!live || !request) return;
+        if (request.status === 'VERIFIED') {
+          setState({ status: 'verified', requestId: request.requestId, maskedPhone: request.phone, firstName: request.firstName });
+        } else if (request.status === 'PENDING') {
+          setState({ status: 'waiting', requestId: request.requestId });
+          poll(request.requestId);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [purpose, poll]);
+
   const start = useCallback(async () => {
     stop();
     setState({ status: 'starting' });
@@ -40,31 +87,11 @@ export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
       if (tg?.openTelegramLink) tg.openTelegramLink(res.deepLink);
       else window.open(res.deepLink, '_blank', 'noopener');
       setState({ status: 'waiting', deepLink: res.deepLink, requestId: res.requestId });
-      startedAt.current = Date.now();
-
-      timer.current = setInterval(async () => {
-        if (Date.now() - startedAt.current > GIVE_UP_MS) {
-          stop();
-          setState((s) => ({ ...s, status: 'expired' }));
-          return;
-        }
-        try {
-          const st = await api<StatusResponse>(`/auth/telegram/${res.requestId}/status`);
-          if (st.status === 'VERIFIED') {
-            stop();
-            setState((s) => ({ ...s, status: 'verified', maskedPhone: st.phone, firstName: st.firstName }));
-          } else if (st.status === 'EXPIRED' || st.status === 'COMPLETED') {
-            stop();
-            setState((s) => ({ ...s, status: 'expired' }));
-          }
-        } catch {
-          // Transient network error: keep polling until the give-up time.
-        }
-      }, POLL_MS);
+      poll(res.requestId);
     } catch (error) {
       setState({ status: 'error', error });
     }
-  }, [purpose, phone, stop]);
+  }, [purpose, phone, stop, poll]);
 
   const reset = useCallback(() => {
     stop();

@@ -88,6 +88,26 @@ describe('telegram phone verification', () => {
     expect((await agent.post('/api/v1/auth/signup/complete').set('Origin', WEB_ORIGIN).send(body)).status).toBe(409);
   });
 
+  it('lets a reloaded page pick up its own verified request', async () => {
+    const { agent, requestId, token } = await start(ctx, { purpose: 'SIGNUP' });
+    await sendStart(ctx, 777, token);
+    await sendContact(ctx, 777, '85512345678');
+    const res = await agent.get('/api/v1/auth/telegram/current').query({ purpose: 'SIGNUP' });
+    expect(res.status).toBe(200);
+    expect(res.body.request).toMatchObject({ requestId, status: 'VERIFIED', firstName: 'Dara', phone: '+855 •• ••• 678' });
+  });
+
+  it("reports a request that is still waiting, but never someone else's or a finished one", async () => {
+    const { agent, requestId, token } = await start(ctx, { purpose: 'SIGNUP' });
+    expect((await agent.get('/api/v1/auth/telegram/current').query({ purpose: 'SIGNUP' })).body.request).toMatchObject({ requestId, status: 'PENDING' });
+    expect((await agent.get('/api/v1/auth/telegram/current').query({ purpose: 'RESET' })).body.request).toBeNull();
+    expect((await request.agent(ctx.app).get('/api/v1/auth/telegram/current').query({ purpose: 'SIGNUP' })).body.request).toBeNull();
+    await sendStart(ctx, 777, token);
+    await sendContact(ctx, 777, '85512345678');
+    await agent.post('/api/v1/auth/signup/complete').set('Origin', WEB_ORIGIN).send({ requestId, name: 'Dara', password: TEST_PASSWORD });
+    expect((await agent.get('/api/v1/auth/telegram/current').query({ purpose: 'SIGNUP' })).body.request).toBeNull();
+  });
+
   it('only the browser that started the request can read or complete it', async () => {
     const { requestId, token } = await start(ctx, { purpose: 'SIGNUP' });
     await sendStart(ctx, 777, token);

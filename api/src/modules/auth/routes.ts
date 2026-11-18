@@ -4,6 +4,7 @@ import {
   loginSchema,
   resetCompleteSchema,
   signupCompleteSchema,
+  TELEGRAM_AUTH_PURPOSES,
   telegramStartSchema,
   uuidSchema,
   type ChangePasswordInput,
@@ -23,6 +24,7 @@ import { hashPassword, verifyAgainstDummy, verifyPassword } from './password';
 import { clearSessionCookie, revokeAllSessions, revokeSession, startSession, toPublicUser } from './sessions';
 import {
   consumeVerifiedRequest,
+  effectiveStatus,
   findOwnRequest,
   startTelegramAuth,
   statusView,
@@ -95,6 +97,16 @@ export function authRouter(deps: AppDeps): Router {
       maxAge: TG_REQUEST_TTL_MS + 5 * 60 * 1000,
     });
     res.json(result);
+  });
+
+  // The request this browser started (found through its cookie), so a page that was reloaded or
+  // suspended while the customer was in Telegram can carry on instead of starting over.
+  r.get('/telegram/current', validate({ query: z.object({ purpose: z.enum(TELEGRAM_AUTH_PURPOSES) }) }), async (req, res) => {
+    const { purpose } = req.valid.query as { purpose: (typeof TELEGRAM_AUTH_PURPOSES)[number] };
+    const id = req.cookies?.[TG_REQUEST_COOKIE];
+    const found = typeof id === 'string' && uuidSchema.safeParse(id).success ? await findOwnRequest(deps, req, id) : null;
+    const open = found && found.purpose === purpose && ['PENDING', 'VERIFIED'].includes(effectiveStatus(found));
+    res.set('Cache-Control', 'no-store').json({ request: open ? { requestId: found.id, ...statusView(found) } : null });
   });
 
   r.get('/telegram/:id/status', validate({ params: z.object({ id: uuidSchema }) }), async (req, res) => {

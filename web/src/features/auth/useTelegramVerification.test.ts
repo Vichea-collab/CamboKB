@@ -21,6 +21,7 @@ describe('useTelegramVerification', () => {
 
   const statuses = (...list: object[]) => {
     mockApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/auth/telegram/current')) return { request: null };
       if (path === '/auth/telegram/start') return START;
       return list.length > 1 ? list.shift() : list[0];
     });
@@ -64,5 +65,27 @@ describe('useTelegramVerification', () => {
     unmount();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(statusCalls()).toBe(calls);
+  });
+
+  it('picks up a verification that finished while the page was away (reload, or back from Telegram)', async () => {
+    mockApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/auth/telegram/current')) return { request: { requestId: START.requestId, status: 'VERIFIED', phone: '+855 •• ••• 678', firstName: 'Dara' } };
+      throw new Error(`unexpected ${path}`);
+    });
+    const { result } = renderHook(() => useTelegramVerification('SIGNUP'));
+    await act(async () => {});
+    expect(mockApi).toHaveBeenCalledWith('/auth/telegram/current?purpose=SIGNUP');
+    expect(result.current).toMatchObject({ status: 'verified', requestId: START.requestId, maskedPhone: '+855 •• ••• 678', firstName: 'Dara' });
+  });
+
+  it('keeps waiting for a request that was started before the reload', async () => {
+    mockApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/auth/telegram/current')) return { request: { requestId: START.requestId, status: 'PENDING' } };
+      return { status: 'PENDING' };
+    });
+    const { result } = renderHook(() => useTelegramVerification('SIGNUP'));
+    await act(async () => {});
+    expect(result.current.status).toBe('waiting');
+    expect(result.current.requestId).toBe(START.requestId);
   });
 });
