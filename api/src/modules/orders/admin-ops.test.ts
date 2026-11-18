@@ -160,8 +160,8 @@ describe('admin operations', () => {
 
   it('alerts the admin chat about a new order, escaping customer text', async () => {
     const o = await placeOrder({ note: '<b>ring twice</b>' });
-    await vi.waitFor(() => expect(ctx.telegram.sent.some((m) => m.chatId === '5000')).toBe(true));
-    const msg = ctx.telegram.sent.find((m) => m.chatId === '5000')!;
+    await vi.waitFor(() => expect(ctx.telegram.sent.some((m) => String(m.chatId) === '5000')).toBe(true));
+    const msg = ctx.telegram.sent.find((m) => String(m.chatId) === '5000')!;
     expect(msg.text).toContain(o.number);
     expect(msg.text).toContain('&lt;b&gt;ring twice&lt;/b&gt;');
     expect(msg.text).toContain('2 × Attack Shark X11 White');
@@ -178,6 +178,6 @@ describe('admin operations', () => {
     await ctx.prisma.storeSetting.update({ where: { id: 1 }, data: { telegramNotify: false } });
     await placeOrder();
     await new Promise((r) => setTimeout(r, 200));
-    expect(ctx.telegram.sent.filter((m) => m.chatId === '5000')).toHaveLength(0);
+    expect(ctx.telegram.sent.filter((m) => String(m.chatId) === '5000')).toHaveLength(0);
   });
 });

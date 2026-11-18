@@ -1,6 +1,7 @@
 import type { AppDeps } from '../../http/app';
 import { sha256 } from '../auth/sessions';
 import { formatUsd, normalizePhone } from '@cambo/shared';
+import { handleCallbackQuery } from './order-actions';
 import type { TgMessage, TgUpdate } from '../../integrations/telegram/client';
 
 export const BOT_TEXT = {
@@ -19,6 +20,7 @@ export const BOT_TEXT = {
 const removeKeyboard = { remove_keyboard: true };
 
 export async function handleTelegramUpdate(deps: AppDeps, update: TgUpdate): Promise<void> {
+  if (update.callback_query) return handleCallbackQuery(deps, update.callback_query);
   const msg = update.message;
   if (!msg?.from || msg.from.is_bot || msg.chat.type !== 'private') return;
   if (msg.text?.startsWith('/start')) return handleStart(deps, msg);

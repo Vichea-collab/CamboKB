@@ -7,6 +7,7 @@ import { HttpFileClient } from './integrations/files/client';
 import { HttpReportClient } from './integrations/reports/client';
 import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './integrations/telegram/client';
 import { startPolling } from './modules/bot/poller';
+import { startOutboxWorker } from './modules/bot/outbox';
 import { setupBot } from './modules/bot/setup';
 import { startKhqrSweeper } from './modules/payments/khqr';
 
@@ -26,12 +27,14 @@ async function main() {
   const app = createApp(deps);
   const server = app.listen(config.port, () => logger.info(`API listening on :${config.port}`));
   const stopBackground = await startBackground(deps);
+  const stopOutbox = startOutboxWorker(deps);
   const stopSweeper = config.bakong.enabled ? startKhqrSweeper(deps) : () => {};
   if (!config.bakong.enabled) logger.info('KHQR payments off (set BAKONG_ACCOUNT_ID and BAKONG_TOKEN to turn them on)');
 
   const shutdown = (signal: string) => {
     logger.info(`${signal} received, shutting down`);
     stopBackground();
+    stopOutbox();
     stopSweeper();
     server.close(async () => {
       await prisma.$disconnect();

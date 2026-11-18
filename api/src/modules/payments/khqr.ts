@@ -5,6 +5,8 @@ import { AppError } from '../../http/errors';
 import { BakongError, type BakongCheck } from '../../integrations/bakong/client';
 import { createKhqr } from '../../integrations/bakong/khqr';
 import { notifyAdmin, notifyCustomer } from '../bot/notify';
+import { orderKeyboard } from '../bot/order-actions';
+import { publishOrderUpdate } from '../orders/status';
 import { cancelOrder } from '../orders/orders';
 
 /** Customer polling asks Bakong at most this often per payment. */
@@ -153,9 +155,14 @@ async function markPaid(deps: AppDeps, paymentId: string, md5: string, tx: Extra
   });
 
   const n = payment.order.number;
+  if (outcome !== 'already') void publishOrderUpdate(deps, payment.orderId, 'payment');
   if (outcome === 'confirmed') {
+    void publishOrderUpdate(deps, payment.orderId);
     void notifyCustomer(deps, payment.orderId, 'PAID');
-    void notifyAdmin(deps, `💰 Payment received: order ${n}, ${formatUsd(payment.amountCents)} via KHQR. The order is confirmed.`);
+    void notifyAdmin(deps, `💰 Payment received: order ${n}, ${formatUsd(payment.amountCents)} via KHQR. The order is confirmed.`, {
+      replyMarkup: orderKeyboard({ id: payment.orderId, status: 'CONFIRMED' }),
+      dedupeKey: `order:${payment.orderId}:admin:paid`,
+    });
   } else if (outcome === 'paid-after-cancel') {
     void notifyAdmin(deps, `⚠️ Order ${n} was paid (${formatUsd(payment.amountCents)} via KHQR) but it is cancelled: please refund the customer, or restore the order by hand.`);
   }
@@ -175,7 +182,11 @@ async function expirePayment(deps: AppDeps, paymentId: string): Promise<boolean>
     await cancelOrder(db, order, null, `Not paid within ${config.bakong.holdMinutes} minutes`);
     return order.id;
   });
-  if (cancelledOrderId) void notifyCustomer(deps, cancelledOrderId, 'PAYMENT_EXPIRED');
+  if (cancelledOrderId) {
+    void notifyCustomer(deps, cancelledOrderId, 'PAYMENT_EXPIRED');
+    void publishOrderUpdate(deps, cancelledOrderId);
+    void publishOrderUpdate(deps, cancelledOrderId, 'payment');
+  }
   return Boolean(cancelledOrderId);
 }
 

@@ -47,7 +47,7 @@ describe('KHQR payments with Bakong', () => {
   const payment = (number: string, agent = customer) => agent.get(`/api/v1/orders/${number}/payment`);
   const codes = (orderId: string) => ctx.prisma.khqrCode.findMany({ where: { payment: { orderId } }, orderBy: { createdAt: 'asc' } });
   const toCustomer = () => ctx.telegram.sent.filter((m) => m.chatId === TG).map((m) => m.text);
-  const toAdmin = () => ctx.telegram.sent.filter((m) => m.chatId === '5000').map((m) => m.text);
+  const toAdmin = () => ctx.telegram.sent.filter((m) => String(m.chatId) === '5000').map((m) => m.text);
 
   it('takes province orders with KHQR and gives a valid QR for the exact total', async () => {
     const o = await placeKhqr();

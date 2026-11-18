@@ -1,6 +1,8 @@
 import type { OrderStatus } from '@prisma/client';
 import { formatUsd } from '@cambo/shared';
 import type { AppDeps } from '../../http/app';
+import { enqueueTelegram } from './outbox';
+import { orderKeyboard } from './order-actions';
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -8,11 +10,9 @@ const REGION = { PHNOM_PENH: 'Phnom Penh', PROVINCE: 'Province' } as const;
 const SERVICE = { GRAB: 'Grab', VET: 'VET Express', JNT: 'J&T Express' } as const;
 const PAYMENT = { COD: 'Cash on Delivery', KHQR: 'KHQR' } as const;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** Send the admin chat a summary of a new order. Retries, then logs; never throws. */
-export async function notifyNewOrder(deps: AppDeps, orderId: string, backoffMs: number[] = [1000, 3000]): Promise<void> {
-  const { prisma, telegram, config, logger } = deps;
+/** Queue a summary of a new order for the admin chat, with buttons to work the order. Never throws. */
+export async function notifyNewOrder(deps: AppDeps, orderId: string): Promise<void> {
+  const { prisma, config, logger } = deps;
   try {
     const chatId = config.telegram.adminChatId;
     if (!chatId) return;
@@ -41,15 +41,7 @@ export async function notifyNewOrder(deps: AppDeps, orderId: string, backoffMs: 
     ];
     const text = lines.join('\n');
 
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await telegram.sendMessage(chatId, text, { parseMode: 'HTML' });
-        return;
-      } catch (err) {
-        if (attempt >= backoffMs.length) throw err;
-        await sleep(backoffMs[attempt]!);
-      }
-    }
+    await enqueueTelegram(deps, { chatId, text, parseMode: 'HTML', replyMarkup: orderKeyboard(o), dedupeKey: `order:${o.id}:admin:new` });
   } catch (err) {
     logger.error({ err, orderId }, 'new-order Telegram alert failed');
   }
@@ -74,8 +66,8 @@ const STATUS_MESSAGE: Record<CustomerEvent, string> = {
  * and the admin's status change always succeed even when Telegram is down. Internal
  * admin notes are never included.
  */
-export async function notifyCustomer(deps: AppDeps, orderId: string, status: CustomerEvent, backoffMs: number[] = [1000]): Promise<void> {
-  const { prisma, telegram, config, logger } = deps;
+export async function notifyCustomer(deps: AppDeps, orderId: string, status: CustomerEvent): Promise<void> {
+  const { prisma, config, logger } = deps;
   try {
     const order = await prisma.order.findUnique({ where: { id: orderId }, include: { user: true, payment: true } });
     const chatId = order?.user.telegramChatId;
@@ -91,29 +83,21 @@ export async function notifyCustomer(deps: AppDeps, orderId: string, status: Cus
       '',
       `${config.webOrigin[0] ?? ''}/account/orders/${order.number}`,
     ].join('\n');
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await telegram.sendMessage(Number(chatId), text);
-        return;
-      } catch (err) {
-        if (attempt >= backoffMs.length) throw err;
-        await sleep(backoffMs[attempt]!);
-      }
-    }
+    await enqueueTelegram(deps, { chatId, text, dedupeKey: `order:${orderId}:customer:${status}` });
   } catch (err) {
     logger.warn({ err, orderId, status }, 'customer Telegram message failed');
   }
 }
 
-/** A plain message to the admin chat (if set up and alerts are on). Never throws. */
-export async function notifyAdmin(deps: AppDeps, text: string): Promise<void> {
-  const { prisma, telegram, config, logger } = deps;
+/** A message to the admin chat (if set up and alerts are on). Never throws. */
+export async function notifyAdmin(deps: AppDeps, text: string, opts: { replyMarkup?: unknown; dedupeKey?: string } = {}): Promise<void> {
+  const { prisma, config, logger } = deps;
   try {
     const chatId = config.telegram.adminChatId;
     if (!chatId) return;
     const settings = await prisma.storeSetting.findUnique({ where: { id: 1 } });
     if (settings && !settings.telegramNotify) return;
-    await telegram.sendMessage(chatId, text);
+    await enqueueTelegram(deps, { chatId, text, ...opts });
   } catch (err) {
     logger.warn({ err }, 'admin Telegram message failed');
   }

@@ -12,7 +12,8 @@ services:
       POSTGRES_USER: cambo
       POSTGRES_PASSWORD: cambo
       POSTGRES_DB: cambo_supply
-    ports: ['5432:5432']
+    # Set DB_PORT if 5432 is already used by a Postgres on this machine.
+    ports: ['${DB_PORT:-5432}:5432']
     volumes: [db-data:/var/lib/postgresql/data]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_supply']

@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { useUi } from '../../shared/lib/ui-store';
 import { FormError } from '../../shared/ui/FormCard';
 import { api } from '../../shared/lib/api';
 import { useCategories } from '../catalog/api';
 import { dollars, Loading, PageHeader, toCents, Toggle } from './components/ui';
 import { ImageUploader } from './components/ImageUploader';
+import { SaveBar, useUnsavedGuard } from './components/SaveBar';
 import { SpecEditor } from './components/SpecEditor';
 import type { AdminProduct } from './types';
 
@@ -20,7 +22,13 @@ export default function ProductEdit() {
   const categories = useCategories();
   const product = useQuery({ queryKey: ['admin', 'product', id], queryFn: () => api<AdminProduct>(`/admin/products/${id}`), enabled: !isNew });
   const [form, setForm] = useState<Form>(blank);
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const showToast = useUi((s) => s.showToast);
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(dirty);
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => {
+    setDirty(true);
+    setForm((f) => ({ ...f, [k]: v }));
+  };
 
   useEffect(() => {
     const p = product.data;
@@ -65,6 +73,8 @@ export default function ProductEdit() {
     },
     onSuccess: (p) => {
       refresh(p);
+      setDirty(false);
+      showToast(isNew ? 'Product created' : 'Changes saved');
       if (isNew) navigate(`/admin/products/${p.id}`, { replace: true });
     },
   });
@@ -102,14 +112,10 @@ export default function ProductEdit() {
                 View in shop
               </a>
             )}
-            <button className="btn-primary px-4 py-2.5 text-sm" disabled={save.isPending || !form.name.trim() || !form.price}>
-              {save.isPending ? 'Saving…' : isNew ? 'Create product' : 'Save changes'}
-            </button>
           </>
         }
       />
       <FormError>{save.error ? (save.error as Error).message : undefined}</FormError>
-      {save.isSuccess && !save.isPending && <p className="mb-3 text-sm font-semibold text-green">Saved.</p>}
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">
           <section className="panel space-y-4 p-5">
@@ -180,6 +186,7 @@ export default function ProductEdit() {
           </section>
         </aside>
       </div>
+      <SaveBar dirty={dirty || isNew} saving={save.isPending} label={isNew ? 'Create product' : 'Save changes'} disabled={!form.name.trim() || !form.price} />
     </form>
   );
 }

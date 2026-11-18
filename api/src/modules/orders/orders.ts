@@ -4,6 +4,7 @@ import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import type { FileClient } from '../../integrations/files/client';
 import { notifyCustomer, notifyNewOrder } from '../bot/notify';
+import { publishAdminEvent } from '../../lib/events';
 import { getPaymentProvider } from '../payments/providers';
 import { buildQuote } from './quote';
 
@@ -135,6 +136,7 @@ export async function createOrder(
 
   void notifyNewOrder(deps, order.id);
   void notifyCustomer(deps, order.id, 'PENDING');
+  publishAdminEvent({ type: 'order.created', orderId: order.id, number: order.number, totalCents: order.totalCents, customer: order.contactName });
   return { order, created: true };
 }
 

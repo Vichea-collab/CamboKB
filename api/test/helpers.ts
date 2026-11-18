@@ -8,6 +8,7 @@ import { AppError } from '../src/http/errors';
 import type { ReportClient } from '../src/integrations/reports/client';
 import { BakongError, type BakongCheck, type BakongClient } from '../src/integrations/bakong/client';
 import type { TelegramClient } from '../src/integrations/telegram/client';
+import { outboxIdle } from '../src/modules/bot/outbox';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
 export const WEB_ORIGIN = 'http://localhost:5173';
@@ -37,9 +38,20 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
 export class FakeTelegramClient implements TelegramClient {
   sent: { chatId: number | string; text: string; opts?: Parameters<TelegramClient['sendMessage']>[2] }[] = [];
   failSends = false;
+  /** When set, the next sends fail with this error (e.g. a 429 or 403) until cleared. */
+  failWith: Error | null = null;
+  answers: { id: string; text?: string; alert?: boolean }[] = [];
+  edits: { chatId: number | string; messageId: number; replyMarkup: unknown }[] = [];
   async sendMessage(chatId: number | string, text: string, opts?: Parameters<TelegramClient['sendMessage']>[2]) {
+    if (this.failWith) throw this.failWith;
     if (this.failSends) throw new Error('telegram down');
     this.sent.push({ chatId, text, opts });
+  }
+  async answerCallbackQuery(id: string, text?: string, alert?: boolean) {
+    this.answers.push({ id, text, alert });
+  }
+  async editReplyMarkup(chatId: number | string, messageId: number, replyMarkup: unknown) {
+    this.edits.push({ chatId, messageId, replyMarkup });
   }
   async getUpdates() {
     return [];
@@ -127,6 +139,7 @@ export { BakongError };
 export const TINY_PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
 export async function resetDb(db: PrismaClient = testPrisma()) {
+  await outboxIdle();
   const tables = await db.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length) {

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { FormError } from '../../shared/ui/FormCard';
 import { api } from '../../shared/lib/api';
+import { useUi } from '../../shared/lib/ui-store';
+import { SaveBar, useUnsavedGuard } from './components/SaveBar';
 import { dollars, Loading, PageHeader, toCents, Toggle } from './components/ui';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
@@ -18,15 +20,28 @@ export default function SettingsPage() {
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api<Settings>('/admin/settings') });
   const [s, setS] = useState<Settings | null>(null);
+  const showToast = useUi((st) => st.showToast);
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(dirty);
   useEffect(() => {
     if (settings.data) setS(settings.data);
   }, [settings.data]);
-  const save = useMutation({ mutationFn: (body: Settings) => api<Settings>('/admin/settings', { method: 'PUT', body }), onSuccess: (r) => qc.setQueryData(['admin', 'settings'], r) });
+  // Every edit goes through setS below; wrap it so we know when there is something to save.
+  const edit = (next: Settings) => {
+    setDirty(true);
+    setS(next);
+  };
+  const save = useMutation({ mutationFn: (body: Settings) => api<Settings>('/admin/settings', { method: 'PUT', body }), onSuccess: (r) => {
+      qc.setQueryData(['admin', 'settings'], r);
+      setDirty(false);
+      showToast('Settings saved. New rates apply to the next checkout.');
+    },
+  });
 
   if (!s) return <Loading />;
   const d = s.delivery;
-  const setD = (patch: Partial<Settings['delivery']>) => setS({ ...s, delivery: { ...d, ...patch } });
-  const setInfo = (patch: Partial<Info>) => setS({ ...s, info: { ...s.info, ...patch } });
+  const setD = (patch: Partial<Settings['delivery']>) => edit({ ...s, delivery: { ...d, ...patch } });
+  const setInfo = (patch: Partial<Info>) => edit({ ...s, info: { ...s.info, ...patch } });
   const fee = (cents: number, onChange: (c: number) => void, label: string) => (
     <label className="block">
       <span className="label">{label}</span>
@@ -41,20 +56,19 @@ export default function SettingsPage() {
         save.mutate(s);
       }}
     >
-      <PageHeader title="Settings" actions={<button className="btn-primary px-4 py-2.5 text-sm" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save settings'}</button>} />
+      <PageHeader title="Settings" />
       <FormError>{save.error ? (save.error as Error).message : undefined}</FormError>
-      {save.isSuccess && <p className="text-sm font-semibold text-green">Saved. New rates apply to the next checkout.</p>}
       <section className="panel space-y-4 p-5">
         <label className="block">
           <span className="label">Store name</span>
-          <input className="field" value={s.storeName} onChange={(e) => setS({ ...s, storeName: e.target.value })} maxLength={60} />
+          <input className="field" value={s.storeName} onChange={(e) => edit({ ...s, storeName: e.target.value })} maxLength={60} />
         </label>
         <div className="flex items-center justify-between gap-3">
           <span>
             <span className="block font-semibold">New-order alerts on Telegram</span>
             <span className="text-xs text-muted">Sent to the chat set in TELEGRAM_ADMIN_CHAT_ID</span>
           </span>
-          <Toggle checked={s.telegramNotify} onChange={(v) => setS({ ...s, telegramNotify: v })} label="Telegram alerts" />
+          <Toggle checked={s.telegramNotify} onChange={(v) => edit({ ...s, telegramNotify: v })} label="Telegram alerts" />
         </div>
       </section>
       <section className="panel space-y-4 p-5">
@@ -114,6 +128,7 @@ export default function SettingsPage() {
           </Suspense>
         </div>
       </section>
+      <SaveBar dirty={dirty} saving={save.isPending} label="Save settings" />
     </form>
   );
 }

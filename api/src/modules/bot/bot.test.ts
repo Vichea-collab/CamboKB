@@ -95,7 +95,7 @@ describe('customer messages from the bot', () => {
       .set('Origin', WEB_ORIGIN)
       .send({ items: [{ productId: product.id, quantity: 1 }], region: 'PHNOM_PENH', deliveryService: 'VET', contactName: 'X', contactPhone: '012345679', addressLine: 'A', paymentMethod: 'COD' });
     await new Promise((r) => setTimeout(r, 150));
-    expect(ctx.telegram.sent.filter((m) => typeof m.chatId === 'number')).toHaveLength(0);
+    expect(ctx.telegram.sent.filter((m) => String(m.chatId) !== '5000')).toHaveLength(0);
   });
 });
 

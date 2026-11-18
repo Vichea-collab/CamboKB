@@ -1,6 +1,5 @@
 import type { Prisma } from '@prisma/client';
 import {
-  canTransition,
   normalizePhone,
   ORDER_STATUSES,
   orderStatusUpdateSchema,
@@ -14,10 +13,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { AppDeps } from '../../http/app';
 import { toPublicUser } from '../auth/sessions';
-import { cancelOrder, orderInclude, toOrderDto } from './orders';
-import { AppError, notFound } from '../../http/errors';
+import { orderInclude, toOrderDto } from './orders';
+import { changeOrderStatus, publishOrderUpdate } from './status';
+import { notFound } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
-import { notifyCustomer } from '../bot/notify';
 import { checkKhqrPayment } from '../payments/khqr';
 
 const idParams = z.object({ id: uuidSchema });
@@ -80,18 +79,7 @@ export function adminOrdersRouter(deps: AppDeps): Router {
   r.post('/orders/:id/status', validate({ params: idParams, body: orderStatusUpdateSchema }), async (req, res) => {
     const { id } = req.valid.params as { id: string };
     const { status, note } = req.valid.body as { status: OrderStatus; note?: string };
-    await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
-      const order = await tx.order.findUnique({ where: { id }, include: { items: true } });
-      if (!order) throw notFound('Order');
-      if (!canTransition(order.status, status)) {
-        throw new AppError(409, 'INVALID_TRANSITION', `Can't change an order from ${order.status} to ${status}`);
-      }
-      if (status === 'CANCELLED') return cancelOrder(tx, order, req.user!.id, note);
-      await tx.order.update({ where: { id }, data: { status } });
-      await tx.orderStatusEvent.create({ data: { orderId: id, fromStatus: order.status, toStatus: status, note: note ?? null, actorUserId: req.user!.id } });
-    });
-    void notifyCustomer(deps, id, status);
+    await changeOrderStatus(deps, id, status, req.user!.id, note);
     res.json(await detail(id));
   });
 
@@ -112,6 +100,7 @@ export function adminOrdersRouter(deps: AppDeps): Router {
       where: { orderId: id },
       data: { status, paidAt: status === 'PAID' ? (payment.paidAt ?? new Date()) : null },
     });
+    void publishOrderUpdate(deps, id, 'payment');
     res.json(await detail(id));
   });
 
