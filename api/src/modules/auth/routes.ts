@@ -14,14 +14,14 @@ import {
   type TelegramStartInput,
 } from '@cambo/shared';
 import { z } from 'zod';
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import { requireAuth } from '../../http/middleware/auth';
 import { limiter, loginLimiter } from '../../http/middleware/rate-limit';
 import { validate } from '../../http/middleware/validate';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './password';
-import { clearSessionCookie, revokeAllSessions, revokeSession, startSession, toPublicUser } from './sessions';
+import { clearSessionCookie, randomToken, revokeAllSessions, revokeSession, sha256, startSession, toPublicUser } from './sessions';
 import {
   consumeVerifiedRequest,
   effectiveStatus,
@@ -37,6 +37,17 @@ const invalidCredentials = () => new AppError(401, 'INVALID_CREDENTIALS', 'Wrong
 export function authRouter(deps: AppDeps): Router {
   const { prisma, config } = deps;
   const r = Router();
+
+  /** Remember (by cookie) which browser started or claimed a verification request. */
+  const bindRequest = (res: Response, requestId: string) =>
+    res.cookie(TG_REQUEST_COOKIE, requestId, {
+      httpOnly: true,
+      secure: config.cookieSecure,
+      sameSite: 'lax',
+      path: '/api/v1/auth',
+      domain: config.cookieDomain || undefined,
+      maxAge: TG_REQUEST_TTL_MS + 5 * 60 * 1000,
+    });
 
   r.post('/login', loginLimiter(config), validate({ body: loginSchema }), async (req, res) => {
     const { phone, password } = req.valid.body as LoginInput;
@@ -88,15 +99,24 @@ export function authRouter(deps: AppDeps): Router {
       phone: purpose === 'RESET' ? phone : undefined,
       userId: purpose === 'CHANGE_PHONE' ? req.user!.id : undefined,
     });
-    res.cookie(TG_REQUEST_COOKIE, result.requestId, {
-      httpOnly: true,
-      secure: config.cookieSecure,
-      sameSite: 'lax',
-      path: '/api/v1/auth',
-      domain: config.cookieDomain || undefined,
-      maxAge: TG_REQUEST_TTL_MS + 5 * 60 * 1000,
-    });
+    bindRequest(res, result.requestId);
     res.json(result);
+  });
+
+  // The website end of a sign-up that started in the bot: the link carries a one-time token. Claiming it
+  // ties the verified request to this browser, and the token stops working so a forwarded link is useless.
+  r.post('/telegram/claim', limiter(20, 15 * 60 * 1000), validate({ body: z.object({ token: z.string().min(20).max(128) }) }), async (req, res) => {
+    const { token } = req.valid.body as { token: string };
+    const notVerified = new AppError(409, 'TELEGRAM_NOT_VERIFIED', 'This link has expired or was already used. Please start again.');
+    const found = await prisma.telegramAuthRequest.findUnique({ where: { tokenHash: sha256(token) } });
+    if (!found) throw notVerified;
+    const { count } = await prisma.telegramAuthRequest.updateMany({
+      where: { id: found.id, tokenHash: found.tokenHash, purpose: 'SIGNUP', status: 'VERIFIED', expiresAt: { gt: new Date() } },
+      data: { tokenHash: sha256(randomToken()) },
+    });
+    if (count !== 1) throw notVerified;
+    bindRequest(res, found.id);
+    res.set('Cache-Control', 'no-store').json({ requestId: found.id, ...statusView(found) });
   });
 
   // The request this browser started (found through its cookie), so a page that was reloaded or
@@ -117,7 +137,7 @@ export function authRouter(deps: AppDeps): Router {
   });
 
   r.post('/signup/complete', validate({ body: signupCompleteSchema }), async (req, res) => {
-    const { requestId, name, password } = req.valid.body as SignupCompleteInput;
+    const { requestId, name: typedName, password } = req.valid.body as SignupCompleteInput;
     const passwordHash = await hashPassword(password);
     const user = await prisma.$transaction(async (tx) => {
       const verified = await consumeVerifiedRequest(tx, req, requestId, 'SIGNUP');
@@ -128,7 +148,7 @@ export function authRouter(deps: AppDeps): Router {
       return tx.user.create({
         data: {
           phone: verified.phone!,
-          name,
+          name: typedName ?? verified.firstName ?? 'Customer',
           passwordHash,
           telegramUserId: verified.telegramUserId,
           telegramChatId: verified.telegramChatId,

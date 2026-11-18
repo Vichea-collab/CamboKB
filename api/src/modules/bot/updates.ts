@@ -1,5 +1,6 @@
 import type { AppDeps } from '../../http/app';
 import { sha256 } from '../auth/sessions';
+import { issueSignupLink, telegramDisplayName } from '../auth/telegram-verification';
 import { formatUsd, normalizePhone } from '@cambo/shared';
 import { handleCallbackQuery } from './order-actions';
 import type { TgMessage, TgUpdate } from '../../integrations/telegram/client';
@@ -10,9 +11,11 @@ export const BOT_TEXT = {
   expired: 'This link has expired. Please start again on the website.',
   ownNumber: 'Please share your own phone number using the button.',
   alreadyRegistered: 'This number already has an account. Log in on the website or use Forgot password.',
+  welcomeNew: 'Welcome to Cambo Supply! 👋\n\nTo create your account, tap the button below to share your phone number. Then we send you a link to choose a password.',
   cannotVerify: "We couldn't verify this account. Please check the number and try again on the website.",
   phoneInUse: 'This number is already used by another account.',
   verified: '✅ Verified! Go back to the website to continue.',
+  verifiedChoosePassword: '✅ Verified! One more step: choose your password.',
   noPending: 'Please open the sign-up link from the Cambo Supply website first.',
   invalidPhone: "That phone number doesn't look valid.",
 } as const;
@@ -42,26 +45,22 @@ export const COMMANDS = [
 
 const origin = (deps: AppDeps) => deps.config.webOrigin[0] ?? '';
 
+const shareKeyboard = { keyboard: [[{ text: BOT_TEXT.shareButton, request_contact: true }]], one_time_keyboard: true, resize_keyboard: true };
+
 /**
- * What someone sees when they open the bot by hand (no sign-up link): how to get started.
- * Telegram only allows buttons that open https pages, so on a local http site the link goes in the text.
+ * What someone sees when they open the bot by hand. A new person is asked for their phone number
+ * right here (sign-up starts in the bot); a returning customer is welcomed back.
  */
-async function sendWelcome(deps: AppDeps, chatId: number) {
+async function sendWelcome(deps: AppDeps, msg: TgMessage) {
+  const user = await deps.prisma.user.findUnique({ where: { telegramUserId: BigInt(msg.from!.id) } });
+  if (!user) {
+    await deps.telegram.sendMessage(msg.chat.id, BOT_TEXT.welcomeNew, { replyMarkup: shareKeyboard });
+    return;
+  }
   const url = origin(deps);
   const secure = url.startsWith('https://');
-  const text = [
-    'Welcome to Cambo Supply! 👋',
-    '',
-    'New here? Open the shop and tap “Sign up with Telegram”. It brings you back to this chat to share your phone number.',
-    '',
-    ...COMMANDS.map((c) => `/${c.command} — ${c.description}`),
-    ...(secure ? [] : ['', url]),
-  ].join('\n');
-  await deps.telegram.sendMessage(
-    chatId,
-    text,
-    secure ? { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }], [{ text: 'Create an account', url: `${url}/signup` }]] } } : undefined,
-  );
+  const text = [`Welcome back, ${user.name}! 👋`, '', ...COMMANDS.map((c) => `/${c.command} — ${c.description}`), ...(secure ? [] : ['', url])].join('\n');
+  await deps.telegram.sendMessage(msg.chat.id, text, secure ? { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }]] } } : undefined);
 }
 
 async function handleHelp(deps: AppDeps, msg: TgMessage) {
@@ -101,7 +100,7 @@ async function handleStart(deps: AppDeps, msg: TgMessage) {
   const { prisma, telegram } = deps;
   const token = msg.text!.split(/\s+/)[1];
   if (!token) {
-    await sendWelcome(deps, msg.chat.id);
+    await sendWelcome(deps, msg);
     return;
   }
   const from = msg.from!;
@@ -121,16 +120,10 @@ async function handleStart(deps: AppDeps, msg: TgMessage) {
       telegramUserId: BigInt(from.id),
       telegramChatId: BigInt(msg.chat.id),
       telegramUsername: from.username ?? null,
-      firstName: from.first_name?.slice(0, 60) ?? null,
+      firstName: telegramDisplayName(from),
     },
   });
-  await telegram.sendMessage(msg.chat.id, BOT_TEXT.askContact, {
-    replyMarkup: {
-      keyboard: [[{ text: BOT_TEXT.shareButton, request_contact: true }]],
-      one_time_keyboard: true,
-      resize_keyboard: true,
-    },
-  });
+  await telegram.sendMessage(msg.chat.id, BOT_TEXT.askContact, { replyMarkup: shareKeyboard });
 }
 
 async function handleContact(deps: AppDeps, msg: TgMessage) {
@@ -143,7 +136,6 @@ async function handleContact(deps: AppDeps, msg: TgMessage) {
     where: { telegramUserId: BigInt(from.id), status: 'PENDING', expiresAt: { gt: new Date() } },
     orderBy: { createdAt: 'desc' },
   });
-  if (!request) return reply(BOT_TEXT.noPending);
 
   // Only the sender's own contact proves they own the number (forwarded contacts carry someone else's user_id).
   if (msg.contact!.user_id !== from.id) return reply(BOT_TEXT.ownNumber, true);
@@ -152,6 +144,19 @@ async function handleContact(deps: AppDeps, msg: TgMessage) {
   if (!phone) return reply(BOT_TEXT.invalidPhone);
 
   const owner = await prisma.user.findUnique({ where: { phone } });
+
+  // No sign-up started on the website: this person started in the bot. Verify them and send a link
+  // that only asks for a password (the name comes from their Telegram profile).
+  if (!request) {
+    if (owner || (await prisma.user.findUnique({ where: { telegramUserId: BigInt(from.id) } }))) return reply(BOT_TEXT.alreadyRegistered);
+    const { url } = await issueSignupLink(deps, { from, chatId: msg.chat.id, phone });
+    if (url.startsWith('https://')) {
+      await telegram.sendMessage(msg.chat.id, BOT_TEXT.verifiedChoosePassword, { replyMarkup: { inline_keyboard: [[{ text: '🔐 Choose my password', url }]] } });
+    } else {
+      await telegram.sendMessage(msg.chat.id, `${BOT_TEXT.verifiedChoosePassword}\n${url}`, { replyMarkup: removeKeyboard });
+    }
+    return;
+  }
 
   if (request.purpose === 'SIGNUP') {
     if (owner || (await prisma.user.findUnique({ where: { telegramUserId: BigInt(from.id) } }))) {

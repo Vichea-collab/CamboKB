@@ -1,4 +1,4 @@
-export type TgUser = { id: number; is_bot?: boolean; first_name?: string; username?: string };
+export type TgUser = { id: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string };
 export type TgContact = { phone_number: string; first_name?: string; user_id?: number };
 export type TgMessage = {
   message_id: number;

@@ -3,6 +3,7 @@ import { maskPhone, normalizePhone } from '@cambo/shared';
 import type { Request } from 'express';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
+import type { TgUser } from '../../integrations/telegram/client';
 import { randomToken, sha256 } from './sessions';
 
 export const TG_REQUEST_COOKIE = 'cs_tg_req';
@@ -18,6 +19,43 @@ export async function startTelegramAuth(
     data: { tokenHash: sha256(token), purpose: input.purpose, expectedPhone: input.phone, userId: input.userId, expiresAt },
   });
   return { requestId: req.id, deepLink: `https://t.me/${config.telegram.botUsername}?start=${token}`, expiresAt };
+}
+
+/** The customer's name as Telegram shows it, so sign-up never has to ask for one. */
+export function telegramDisplayName(from: TgUser): string | null {
+  return [from.first_name, from.last_name].filter(Boolean).join(' ').slice(0, 60) || null;
+}
+
+/** Bot-first sign-up: the number is already verified, so the website link only has to set a password. */
+export const SIGNUP_LINK_TTL_MS = 30 * 60 * 1000;
+
+export async function issueSignupLink(
+  { prisma, config }: AppDeps,
+  input: { from: TgUser; chatId: number; phone: string },
+): Promise<{ url: string }> {
+  const token = randomToken();
+  await prisma.$transaction([
+    // Only the newest link works: sharing again replaces an earlier one.
+    prisma.telegramAuthRequest.updateMany({
+      where: { telegramUserId: BigInt(input.from.id), purpose: 'SIGNUP', status: { in: ['PENDING', 'VERIFIED'] } },
+      data: { status: 'EXPIRED' },
+    }),
+    prisma.telegramAuthRequest.create({
+      data: {
+        tokenHash: sha256(token),
+        purpose: 'SIGNUP',
+        status: 'VERIFIED',
+        phone: input.phone,
+        telegramUserId: BigInt(input.from.id),
+        telegramChatId: BigInt(input.chatId),
+        telegramUsername: input.from.username ?? null,
+        firstName: telegramDisplayName(input.from),
+        verifiedAt: new Date(),
+        expiresAt: new Date(Date.now() + SIGNUP_LINK_TTL_MS),
+      },
+    }),
+  ]);
+  return { url: `${config.webOrigin[0] ?? ''}/signup?t=${token}` };
 }
 
 export function effectiveStatus(r: TelegramAuthRequest) {

@@ -4,7 +4,8 @@ import { passwordSchema, phoneSchema, uuidSchema } from './common';
 export const loginSchema = z.object({ phone: phoneSchema, password: z.string().min(1).max(128) });
 export const signupCompleteSchema = z.object({
   requestId: uuidSchema,
-  name: z.string().trim().min(1).max(60),
+  /** Optional: when left out, the name from the customer's Telegram profile is used. */
+  name: z.string().trim().min(1).max(60).optional(),
   password: passwordSchema,
 });
 export const resetCompleteSchema = z.object({ requestId: uuidSchema, password: passwordSchema });

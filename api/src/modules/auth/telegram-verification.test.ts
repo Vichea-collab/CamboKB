@@ -187,4 +187,79 @@ describe('telegram phone verification', () => {
     const res = await webhook(ctx, { from: tgUser(1), text: 'hi' }, 'wrong');
     expect(res.status).toBe(401);
   });
+
+  describe('starting in the bot', () => {
+    const shareFirst = async (id = 777, phone = '85512345678') => {
+      const from = { id, first_name: 'Dara', last_name: 'Sok', username: `dara${id}` };
+      await webhook(ctx, { from, text: '/start' });
+      await webhook(ctx, { from, contact: { phone_number: phone, first_name: 'Dara', user_id: id } });
+    };
+    const linkToken = () => /\/signup\?t=([A-Za-z0-9_-]+)/.exec(JSON.stringify(ctx.telegram.sent.at(-1)))?.[1] ?? '';
+
+    it('replies to the shared number with a one-time link to set the password', async () => {
+      await shareFirst();
+      expect(lastText(ctx)).toMatch(/Verified/);
+      expect(linkToken()).toHaveLength(43);
+      const row = await ctx.prisma.telegramAuthRequest.findFirstOrThrow({ where: { telegramUserId: 777n } });
+      expect(row).toMatchObject({ purpose: 'SIGNUP', status: 'VERIFIED', phone: '+85512345678', firstName: 'Dara Sok', telegramUsername: 'dara777' });
+    });
+
+    it('the website claims the link, then asks only for a password; the name comes from Telegram', async () => {
+      await shareFirst();
+      const agent = request.agent(ctx.app);
+      const claim = await agent.post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token: linkToken() });
+      expect(claim.status).toBe(200);
+      expect(claim.body).toMatchObject({ status: 'VERIFIED', firstName: 'Dara Sok', phone: '+855 •• ••• 678' });
+      const done = await agent.post('/api/v1/auth/signup/complete').set('Origin', WEB_ORIGIN).send({ requestId: claim.body.requestId, password: TEST_PASSWORD });
+      expect(done.status).toBe(201);
+      expect((await agent.get('/api/v1/auth/me')).body.user).toMatchObject({ name: 'Dara Sok', phone: '+85512345678', telegramUsername: 'dara777' });
+    });
+
+    it('a link works once, so a leaked or forwarded link cannot be claimed by someone else afterwards', async () => {
+      await shareFirst();
+      const token = linkToken();
+      expect((await request.agent(ctx.app).post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token })).status).toBe(200);
+      const second = await request.agent(ctx.app).post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token });
+      expect(second.status).toBe(409);
+      expect(second.body.error.code).toBe('TELEGRAM_NOT_VERIFIED');
+    });
+
+    it('refuses an unknown or expired link', async () => {
+      await shareFirst();
+      expect((await request.agent(ctx.app).post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token: 'x'.repeat(43) })).status).toBe(409);
+      await ctx.prisma.telegramAuthRequest.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
+      expect((await request.agent(ctx.app).post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token: linkToken() })).status).toBe(409);
+    });
+
+    it('sharing again replaces the earlier link', async () => {
+      await shareFirst();
+      const first = linkToken();
+      await sendContact(ctx, 777, '85512345678');
+      expect(linkToken()).not.toBe(first);
+      expect((await request.agent(ctx.app).post('/api/v1/auth/telegram/claim').set('Origin', WEB_ORIGIN).send({ token: first })).status).toBe(409);
+    });
+
+    it('tells a number that already has an account to log in, and creates nothing', async () => {
+      await createUser(ctx.prisma, { phone: '+85512345678' });
+      await shareFirst();
+      expect(lastText(ctx)).toMatch(/already has an account/);
+      expect(await ctx.prisma.telegramAuthRequest.count()).toBe(0);
+    });
+
+    it("still rejects a contact that isn't the sender's own number", async () => {
+      await webhook(ctx, { from: tgUser(777), text: '/start' });
+      await sendContact(ctx, 777, '85512345678', 999);
+      expect(lastText(ctx)).toMatch(/share your own phone number/);
+      expect(await ctx.prisma.telegramAuthRequest.count()).toBe(0);
+    });
+
+    it('signing up from the website still needs a name when Telegram gave none', async () => {
+      const { agent, requestId, token } = await start(ctx, { purpose: 'SIGNUP' });
+      await sendStart(ctx, 778, token);
+      await sendContact(ctx, 778, '85587654321');
+      const done = await agent.post('/api/v1/auth/signup/complete').set('Origin', WEB_ORIGIN).send({ requestId, password: TEST_PASSWORD });
+      expect(done.status).toBe(201);
+      expect((await agent.get('/api/v1/auth/me')).body.user.name).toBe('Dara');
+    });
+  });
 });

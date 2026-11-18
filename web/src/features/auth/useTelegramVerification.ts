@@ -93,10 +93,25 @@ export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
     }
   }, [purpose, phone, stop, poll]);
 
+  /** The website end of a sign-up that started in the bot: exchange the one-time link token for the verified request. */
+  const claim = useCallback(
+    async (token: string) => {
+      stop();
+      setState({ status: 'starting' });
+      try {
+        const res = await api<StatusResponse & { requestId: string }>('/auth/telegram/claim', { method: 'POST', body: { token } });
+        setState({ status: 'verified', requestId: res.requestId, maskedPhone: res.phone, firstName: res.firstName });
+      } catch {
+        setState({ status: 'expired' });
+      }
+    },
+    [stop],
+  );
+
   const reset = useCallback(() => {
     stop();
     setState({ status: 'idle' });
   }, [stop]);
 
-  return { ...state, start, reset };
+  return { ...state, start, claim, reset };
 }

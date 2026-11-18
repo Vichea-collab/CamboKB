@@ -58,6 +58,8 @@ export const t = {
     expired: 'That link expired. Start again.',
     startAgain: 'Start again',
     verifiedAs: (phone: string) => `Verified ${phone}`,
+    hiName: (name: string) => `Hi, ${name}`,
+    choosePasswordIntro: 'Your phone number is verified. Choose a password to finish.',
     name: 'Your name',
     newPassword: 'New password',
     confirmPassword: 'Confirm password',
