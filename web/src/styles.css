@@ -96,9 +96,13 @@ textarea {
       0 0 0 var(--color-yellow-edge),
       0 4px 10px rgb(255 183 3 / 0.15);
   }
+  /* Not ready yet: a flat grey key, clearly different from a live yellow one. */
   &:disabled {
-    box-shadow: none;
+    opacity: 1;
+    background-color: var(--color-raised);
     background-image: none;
+    color: var(--color-muted);
+    box-shadow: 0 3px 0 rgb(0 0 0 / 0.35);
   }
 }
 
