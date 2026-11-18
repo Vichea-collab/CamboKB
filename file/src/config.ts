@@ -17,8 +17,8 @@ const envSchema = z
     TRUST_PROXY: z.enum(['true', 'false']).optional(),
   })
   .superRefine((e, ctx) => {
-    if (e.NODE_ENV === 'production' && e.FILE_SERVICE_SECRET.length < 32) {
-      ctx.addIssue({ code: 'custom', path: ['FILE_SERVICE_SECRET'], message: 'must be at least 32 characters in production' });
+    if (e.NODE_ENV === 'production' && (e.FILE_SERVICE_SECRET.length < 32 || e.FILE_SERVICE_SECRET.startsWith('dev-'))) {
+      ctx.addIssue({ code: 'custom', path: ['FILE_SERVICE_SECRET'], message: 'set a random secret of at least 32 characters' });
     }
     if (e.STORAGE_DRIVER === 's3') {
       for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {

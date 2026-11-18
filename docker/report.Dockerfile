@@ -17,7 +17,7 @@ RUN npm run build --workspace report \
 
 FROM node:22-bookworm-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-khmeros-core tini ca-certificates \
+ && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-khmeros tini ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production PUPPETEER_SKIP_DOWNLOAD=true CHROME_PATH=/usr/bin/chromium
 WORKDIR /app

@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/server.ts', 'scripts/seed.ts', 'scripts/promote-admin.ts'],
+  // Named so the output is dist/server.js, dist/seed.js, dist/promote-admin.js (what the Docker image runs).
+  entry: { server: 'src/server.ts', seed: 'scripts/seed.ts', 'promote-admin': 'scripts/promote-admin.ts' },
   format: ['esm'],
   platform: 'node',
   target: 'node22',

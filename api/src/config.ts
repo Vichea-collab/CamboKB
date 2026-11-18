@@ -15,6 +15,8 @@ const envSchema = z
     COOKIE_DOMAIN: z.string().optional(),
     SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
     TRUST_PROXY: bool,
+    // Secure cookies need https. Defaults to on in production; set COOKIE_SECURE=false only for a plain-http local stack.
+    COOKIE_SECURE: z.enum(['true', 'false']).optional(),
     TELEGRAM_MODE: z.enum(['webhook', 'polling', 'off']).default('off'),
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_BOT_USERNAME: z.string().optional(),
@@ -59,6 +61,7 @@ const envSchema = z
 export type Config = {
   nodeEnv: 'development' | 'test' | 'production';
   isProduction: boolean;
+  cookieSecure: boolean;
   port: number;
   logLevel: string;
   databaseUrl: string;
@@ -105,6 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     nodeEnv: e.NODE_ENV,
     isProduction: e.NODE_ENV === 'production',
+    cookieSecure: e.COOKIE_SECURE ? e.COOKIE_SECURE === 'true' : e.NODE_ENV === 'production',
     port: e.PORT,
     logLevel: e.LOG_LEVEL ?? (e.NODE_ENV === 'test' ? 'silent' : 'info'),
     databaseUrl: e.DATABASE_URL,

@@ -91,6 +91,10 @@ describe('file service HTTP API', () => {
   it('requires a long secret in production', () => {
     expect(() => loadConfig({ NODE_ENV: 'production', FILE_SERVICE_SECRET: 'short' })).toThrow(/FILE_SERVICE_SECRET/);
   });
+
+  it('refuses the placeholder secret in production even when it is long enough', () => {
+    expect(() => loadConfig({ NODE_ENV: 'production', FILE_SERVICE_SECRET: 'dev-file-secret-change-me-0123456789' })).toThrow(/FILE_SERVICE_SECRET/);
+  });
 });
 
 describe('share-preview images (/files/og)', () => {

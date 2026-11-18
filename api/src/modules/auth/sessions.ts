@@ -55,7 +55,7 @@ export async function revokeAllSessions(prisma: PrismaClient, userId: string, ex
 function cookieOptions(config: Config) {
   return {
     httpOnly: true,
-    secure: config.isProduction,
+    secure: config.cookieSecure,
     sameSite: 'lax' as const,
     path: '/',
     domain: config.cookieDomain || undefined,

@@ -88,7 +88,7 @@ export function authRouter(deps: AppDeps): Router {
     });
     res.cookie(TG_REQUEST_COOKIE, result.requestId, {
       httpOnly: true,
-      secure: config.isProduction,
+      secure: config.cookieSecure,
       sameSite: 'lax',
       path: '/api/v1/auth',
       domain: config.cookieDomain || undefined,

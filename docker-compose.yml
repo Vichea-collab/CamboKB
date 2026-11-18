@@ -23,7 +23,7 @@ services:
   file:
     build: { context: ., dockerfile: docker/file.Dockerfile }
     environment:
-      FILE_SERVICE_SECRET: dev-file-secret-change-me-0123456789
+      FILE_SERVICE_SECRET: local-compose-file-secret-0f3a9c71d2e84b65a7
       CORS_ORIGIN: http://localhost:8080
     volumes: [uploads:/data/uploads]
 
@@ -31,7 +31,7 @@ services:
     build: { context: ., dockerfile: docker/report.Dockerfile }
     environment:
       REPORT_DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
-      REPORT_SERVICE_SECRET: dev-report-secret-change-me-0123456789
+      REPORT_SERVICE_SECRET: local-compose-report-secret-5b2e8d90c1f7a346
     depends_on: { db: { condition: service_healthy } }
 
   api:
@@ -40,11 +40,13 @@ services:
       DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
       WEB_ORIGIN: http://localhost:8080
       TRUST_PROXY: 'true'
+      # The local stack is plain http (the containers run in production mode, whose cookies need https).
+      COOKIE_SECURE: 'false'
       FILE_SERVICE_URL: http://file:4100
-      FILE_SERVICE_SECRET: dev-file-secret-change-me-0123456789
+      FILE_SERVICE_SECRET: local-compose-file-secret-0f3a9c71d2e84b65a7
       PUBLIC_FILES_URL: http://localhost:8080/files
       REPORT_SERVICE_URL: http://report:4200
-      REPORT_SERVICE_SECRET: dev-report-secret-change-me-0123456789
+      REPORT_SERVICE_SECRET: local-compose-report-secret-5b2e8d90c1f7a346
       # Telegram: copy your bot settings from api/.env (never commit the token)
       TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
