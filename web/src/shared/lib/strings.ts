@@ -53,6 +53,8 @@ export const t = {
     openTelegram: 'Open Telegram',
     waiting: 'Waiting for Telegram…',
     waitingHelp: 'In Telegram, tap “Share my phone number”. This page updates by itself.',
+    stuckTitle: 'Nothing happening?',
+    stuckSteps: ['In the bot chat, press Start.', 'Tap “Share my phone number” when it appears.', 'If you blocked the bot before, unblock it first: open the chat, tap its name, then Unblock.'],
     expired: 'That link expired. Start again.',
     startAgain: 'Start again',
     verifiedAs: (phone: string) => `Verified ${phone}`,

@@ -150,6 +150,25 @@ describe('bot commands', () => {
     expect(JSON.stringify(toCustomer(https)[0]!.opts)).toContain('"web_app":{"url":"https://shop.example.com"}');
   });
 
+  it('a plain /start explains how to sign up and lists the commands', async () => {
+    await send(ctx, '/start');
+    const text = toCustomer(ctx)[0]!.text;
+    expect(text).toContain('Welcome to Cambo Supply');
+    expect(text).toMatch(/Sign up with Telegram/);
+    expect(text).toContain('/shop');
+    expect(text).toContain('/orders');
+    expect(text).toContain(WEB_ORIGIN); // plain http (local): the link is in the text, there are no buttons
+    expect(toCustomer(ctx)[0]!.opts?.replyMarkup).toBeUndefined();
+  });
+
+  it('on an https site a plain /start also offers Open shop and Create account buttons', async () => {
+    const https = await createTestApp({ config: { ...ctx.deps.config, webOrigin: ['https://shop.example.com'] } });
+    await send(https, '/start');
+    const markup = JSON.stringify(toCustomer(https)[0]!.opts?.replyMarkup);
+    expect(markup).toContain('"web_app":{"url":"https://shop.example.com"}');
+    expect(markup).toContain('"url":"https://shop.example.com/signup"');
+  });
+
   it('registers the command menu with Telegram', async () => {
     const { setupBot } = await import('./setup');
     await setupBot(ctx.deps);

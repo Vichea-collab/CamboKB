@@ -42,6 +42,28 @@ export const COMMANDS = [
 
 const origin = (deps: AppDeps) => deps.config.webOrigin[0] ?? '';
 
+/**
+ * What someone sees when they open the bot by hand (no sign-up link): how to get started.
+ * Telegram only allows buttons that open https pages, so on a local http site the link goes in the text.
+ */
+async function sendWelcome(deps: AppDeps, chatId: number) {
+  const url = origin(deps);
+  const secure = url.startsWith('https://');
+  const text = [
+    'Welcome to Cambo Supply! 👋',
+    '',
+    'New here? Open the shop and tap “Sign up with Telegram”. It brings you back to this chat to share your phone number.',
+    '',
+    ...COMMANDS.map((c) => `/${c.command} — ${c.description}`),
+    ...(secure ? [] : ['', url]),
+  ].join('\n');
+  await deps.telegram.sendMessage(
+    chatId,
+    text,
+    secure ? { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }], [{ text: 'Create an account', url: `${url}/signup` }]] } } : undefined,
+  );
+}
+
 async function handleHelp(deps: AppDeps, msg: TgMessage) {
   await deps.telegram.sendMessage(
     msg.chat.id,
@@ -76,10 +98,10 @@ async function handleOrders(deps: AppDeps, msg: TgMessage) {
 }
 
 async function handleStart(deps: AppDeps, msg: TgMessage) {
-  const { prisma, telegram, config } = deps;
+  const { prisma, telegram } = deps;
   const token = msg.text!.split(/\s+/)[1];
   if (!token) {
-    await telegram.sendMessage(msg.chat.id, `Welcome to Cambo Supply! Shop at ${config.webOrigin[0] ?? ''}`);
+    await sendWelcome(deps, msg.chat.id);
     return;
   }
   const from = msg.from!;
