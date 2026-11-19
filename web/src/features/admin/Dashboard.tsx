@@ -9,6 +9,7 @@ import {
   QrCode,
   TrendingUp,
   type LucideIcon,
+  Undo2,
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { api } from '../../shared/lib/api';
@@ -24,6 +25,7 @@ type Stats = {
   week: { orders: number; revenueCents: number };
   pendingCount: number;
   khqrWaitingCount: number;
+  refundsDue: { orderId: string; number: string; amountCents: number }[];
   lowStock: { id: string; name: string; stock: number }[];
 };
 type Summary = { buckets: { period: string; revenueCents: number }[] };
@@ -53,7 +55,7 @@ export default function Dashboard() {
   });
   if (!stats.data) return <Loading />;
   const s = stats.data;
-  const attention = s.pendingCount > 0 || s.khqrWaitingCount > 0 || s.lowStock.length > 0;
+  const attention = s.pendingCount > 0 || s.khqrWaitingCount > 0 || s.lowStock.length > 0 || (s.refundsDue?.length ?? 0) > 0;
 
   return (
     <div>
@@ -138,6 +140,16 @@ export default function Dashboard() {
             </p>
           ) : (
             <ul className="space-y-2">
+              {(s.refundsDue ?? []).map((r) => (
+                <Action
+                  key={r.orderId}
+                  to={`/admin/orders/${r.orderId}`}
+                  icon={Undo2}
+                  title={`Refund ${formatUsdExact(r.amountCents)} for ${r.number}`}
+                  hint="Paid, then cancelled. Send the money back, then mark it refunded."
+                  danger
+                />
+              ))}
               {s.pendingCount > 0 && (
                 <Action
                   to="/admin/orders?status=PENDING"
