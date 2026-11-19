@@ -7,7 +7,7 @@ import { useCart } from '../cart/cart-store';
 import { useStore } from '../info/store-api';
 import { formatTime as clock } from '../../shared/lib/format';
 import { t } from '../../shared/lib/strings';
-import { EmptyState, ErrorState, LoadingState } from '../../shared/ui/Page';
+import { BackLink, EmptyState, ErrorState, LoadingState } from '../../shared/ui/Page';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { KhqrCard, saveKhqrPng } from './KhqrCard';
 import { usePayment, useRenewKhqr } from './usePayment';
@@ -72,6 +72,9 @@ export default function PayPage() {
   const qrExpired = !p.khqr || (countdown?.left ?? 1) === 0;
   return (
     <div className="mx-auto max-w-md py-4 sm:py-8">
+      <div className="mb-2">
+        <BackLink to={`/account/orders/${number}`}>{t.invoice.backToOrder}</BackLink>
+      </div>
       <h1 className="title-page text-center">{t.pay.title}</h1>
       <p className="mt-1 text-center text-sm text-muted">
         {number} · {formatUsd(p.amountCents)}

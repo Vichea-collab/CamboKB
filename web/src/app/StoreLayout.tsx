@@ -6,7 +6,10 @@ import { t } from '../shared/lib/strings';
 import { Toast } from '../shared/ui/Toast';
 import { CartDrawer } from '../features/cart/CartDrawer';
 
+import { useTelegramBackButton } from '../shared/lib/telegram';
+
 export function StoreLayout() {
+  useTelegramBackButton();
   return (
     <div className="min-h-dvh">
       <a

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { configureTelegramApp, isTelegramMiniApp, loadTelegramScript } from './telegram';
+import { renderHook } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
+import {
+  configureTelegramApp,
+  isTelegramMiniApp,
+  loadTelegramScript,
+  useTelegramBackButton,
+} from './telegram';
 
 const scripts = () =>
   [...document.head.querySelectorAll('script[src*="telegram-web-app"]')] as HTMLScriptElement[];
@@ -73,6 +81,59 @@ describe('Telegram Mini App set-up', () => {
       configureTelegramApp({ ready: vi.fn(), expand: vi.fn() }, '#12151a'),
     ).not.toThrow();
     expect(() => configureTelegramApp(undefined, '#12151a')).not.toThrow();
+  });
+});
+
+describe('Telegram Mini App back button', () => {
+  const fakeBtn = () => ({
+    isVisible: false,
+    show: vi.fn(),
+    hide: vi.fn(),
+    onClick: vi.fn(),
+    offClick: vi.fn(),
+  });
+
+  const withRouter = (initialPath: string) => {
+    const Wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(MemoryRouter, { initialEntries: [initialPath] }, children);
+    return Wrapper;
+  };
+
+  afterEach(() => {
+    delete (window as { Telegram?: unknown }).Telegram;
+  });
+
+  it('hides the back button on the root home page', () => {
+    const btn = fakeBtn();
+    (window as unknown as { Telegram: { WebApp: { BackButton: typeof btn } } }).Telegram = {
+      WebApp: { BackButton: btn },
+    };
+
+    renderHook(() => useTelegramBackButton(), { wrapper: withRouter('/') });
+    expect(btn.hide).toHaveBeenCalled();
+    expect(btn.show).not.toHaveBeenCalled();
+  });
+
+  it('shows the back button on subpages and hooks up click listener', () => {
+    const btn = fakeBtn();
+    (window as unknown as { Telegram: { WebApp: { BackButton: typeof btn } } }).Telegram = {
+      WebApp: { BackButton: btn },
+    };
+
+    const { unmount } = renderHook(() => useTelegramBackButton(), {
+      wrapper: withRouter('/products/x11'),
+    });
+    expect(btn.show).toHaveBeenCalled();
+    expect(btn.onClick).toHaveBeenCalled();
+
+    unmount();
+    expect(btn.offClick).toHaveBeenCalled();
+  });
+
+  it('gracefully does nothing when Telegram is not present', () => {
+    expect(() =>
+      renderHook(() => useTelegramBackButton(), { wrapper: withRouter('/checkout') }),
+    ).not.toThrow();
   });
 });
 

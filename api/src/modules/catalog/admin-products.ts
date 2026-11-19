@@ -42,13 +42,23 @@ export async function uniqueProductSlug(db: PrismaClient | Prisma.TransactionCli
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
-export function toAdminProduct(p: ProductWithRelations, files: FileClient) {
+export const adminProductInclude = {
+  ...productInclude,
+  _count: { select: { orderItems: true } },
+} as const;
+
+export type AdminProductWithRelations = ProductWithRelations & {
+  _count?: { orderItems: number };
+};
+
+export function toAdminProduct(p: AdminProductWithRelations, files: FileClient) {
   return {
     ...toProductDetail(p, files),
     isSoldOut: p.isSoldOut,
     isActive: p.isActive,
     sortOrder: p.sortOrder,
     categoryId: p.categoryId,
+    orderCount: p._count?.orderItems ?? 0,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     images: p.images.map((i) => ({ id: i.id, storageKey: i.storageKey, width: i.width, height: i.height, ...files.imageUrls(i.storageKey, i.width) })),
@@ -62,11 +72,12 @@ const listQuery = z.object({
   status: z.enum(['active', 'hidden', 'all']).default('all'),
   categoryId: uuidSchema.optional(),
 });
+const deleteQuery = z.object({ permanent: z.enum(['1']).optional() });
 
 export function adminProductsRouter({ prisma, files }: AppDeps): Router {
   const r = Router();
   const load = async (id: string) => {
-    const p = await prisma.product.findUnique({ where: { id }, include: productInclude });
+    const p = await prisma.product.findUnique({ where: { id }, include: adminProductInclude });
     if (!p) throw notFound('Product');
     return p;
   };
@@ -82,7 +93,7 @@ export function adminProductsRouter({ prisma, files }: AppDeps): Router {
     if (status !== 'all') where.isActive = status === 'active';
     if (categoryId) where.categoryId = categoryId;
     if (q) where.OR = [{ name: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }];
-    const items = await prisma.product.findMany({ where, include: productInclude, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+    const items = await prisma.product.findMany({ where, include: adminProductInclude, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
     res.json({ items: items.map((p) => toAdminProduct(p, files)) });
   });
 
@@ -101,7 +112,7 @@ export function adminProductsRouter({ prisma, files }: AppDeps): Router {
         sortOrder: (last._max.sortOrder ?? 0) + 1,
         specs: { create: specs.map((s, i) => ({ ...s, sortOrder: i })) },
       },
-      include: productInclude,
+      include: adminProductInclude,
     });
     res.status(201).json(toAdminProduct(p, files));
   });
@@ -119,16 +130,33 @@ export function adminProductsRouter({ prisma, files }: AppDeps): Router {
       return tx.product.update({
         where: { id },
         data: { ...data, ...(slug ? { slug: await uniqueProductSlug(tx, slug, id) } : {}) },
-        include: productInclude,
+        include: adminProductInclude,
       });
     });
     res.json(toAdminProduct(p, files));
   });
 
-  // Archive: products stay referenced by past orders, so they are never hard-deleted.
-  r.delete('/products/:id', validate({ params: idParams }), async (req, res) => {
+  // Archive (soft-delete) or permanent delete (only allowed if 0 past orders)
+  r.delete('/products/:id', validate({ params: idParams, query: deleteQuery }), async (req, res) => {
     const { id } = req.valid.params as { id: string };
+    const { permanent } = req.valid.query as { permanent?: string };
     await load(id);
+    const orderCount = await prisma.orderItem.count({ where: { productId: id } });
+
+    if (permanent === '1') {
+      if (orderCount > 0) {
+        throw new AppError(
+          400,
+          'CANNOT_DELETE_WITH_ORDERS',
+          'This product has past orders and cannot be permanently deleted. Archive it instead.',
+        );
+      }
+      const images = await prisma.productImage.findMany({ where: { productId: id } });
+      await Promise.allSettled(images.map((img) => files.deleteImage(img.storageKey)));
+      await prisma.product.delete({ where: { id } });
+      return res.status(204).end();
+    }
+
     await prisma.product.update({ where: { id }, data: { isActive: false } });
     res.status(204).end();
   });

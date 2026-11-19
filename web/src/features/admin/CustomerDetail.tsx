@@ -1,10 +1,15 @@
 import { formatPhone, formatUsdExact } from '@cambo/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { Pencil } from 'lucide-react';
+import { Drawer } from '../../shared/ui/Drawer';
 import { FormError } from '../../shared/ui/FormCard';
+import { PhoneInput } from '../../shared/ui/PhoneInput';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { api } from '../../shared/lib/api';
 import { useMe } from '../auth/auth';
+import { useUi } from '../../shared/lib/ui-store';
 import type { Order } from '../../shared/lib/types';
 import { RoleControl } from './components/RoleControl';
 import { Badge, Fact, Section } from '../../shared/ui/Page';
@@ -14,6 +19,11 @@ import type { Customer } from './types';
 export default function CustomerDetail() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const showToast = useUi((s) => s.showToast);
+  const [editing, setEditing] = useState(false);
+  const [delError, setDelError] = useState<string>();
+
   const c = useQuery({
     queryKey: ['admin', 'customer', id],
     queryFn: () => api<Customer & { orders: Order[] }>(`/admin/customers/${id}`),
@@ -22,6 +32,15 @@ export default function CustomerDetail() {
     mutationFn: (disable: boolean) =>
       api(`/admin/customers/${id}/${disable ? 'disable' : 'enable'}`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'customer', id] }),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/admin/customers/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast('Customer deleted');
+      navigate('/admin/customers');
+    },
+    onError: (err) => setDelError((err as Error).message),
   });
   const me = useMe();
   const role = useMutation({
@@ -45,6 +64,11 @@ export default function CustomerDetail() {
           </span>
         }
         back={{ to: '/admin/customers', label: 'Customers' }}
+        actions={
+          <button className="btn-ghost" onClick={() => setEditing(true)}>
+            <Pencil className="size-4" aria-hidden /> Edit
+          </button>
+        }
       />
       <section className="panel grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
         <Fact label="Phone">{formatPhone(u.phone)}</Fact>
@@ -96,23 +120,125 @@ export default function CustomerDetail() {
           }
         >
           <FormError>{toggle.error ? (toggle.error as Error).message : undefined}</FormError>
-          {u.disabled ? (
-            <button className="btn-ghost" onClick={() => toggle.mutate(false)}>
-              Enable account
-            </button>
-          ) : (
-            <button
-              className="btn-danger"
-              onClick={() =>
-                confirm(`Disable ${u.name}? They will be logged out and can't log in.`) &&
-                toggle.mutate(true)
-              }
-            >
-              Disable account
-            </button>
+          <FormError>{delError}</FormError>
+          <div className="flex flex-wrap items-center gap-3">
+            {u.disabled ? (
+              <button className="btn-ghost" onClick={() => toggle.mutate(false)}>
+                Enable account
+              </button>
+            ) : (
+              <button
+                className="btn-danger"
+                onClick={() =>
+                  confirm(`Disable ${u.name}? They will be logged out and can't log in.`) &&
+                  toggle.mutate(true)
+                }
+              >
+                Disable account
+              </button>
+            )}
+            {u.orderCount === 0 ? (
+              <button
+                className="btn-danger"
+                disabled={del.isPending}
+                onClick={() =>
+                  confirm(`Delete customer "${u.name}" permanently? This cannot be undone.`) &&
+                  del.mutate()
+                }
+              >
+                {del.isPending ? 'Deleting…' : 'Delete customer'}
+              </button>
+            ) : null}
+          </div>
+          {u.orderCount > 0 && (
+            <p className="mt-3 text-xs text-muted">
+              This customer has {u.orderCount} order{u.orderCount === 1 ? '' : 's'}. Customers with orders cannot be deleted to preserve order records. Disable their account instead.
+            </p>
           )}
         </Section>
       )}
+      <EditCustomerDrawer
+        open={editing}
+        onClose={() => setEditing(false)}
+        customer={u}
+      />
     </div>
+  );
+}
+
+function EditCustomerDrawer({
+  open,
+  onClose,
+  customer,
+}: {
+  open: boolean;
+  onClose: () => void;
+  customer: Customer;
+}) {
+  const qc = useQueryClient();
+  const showToast = useUi((s) => s.showToast);
+  const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(formatPhone(customer.phone));
+  const [error, setError] = useState<string>();
+
+  const update = useMutation({
+    mutationFn: () =>
+      api<Customer>(`/admin/customers/${customer.id}`, {
+        method: 'PATCH',
+        body: { name: name.trim(), phone },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customer', customer.id] });
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast('Customer updated');
+      setError(undefined);
+      onClose();
+    },
+    onError: (err) => setError((err as Error).message),
+  });
+
+  return (
+    <Drawer open={open} onClose={onClose} title="Edit customer">
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          update.mutate();
+        }}
+      >
+        <FormError>{error}</FormError>
+        <div>
+          <label htmlFor="edit-cust-name" className="label">
+            Full name
+          </label>
+          <input
+            id="edit-cust-name"
+            className="field"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={60}
+          />
+        </div>
+        <div>
+          <label htmlFor="edit-cust-phone" className="label">
+            Phone number
+          </label>
+          <PhoneInput id="edit-cust-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        </div>
+        <div className="flex justify-end gap-3 pt-3">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={update.isPending || !name.trim() || !phone.trim()}
+          >
+            {update.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </form>
+    </Drawer>
   );
 }

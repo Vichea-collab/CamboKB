@@ -1,4 +1,4 @@
-import { ShoppingBag, UserRound } from 'lucide-react';
+import { Package, ShoppingBag, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useMe } from '../features/auth/auth';
@@ -89,10 +89,21 @@ export function Header() {
             </Link>
           )}
           <LanguageToggle />
+          {me.data && (
+            <Link
+              to="/account/orders"
+              className={`btn-icon ${phoneBar}`}
+              aria-label={t.account.orders}
+              title={t.account.orders}
+            >
+              <Package className="size-[18px]" strokeWidth={2.2} aria-hidden />
+            </Link>
+          )}
           <Link
             to={me.data ? '/account' : '/login'}
             className={`btn-icon ${phoneBar}`}
             aria-label={me.data ? t.nav.account : t.nav.login}
+            title={me.data ? t.nav.account : t.nav.login}
           >
             <UserRound className="size-[18px]" strokeWidth={2.2} aria-hidden />
           </Link>

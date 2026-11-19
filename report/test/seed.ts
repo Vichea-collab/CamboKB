@@ -48,6 +48,7 @@ export async function seedOrder(opts: {
     lng: null,
     distanceKm: null,
     note: null,
+    trackingNumber: null,
     subtotalCents: subtotal,
     deliveryFeeCents: fee,
     discountCents: discount,

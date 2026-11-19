@@ -1,6 +1,6 @@
 import { formatUsd } from '@cambo/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Package, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Package, Plus, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../../shared/lib/api';
@@ -50,6 +50,32 @@ export default function Products() {
       refresh();
     },
   });
+  const removeProduct = useMutation({
+    mutationFn: ({ id, permanent }: { id: string; permanent?: boolean }) =>
+      api(`/admin/products/${id}${permanent ? '?permanent=1' : ''}`, { method: 'DELETE' }),
+    onSuccess: (_, vars) => {
+      showToast(vars.permanent ? 'Product deleted permanently' : 'Product archived');
+      refresh();
+    },
+    onError: (err) => {
+      showToast((err as Error).message);
+    },
+  });
+  const handleDelete = (p: AdminProduct) => {
+    if (p.orderCount > 0) {
+      if (p.isActive) {
+        if (confirm(`Archive "${p.name}" and remove from shop? Past orders will be preserved.`)) {
+          removeProduct.mutate({ id: p.id, permanent: false });
+        }
+      } else {
+        showToast('This product has order history and cannot be permanently deleted.');
+      }
+    } else {
+      if (confirm(`Delete product "${p.name}" permanently? This cannot be undone.`)) {
+        removeProduct.mutate({ id: p.id, permanent: true });
+      }
+    }
+  };
   const move = (i: number, d: -1 | 1) => {
     const ids = products.data!.items.map((p) => p.id);
     const [id] = ids.splice(i, 1);
@@ -143,12 +169,29 @@ export default function Products() {
                     {p.category.name} · {formatUsd(p.priceCents)}
                     <ProductFlags p={p} />
                   </p>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted">
-                    Stock{' '}
-                    <StockInput
-                      product={p}
-                      onSave={(stock) => setStock.mutate({ id: p.id, stock })}
-                    />
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+                    <div className="flex items-center gap-2">
+                      Stock{' '}
+                      <StockInput
+                        product={p}
+                        onSave={(stock) => setStock.mutate({ id: p.id, stock })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-btn-danger"
+                      title={
+                        p.orderCount > 0
+                          ? p.isActive
+                            ? 'Archive product'
+                            : 'Archived (has order history)'
+                          : 'Delete product'
+                      }
+                      aria-label={`Delete ${p.name}`}
+                      onClick={() => handleDelete(p)}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </button>
                   </div>
                 </div>
               </li>
@@ -164,6 +207,7 @@ export default function Products() {
                   <th className={`${th} text-right`}>Price</th>
                   <th className={`${th} text-right`}>Stock</th>
                   {canReorder && <th className={`${th} text-right`}>Order in shop</th>}
+                  <th className={`${th} text-right`}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -212,6 +256,23 @@ export default function Products() {
                         </button>
                       </td>
                     )}
+                    <td className={`${td} text-right`}>
+                      <button
+                        type="button"
+                        className="icon-btn-danger"
+                        title={
+                          p.orderCount > 0
+                            ? p.isActive
+                              ? 'Archive product'
+                              : 'Archived (has order history)'
+                            : 'Delete product'
+                        }
+                        aria-label={`Delete ${p.name}`}
+                        onClick={() => handleDelete(p)}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -74,6 +74,12 @@ describe('Checkout', () => {
     );
   });
 
+  it('offers a back link to return to the shop', async () => {
+    mockServer();
+    renderCheckout();
+    expect(await screen.findByRole('link', { name: 'Back to the shop' })).toHaveAttribute('href', '/');
+  });
+
   it('does not offer Telegram location sharing on a computer, where Telegram cannot send a location', async () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',

@@ -184,7 +184,7 @@ export default function Checkout() {
 
   return (
     <form onSubmit={onSubmit} className="pb-28 lg:pb-0" noValidate>
-      <PageHeader title={t.checkout.title} />
+      <PageHeader title={t.checkout.title} back={{ to: '/', label: t.product.backToShop }} />
 
       {/* Phones: the order stays in view at the top, folded away until you want to check it. */}
       <details className="panel group mb-5 overflow-hidden lg:hidden">

@@ -18,6 +18,11 @@ const renderLogin = () =>
   );
 
 describe('Login', () => {
+  it('offers a back link to the shop', () => {
+    renderLogin();
+    expect(screen.getByRole('link', { name: 'Back to the shop' })).toHaveAttribute('href', '/');
+  });
+
   it('explains wrong credentials', async () => {
     vi.mocked(api).mockRejectedValue(new ApiError(401, 'INVALID_CREDENTIALS', 'Wrong phone number or password'));
     renderLogin();

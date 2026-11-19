@@ -6,8 +6,9 @@ import { t } from '../../shared/lib/strings';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { ErrorState, LoadingState, PageHeader } from '../../shared/ui/Page';
 
-// The invoice is laid out as an A4 sheet (210 x 297 mm at 96 dpi).
-const SHEET_W = 794;
+// The invoice is laid out as an A4 sheet (210 x 297 mm at 96 dpi) plus 16px padding on all sides for the screen preview.
+const PAD = 16;
+const SHEET_W = 794 + PAD * 2;
 const SHEET_H = 1160;
 
 /** Scale the sheet down to fit a narrow screen, never up. */
@@ -62,14 +63,24 @@ export default function InvoiceView({
       ) : !page.data ? (
         <LoadingState />
       ) : (
-        <div ref={ref} className="overflow-hidden rounded-2xl ring-1 ring-line" style={{ height: SHEET_H * scale }}>
-          <iframe
-            title={`${t.invoice.title} ${number}`}
-            srcDoc={page.data}
-            sandbox=""
-            className="block border-0 bg-white"
-            style={{ width: SHEET_W, height: SHEET_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          />
+        <div ref={ref} className="w-full">
+          <div
+            className="mx-auto overflow-hidden rounded-2xl bg-[#e7eaf0] shadow-sm ring-1 ring-line"
+            style={{ width: Math.round(SHEET_W * scale), height: Math.round(SHEET_H * scale) }}
+          >
+            <iframe
+              title={`${t.invoice.title} ${number}`}
+              srcDoc={page.data}
+              sandbox=""
+              className="block border-0 bg-[#e7eaf0]"
+              style={{
+                width: SHEET_W,
+                height: SHEET_H,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
