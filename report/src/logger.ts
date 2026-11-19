@@ -1,5 +1,5 @@
-import pino from 'pino';
+import { createLogger as createKitLogger, type Logger } from '@cambo/service-kit';
 
-export type Logger = pino.Logger;
-export const createLogger = (level: string) =>
-  pino({ level, redact: { paths: ['req.headers.authorization'], remove: true } });
+export type { Logger };
+export const createLogger = (level: string, pretty = false) =>
+  createKitLogger({ service: 'report', level, pretty });

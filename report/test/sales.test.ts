@@ -1,9 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPool } from '../src/db';
 import { breakdown, salesSummary, topProducts } from '../src/sales';
-import { resetDb, seedCatalog, seedOrder } from './seed';
+import { pool, resetDb, seedCatalog, seedOrder } from './seed';
 
-const pool = createPool(process.env.DATABASE_URL_TEST!);
 afterAll(() => pool.end());
 
 describe('sales reports', () => {
@@ -11,14 +9,24 @@ describe('sales reports', () => {
   beforeEach(async () => {
     await resetDb();
     ids = await seedCatalog();
-    const { user, mouse, pad } = ids;
-    const m = (q: number) => ({ productId: mouse.id, name: mouse.name, priceCents: 2100, quantity: q });
+    const { mouse, pad } = ids;
+    const m = (q: number) => ({
+      productId: mouse.id,
+      name: mouse.name,
+      priceCents: 2100,
+      quantity: q,
+    });
     const p = (q: number) => ({ productId: pad.id, name: pad.name, priceCents: 600, quantity: q });
-    await seedOrder({ userId: user.id, at: '2026-11-10T02:00:00Z', items: [m(2)] }); // $44
-    await seedOrder({ userId: user.id, at: '2026-11-10T05:00:00Z', items: [p(3)], deliveryFeeCents: 300, region: 'PROVINCE' }); // $21
-    await seedOrder({ userId: user.id, at: '2026-11-10T06:00:00Z', items: [m(5)], status: 'CANCELLED' });
-    await seedOrder({ userId: user.id, at: '2026-11-10T18:30:00Z', items: [m(1)] }); // 11th in Phnom Penh, $23
-    await seedOrder({ userId: user.id, at: '2026-11-12T01:00:00Z', items: [p(1)] }); // $8
+    await seedOrder({ at: '2026-11-10T02:00:00Z', items: [m(2)] }); // $44
+    await seedOrder({
+      at: '2026-11-10T05:00:00Z',
+      items: [p(3)],
+      deliveryFeeCents: 300,
+      region: 'PROVINCE',
+    }); // $21
+    await seedOrder({ at: '2026-11-10T06:00:00Z', items: [m(5)], status: 'CANCELLED' });
+    await seedOrder({ at: '2026-11-10T18:30:00Z', items: [m(1)] }); // 11th in Phnom Penh, $23
+    await seedOrder({ at: '2026-11-12T01:00:00Z', items: [p(1)] }); // $8
   });
 
   it('groups revenue by Phnom Penh day, including empty days', async () => {

@@ -29,24 +29,30 @@ export type InvoiceData = {
 const REGION: Record<string, string> = { PHNOM_PENH: 'Phnom Penh', PROVINCE: 'Province' };
 const SERVICE: Record<string, string> = { GRAB: 'Grab', VET: 'VET Express', JNT: 'J&T Express' };
 const PAYMENT: Record<string, string> = { COD: 'Cash on Delivery', KHQR: 'KHQR' };
-const PAYMENT_STATUS: Record<string, string> = { UNPAID: 'Unpaid', PENDING: 'Pending', PAID: 'Paid', FAILED: 'Failed', EXPIRED: 'Expired', REFUNDED: 'Refunded' };
+const PAYMENT_STATUS: Record<string, string> = {
+  UNPAID: 'Unpaid',
+  PENDING: 'Pending',
+  PAID: 'Paid',
+  FAILED: 'Failed',
+  EXPIRED: 'Expired',
+  REFUNDED: 'Refunded',
+};
 const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
+/** Reads only this service's own database (the copy of the order kept from the api's snapshots). */
 export async function getInvoiceData(db: pg.Pool, orderId: string): Promise<InvoiceData | null> {
   const { rows } = await db.query(
-    `SELECT o.number, o."createdAt", o.status::text AS status, o."contactName", o."contactPhone",
-            o.region::text AS region, o."deliveryService"::text AS "deliveryService", o."addressLine", o.note,
-            o."subtotalCents", o."deliveryFeeCents", o."discountCents", o."totalCents",
-            pc.code AS "promoCode", pay.method::text AS "paymentMethod", pay.status::text AS "paymentStatus"
-     FROM "Order" o
-     LEFT JOIN "PromoCode" pc ON pc.id = o."promoCodeId"
-     LEFT JOIN "Payment" pay ON pay."orderId" = o.id
+    `SELECT o.number, o.created_at AS "createdAt", o.status, o.contact_name AS "contactName", o.contact_phone AS "contactPhone",
+            o.region, o.delivery_service AS "deliveryService", o.address_line AS "addressLine", o.note,
+            o.subtotal_cents AS "subtotalCents", o.delivery_fee_cents AS "deliveryFeeCents", o.discount_cents AS "discountCents", o.total_cents AS "totalCents",
+            o.promo_code AS "promoCode", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus"
+     FROM orders o
      WHERE o.id = $1`,
     [orderId],
   );
   if (!rows[0]) return null;
   const items = await db.query(
-    `SELECT name, quantity, "priceCents", "lineTotalCents" FROM "OrderItem" WHERE "orderId" = $1 ORDER BY "createdAt"`,
+    `SELECT name, quantity, price_cents AS "priceCents", line_total_cents AS "lineTotalCents" FROM order_items WHERE order_id = $1 ORDER BY position`,
     [orderId],
   );
   return { ...(rows[0] as Omit<InvoiceData, 'items'>), items: items.rows };
@@ -54,18 +60,22 @@ export async function getInvoiceData(db: pg.Pool, orderId: string): Promise<Invo
 
 export type InvoiceRenderer = {
   render(data: InvoiceData, store: { name: string }): Promise<Buffer>;
+  /** The same invoice as a web page, for looking at it before downloading the PDF. */
+  renderHtml(data: InvoiceData, store: { name: string }): Promise<string>;
   close(): Promise<void>;
 };
 
 const TEMPLATE_PATH = fileURLToPath(new URL('../templates/invoice.html', import.meta.url));
+const LOGO_PATH = fileURLToPath(new URL('../templates/logo.png', import.meta.url));
+
+/** The printed form always shows at least this many item rows, like the paper invoice. */
+const MIN_ROWS = 13;
 
 /** Everything the template prints, pre-formatted: the template stays logic-free and Handlebars escapes it all. */
-export function invoiceView(d: InvoiceData, store: { name: string }) {
-  const [first = store.name, ...rest] = store.name.split(' ');
+export function invoiceView(d: InvoiceData, store: { name: string }, logo = '') {
   return {
     storeName: store.name,
-    storeFirst: first,
-    storeRest: rest.join(' '),
+    logo,
     number: d.number,
     date: phnomPenhDate(new Date(d.createdAt)),
     contactName: d.contactName,
@@ -74,8 +84,14 @@ export function invoiceView(d: InvoiceData, store: { name: string }) {
     service: SERVICE[d.deliveryService] ?? d.deliveryService,
     addressLine: d.addressLine,
     note: d.note,
-    items: d.items.map((i) => ({ name: i.name, quantity: i.quantity, price: formatUsd(i.priceCents), lineTotal: formatUsd(i.lineTotalCents) })),
-    subtotal: formatUsd(d.subtotalCents),
+    items: d.items.map((i, n) => ({
+      index: n + 1,
+      name: i.name,
+      quantity: i.quantity,
+      price: formatUsd(i.priceCents),
+      lineTotal: formatUsd(i.lineTotalCents),
+    })),
+    blankRows: Array.from({ length: Math.max(0, MIN_ROWS - d.items.length) }, (_, n) => n),
     delivery: formatUsd(d.deliveryFeeCents),
     discount: d.discountCents ? formatUsd(d.discountCents) : null,
     promoCode: d.promoCode,
@@ -91,8 +107,12 @@ export function invoiceView(d: InvoiceData, store: { name: string }) {
  * Start an embedded jsreport (Handlebars + headless Chrome). Start once per process;
  * a small Chrome pool renders invoices concurrently.
  */
-export async function createInvoiceRenderer(opts: { chromePath?: string; workers?: number } = {}): Promise<InvoiceRenderer> {
+export async function createInvoiceRenderer(
+  opts: { chromePath?: string; workers?: number } = {},
+): Promise<InvoiceRenderer> {
   const template = await readFile(TEMPLATE_PATH, 'utf8');
+  // Inlined: the renderer has no network and the template stays one self-contained document.
+  const logo = `data:image/png;base64,${(await readFile(LOGO_PATH)).toString('base64')}`;
   const reporter = jsreport({
     discover: false,
     logger: { console: { transport: 'console', level: 'error' } },
@@ -116,15 +136,29 @@ export async function createInvoiceRenderer(opts: { chromePath?: string; workers
   await reporter.init();
 
   return {
+    async renderHtml(data, store) {
+      const res = await reporter.render({
+        template: { content: template, engine: 'handlebars', recipe: 'html' },
+        data: invoiceView(data, store, logo),
+      });
+      return res.content.toString('utf8');
+    },
     async render(data, store) {
       const res = await reporter.render({
         template: {
           content: template,
           engine: 'handlebars',
           recipe: 'chrome-pdf',
-          chrome: { format: 'A4', printBackground: true, marginTop: '0', marginBottom: '0', marginLeft: '0', marginRight: '0' },
+          chrome: {
+            format: 'A4',
+            printBackground: true,
+            marginTop: '0',
+            marginBottom: '0',
+            marginLeft: '0',
+            marginRight: '0',
+          },
         },
-        data: invoiceView(data, store),
+        data: invoiceView(data, store, logo),
       });
       return res.content;
     },

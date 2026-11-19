@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cambo/service-kit": "*",
     "@cambo/shared": "*",
     "@jsreport/jsreport-chrome-pdf": "4.5.0",
     "@jsreport/jsreport-core": "4.11.3",
@@ -20,6 +21,7 @@
     "pg": "8.23.1",
     "pino": "10.4.0",
     "pino-http": "11.0.0",
+    "prom-client": "15.1.3",
     "puppeteer": "25.17.0",
     "zod": "4.6.7"
   },

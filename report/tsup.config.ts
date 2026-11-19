@@ -8,5 +8,5 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
-  noExternal: ['@cambo/shared'],
+  noExternal: ['@cambo/shared', '@cambo/service-kit'],
 });
