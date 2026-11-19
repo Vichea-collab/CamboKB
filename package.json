@@ -4,9 +4,11 @@
   "type": "module",
   "workspaces": [
     "shared",
+    "service-kit",
     "api",
     "file",
     "report",
+    "notification",
     "web"
   ],
   "engines": {
@@ -15,7 +17,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:scripts",
+    "test:scripts": "node --test scripts/pipeline-notify.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",

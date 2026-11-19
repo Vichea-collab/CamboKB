@@ -14,7 +14,7 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: passwordSchema,
 });
-export const TELEGRAM_AUTH_PURPOSES = ['SIGNUP', 'RESET', 'CHANGE_PHONE'] as const;
+export const TELEGRAM_AUTH_PURPOSES = ['SIGNUP', 'RESET', 'CHANGE_PHONE', 'SHARE_LOCATION'] as const;
 export type TelegramAuthPurpose = (typeof TELEGRAM_AUTH_PURPOSES)[number];
 export const telegramStartSchema = z.object({
   purpose: z.enum(TELEGRAM_AUTH_PURPOSES),
