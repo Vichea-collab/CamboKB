@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import {
   normalizePhone,
   ORDER_STATUSES,
+  PAYMENT_METHODS,
   orderStatusUpdateSchema,
   paymentStatusUpdateSchema,
   phnomPenhDayRange,
@@ -25,6 +26,9 @@ const idParams = z.object({ id: uuidSchema });
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const listQuery = z.object({
   status: z.enum(ORDER_STATUSES).optional(),
+  /** UNPAID also covers a KHQR payment that has not come in yet. */
+  payment: z.enum(['PAID', 'UNPAID', 'FAILED', 'REFUNDED', 'EXPIRED']).optional(),
+  method: z.enum(PAYMENT_METHODS).optional(),
   q: z.string().trim().max(60).optional(),
   from: dateStr.optional(),
   to: dateStr.optional(),
@@ -64,11 +68,28 @@ export function adminOrdersRouter(deps: AppDeps): Router {
   });
 
   r.get('/orders', validate({ query: listQuery }), async (req, res) => {
-    const { status, q, from, to, page, pageSize } = req.valid.query as z.infer<typeof listQuery>;
+    const { status, payment, method, q, from, to, page, pageSize } = req.valid.query as z.infer<
+      typeof listQuery
+    >;
     const where: Prisma.OrderWhereInput = {};
     if (status) where.status = status;
-    // Unpaid orders whose payment ran out are left out, unless the admin looks for a specific one.
-    if (!q) where.NOT = abandonedOrder;
+    if (payment || method) {
+      const stillToPay: PaymentStatus[] = ['UNPAID', 'PENDING'];
+      where.payment = {
+        is: {
+          ...(payment === 'UNPAID'
+            ? { status: { in: stillToPay } }
+            : payment
+              ? { status: payment }
+              : {}),
+          ...(method ? { method } : {}),
+        },
+      };
+      // A cancelled order owes nothing, so "not paid yet" leaves it out (unless cancelled orders were asked for).
+      if (payment === 'UNPAID' && !status) where.status = { not: 'CANCELLED' };
+    }
+    // Unpaid orders whose payment ran out are left out, unless the admin looks for one by number or asks for them.
+    if (!q && payment !== 'EXPIRED') where.NOT = abandonedOrder;
     if (q) {
       const phone = normalizePhone(q);
       where.OR = [
@@ -116,14 +137,21 @@ export function adminOrdersRouter(deps: AppDeps): Router {
   // The carrier's tracking number: shown to the customer and sent to them on Telegram (once per number).
   r.post(
     '/orders/:id/tracking',
-    validate({ params: idParams, body: z.object({ trackingNumber: z.string().max(60).nullable() }) }),
+    validate({
+      params: idParams,
+      body: z.object({ trackingNumber: z.string().max(60).nullable() }),
+    }),
     async (req, res) => {
       const { id } = req.valid.params as { id: string };
       const typed = (req.valid.body as { trackingNumber: string | null }).trackingNumber?.trim();
       const trackingNumber = typed ? typed : null;
-      const order = await prisma.order.findUnique({ where: { id }, select: { status: true, trackingNumber: true } });
+      const order = await prisma.order.findUnique({
+        where: { id },
+        select: { status: true, trackingNumber: true },
+      });
       if (!order) throw notFound('Order');
-      if (order.status === 'CANCELLED') throw new AppError(409, 'ORDER_CLOSED', 'A cancelled order cannot be shipped');
+      if (order.status === 'CANCELLED')
+        throw new AppError(409, 'ORDER_CLOSED', 'A cancelled order cannot be shipped');
       if (order.trackingNumber !== trackingNumber) {
         await prisma.$transaction(async (tx) => {
           await tx.order.update({ where: { id }, data: { trackingNumber } });

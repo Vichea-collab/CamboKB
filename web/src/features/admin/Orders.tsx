@@ -15,13 +15,21 @@ export default function Orders() {
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState(params.get('q') ?? '');
   const status = params.get('status') ?? '';
+  const payment = params.get('payment') ?? '';
+  const method = params.get('method') ?? '';
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
   const page = Number(params.get('page') ?? 1);
   const qs = new URLSearchParams(
-    Object.entries({ status, q: params.get('q') ?? '', from, to, page: String(page) }).filter(
-      ([, v]) => v,
-    ),
+    Object.entries({
+      status,
+      payment,
+      method,
+      q: params.get('q') ?? '',
+      from,
+      to,
+      page: String(page),
+    }).filter(([, v]) => v),
   );
   const orders = useQuery({
     queryKey: ['admin', 'orders', qs.toString()],
@@ -100,6 +108,28 @@ export default function Orders() {
             aria-label="Search orders"
           />
         </form>
+        <select
+          className="field w-auto min-w-[9.5rem] flex-1 sm:flex-none"
+          value={payment}
+          onChange={(e) => set('payment', e.target.value)}
+          aria-label="Payment"
+        >
+          <option value="">All payments</option>
+          <option value="PAID">Paid</option>
+          <option value="UNPAID">Not paid yet</option>
+          <option value="FAILED">Failed</option>
+          <option value="REFUNDED">Refunded</option>
+        </select>
+        <select
+          className="field w-auto min-w-[9.5rem] flex-1 sm:flex-none"
+          value={method}
+          onChange={(e) => set('method', e.target.value)}
+          aria-label="Payment method"
+        >
+          <option value="">Any method</option>
+          <option value="KHQR">KHQR</option>
+          <option value="COD">Cash on delivery</option>
+        </select>
         <details className="group relative w-full sm:w-auto" open={Boolean(from || to)}>
           <summary className="btn-ghost w-full cursor-pointer list-none justify-start px-3.5 sm:w-auto [&::-webkit-details-marker]:hidden">
             <CalendarDays className="size-4 text-muted" aria-hidden />
@@ -140,7 +170,7 @@ export default function Orders() {
         <Loading />
       ) : orders.data.items.length === 0 ? (
         <EmptyState icon={Receipt} title="No orders match these filters">
-          Try another status, or clear the search and dates.
+          Try another status or payment, or clear the search and dates.
         </EmptyState>
       ) : (
         <>

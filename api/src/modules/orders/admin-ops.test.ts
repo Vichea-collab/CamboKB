@@ -215,6 +215,69 @@ describe('admin operations', () => {
     });
   });
 
+  describe('filtering orders by payment', () => {
+    const khqr = {
+      region: 'PROVINCE',
+      deliveryService: 'VET',
+      pin: undefined,
+      paymentMethod: 'KHQR',
+    };
+    const ids = (r: { body: { items: { id: string }[] } }) => r.body.items.map((o) => o.id).sort();
+    const list = (query: Record<string, string>) => admin.get('/api/v1/admin/orders').query(query);
+
+    beforeEach(async () => {
+      await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 30 } });
+    });
+
+    it('finds cash still to collect, KHQR that came in, and KHQR still waiting', async () => {
+      const cashToCollect = await placeOrder();
+      const cashCollected = await placeOrder();
+      await admin
+        .post(`/api/v1/admin/orders/${cashCollected.id}/payment`)
+        .set('Origin', WEB_ORIGIN)
+        .send({ status: 'PAID' });
+      const waiting = await placeOrder(khqr);
+      const paidByKhqr = await placeOrder(khqr);
+      await ctx.prisma.payment.update({
+        where: { orderId: paidByKhqr.id },
+        data: { status: 'PAID' },
+      });
+
+      expect(ids(await list({ payment: 'PAID' }))).toEqual(
+        [cashCollected.id, paidByKhqr.id].sort(),
+      );
+      expect(ids(await list({ payment: 'UNPAID' }))).toEqual([cashToCollect.id, waiting.id].sort());
+      expect(ids(await list({ method: 'KHQR' }))).toEqual([waiting.id, paidByKhqr.id].sort());
+      expect(ids(await list({ payment: 'UNPAID', method: 'COD' }))).toEqual([cashToCollect.id]);
+      expect(ids(await list({ payment: 'PAID', method: 'KHQR' }))).toEqual([paidByKhqr.id]);
+    });
+
+    it('does not list a cancelled order as "not paid yet", and finds failed payments', async () => {
+      const cancelled = await placeOrder();
+      await setStatus(cancelled.id, 'CANCELLED');
+      const open = await placeOrder();
+      const failed = await placeOrder(khqr);
+      await ctx.prisma.payment.update({
+        where: { orderId: failed.id },
+        data: { status: 'FAILED' },
+      });
+      expect(ids(await list({ payment: 'UNPAID' }))).toEqual([open.id]);
+      expect(ids(await list({ payment: 'FAILED' }))).toEqual([failed.id]);
+    });
+
+    it('can still show the unpaid orders that expired, when asked for them', async () => {
+      const o = await placeOrder(khqr);
+      await ctx.prisma.order.update({ where: { id: o.id }, data: { status: 'CANCELLED' } });
+      await ctx.prisma.payment.update({ where: { orderId: o.id }, data: { status: 'EXPIRED' } });
+      expect(ids(await list({}))).toEqual([]);
+      expect(ids(await list({ payment: 'EXPIRED' }))).toEqual([o.id]);
+    });
+
+    it('rejects a payment filter it does not know', async () => {
+      expect((await list({ payment: 'MAYBE' })).status).toBe(400);
+    });
+  });
+
   describe('orders whose KHQR payment ran out', () => {
     // A KHQR order, closed the way the payment sweep does it: cancelled, with the payment marked EXPIRED or FAILED.
     const closedKhqrOrder = async (paymentStatus: 'EXPIRED' | 'FAILED') => {
