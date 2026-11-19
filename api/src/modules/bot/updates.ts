@@ -19,6 +19,8 @@ export const BOT_TEXT = {
   verified: '✅ Verified! Go back to the website to continue.',
   verifiedChoosePassword: '✅ Verified! One more step: choose your password.',
   noPending: 'Please open the sign-up link from the Cambo Supply website first.',
+  unknownMessage:
+    'I only understand commands. Try /shop to open the store, /orders for your latest orders, or /help.',
   invalidPhone: "That phone number doesn't look valid.",
   askLocation:
     "Tap the button below to share where we should deliver. You can also send any other spot from the 📎 menu → Location. (Telegram on a computer can't send a location: use your phone, or tap “Use my location” on the checkout page.)",
@@ -66,9 +68,22 @@ export async function handleTelegramUpdate(deps: AppDeps, update: TgUpdate): Pro
     if (command === 'orders') await handleOrders(deps, msg, say);
     else if (command === 'shop') handleShop(deps, msg, say);
     else if (command === 'help') handleHelp(msg, say);
-    else say(msg.chat.id, `${BOT_TEXT.noPending}\n${deps.config.webOrigin[0] ?? ''}`);
+    else await handleOther(deps, msg, say);
   }
   return actions;
+}
+
+/**
+ * Anything that isn't a command. A customer who already has an account is pointed at the commands;
+ * someone without one is pointed at sign-up.
+ */
+async function handleOther(deps: AppDeps, msg: TgMessage, say: Say) {
+  const user = await deps.prisma.user.findUnique({
+    where: { telegramUserId: BigInt(msg.from!.id) },
+    select: { id: true },
+  });
+  if (user) say(msg.chat.id, BOT_TEXT.unknownMessage);
+  else say(msg.chat.id, `${BOT_TEXT.noPending}\n${deps.config.webOrigin[0] ?? ''}`);
 }
 
 const STATUS_LABEL: Record<string, string> = {

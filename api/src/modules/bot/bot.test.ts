@@ -102,6 +102,14 @@ describe('bot commands (answered by the api, sent by the notification service)',
     );
   });
 
+  it('points a customer who types something that is not a command to the commands, not to sign-up', async () => {
+    await createUser(ctx.prisma, { telegramUserId: TG_ID, name: 'Dara' });
+    const [reply] = await ask(ctx, 'hello');
+    expect(reply!.text).toContain('/shop');
+    expect(reply!.text).toContain('/help');
+    expect(reply!.text).not.toMatch(/sign-up/i);
+  });
+
   it('ignores group chats and bots, and answers a stranger with how to start', async () => {
     const group = await request(ctx.app)
       .post('/internal/telegram/updates')
