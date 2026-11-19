@@ -51,6 +51,35 @@ describe('request context', () => {
   });
 });
 
+describe('logger secrets', () => {
+  it('never writes credentials from request headers (cookie, bearer, Telegram webhook secret)', () => {
+    const lines: string[] = [];
+    const destination = new Writable({
+      write: (chunk, _enc, cb) => (lines.push(String(chunk)), cb()),
+    });
+    const log = createLogger({ service: 'demo', level: 'info', destination });
+    log.info(
+      {
+        req: {
+          method: 'POST',
+          headers: {
+            host: 'shop.test',
+            cookie: 'sid=SESSION-SECRET',
+            authorization: 'Bearer BEARER-SECRET',
+            'x-telegram-bot-api-secret-token': 'WEBHOOK-SECRET',
+            'x-api-key': 'KEY-SECRET',
+          },
+        },
+      },
+      'request completed',
+    );
+    const text = lines.join('');
+    for (const secret of ['SESSION-SECRET', 'BEARER-SECRET', 'WEBHOOK-SECRET', 'KEY-SECRET'])
+      expect(text).not.toContain(secret);
+    expect(JSON.parse(text).req.headers.host).toBe('shop.test');
+  });
+});
+
 describe('metrics', () => {
   it('counts requests by route pattern and exposes process metrics', async () => {
     const metrics = createMetrics('demo');
