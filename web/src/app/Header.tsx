@@ -8,7 +8,11 @@ import { useUi } from '../shared/lib/ui-store';
 import { useBottomNavVisible } from './BottomNav';
 import { LanguageToggle } from './LanguageToggle';
 
-export function BrandMark({ tagline = true }: { tagline?: boolean }) {
+/**
+ * `compact`: the header also carries account, orders and cart (the pages without a bottom bar), so on a phone
+ * only the logo is shown. Otherwise the buttons would be drawn over the name.
+ */
+export function BrandMark({ tagline = true, compact = false }: { tagline?: boolean; compact?: boolean }) {
   return (
     <Link
       to="/"
@@ -20,7 +24,7 @@ export function BrandMark({ tagline = true }: { tagline?: boolean }) {
         alt=""
         className="size-10 rounded-xl border border-line shadow-pop sm:size-11"
       />
-      <span className="flex flex-col max-[339px]:sr-only">
+      <span className={`flex flex-col ${compact ? 'max-[429px]:sr-only' : 'max-[339px]:sr-only'}`}>
         <span className="font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.03em] sm:text-[1.5rem]">
           Cambo<span className="text-yellow">Supply</span>
         </span>
@@ -70,13 +74,14 @@ export function Header() {
   const me = useMe();
   const hidden = useHideOnScroll();
   // On phones the bottom bar carries account and cart, so the header drops them there (not where the bar is hidden).
-  const phoneBar = useBottomNavVisible() ? 'max-md:hidden' : '';
+  const navShown = useBottomNavVisible();
+  const phoneBar = navShown ? 'max-md:hidden' : '';
   return (
     <header
       className={`sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none ${hidden ? '-translate-y-full' : ''}`}
     >
       <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center justify-between gap-3 px-3 min-[360px]:px-4 sm:h-16 sm:px-6 lg:px-8">
-        <BrandMark />
+        <BrandMark compact={!navShown} />
         <nav className="flex items-center gap-1 min-[360px]:gap-2">
           {me.data?.role === 'ADMIN' && (
             <Link to="/admin" className="chip hidden sm:inline-flex">
