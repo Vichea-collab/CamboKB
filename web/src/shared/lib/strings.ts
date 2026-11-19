@@ -278,6 +278,8 @@ const en = {
     EXPIRED: 'Expired',
     REFUNDED: 'Refunded',
   } as Record<string, string>,
+  /** Short form for lists: a KHQR payment that has not come in yet. */
+  paymentWaiting: 'Waiting',
   region: { PHNOM_PENH: 'Phnom Penh', PROVINCE: 'Province' } as Record<string, string>,
   service: { GRAB: 'Grab', VET: 'VET Express', JNT: 'J&T Express' } as Record<string, string>,
   orderView: {
@@ -642,6 +644,7 @@ const km: Strings = {
     EXPIRED: 'ផុតកំណត់',
     REFUNDED: 'បានសងប្រាក់វិញ',
   },
+  paymentWaiting: 'កំពុងរង់ចាំ',
   region: { PHNOM_PENH: 'ភ្នំពេញ', PROVINCE: 'តាមខេត្ត' },
   service: { GRAB: 'Grab', VET: 'VET Express', JNT: 'J&T Express' },
   orderView: {

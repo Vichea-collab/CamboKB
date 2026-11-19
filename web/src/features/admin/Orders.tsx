@@ -1,13 +1,13 @@
 import { formatPhone, formatUsdExact, ORDER_STATUSES } from '@cambo/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, QrCode, Receipt, Search } from 'lucide-react';
+import { CalendarDays, Receipt, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api } from '../../shared/lib/api';
 import { t } from '../../shared/lib/strings';
 import type { Paged } from '../../shared/lib/types';
-import { StatusBadge } from '../../shared/ui/StatusBadge';
-import { Badge, EmptyState } from '../../shared/ui/Page';
+import { PaymentBadge, StatusBadge } from '../../shared/ui/StatusBadge';
+import { EmptyState } from '../../shared/ui/Page';
 import { fmtDate, Loading, PageHeader, td, th } from './components/ui';
 import type { AdminOrder } from './types';
 
@@ -170,7 +170,9 @@ export default function Orders() {
                       <p className="font-display text-xl font-extrabold tabular-nums">
                         {formatUsdExact(o.totalCents)}
                       </p>
-                      <Waiting o={o} />
+                      <div className="mt-1 flex justify-end">
+                        <PaymentBadge payment={o.payment} orderStatus={o.status} align="end" />
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -187,6 +189,7 @@ export default function Orders() {
                   <th className={th}>Date</th>
                   <th className={th}>Customer</th>
                   <th className={th}>Delivery</th>
+                  <th className={th}>Payment</th>
                   <th className={th}>Status</th>
                   <th className={`${th} text-right`}>Total</th>
                 </tr>
@@ -213,10 +216,10 @@ export default function Orders() {
                       {t.region[o.region]} · {t.service[o.deliveryService]}
                     </td>
                     <td className={td}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={o.status} payment={o.payment?.status} />
-                        <Waiting o={o} />
-                      </div>
+                      <PaymentBadge payment={o.payment} orderStatus={o.status} />
+                    </td>
+                    <td className={td}>
+                      <StatusBadge status={o.status} payment={o.payment?.status} />
                     </td>
                     <td className={`${td} text-right font-bold tabular-nums`}>
                       {formatUsdExact(o.totalCents)}
@@ -235,17 +238,6 @@ export default function Orders() {
         </>
       )}
     </div>
-  );
-}
-
-/** Marks an order that is waiting for its KHQR payment. */
-function Waiting({ o }: { o: AdminOrder }) {
-  if (o.payment?.method !== 'KHQR' || o.payment.status !== 'PENDING' || o.status !== 'PENDING')
-    return null;
-  return (
-    <Badge tone="yellow" className="mt-1">
-      <QrCode className="size-3" aria-hidden /> Awaiting KHQR
-    </Badge>
   );
 }
 
