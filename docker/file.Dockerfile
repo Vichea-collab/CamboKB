@@ -4,8 +4,10 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
+COPY service-kit/package.json service-kit/
 COPY file/package.json file/
 RUN npm ci --workspace file --include-workspace-root
+COPY service-kit service-kit
 COPY file file
 RUN npm run build --workspace file \
  && npm prune --omit=dev --workspace file --include-workspace-root
@@ -17,6 +19,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules node_modules
 COPY --from=build --chown=node:node /app/file/package.json file/package.json
 COPY --from=build --chown=node:node /app/file/dist file/dist
+COPY --from=build --chown=node:node /app/file/migrations file/migrations
 RUN mkdir -p /data/uploads && chown -R node:node /data
 USER node
 WORKDIR /app/file

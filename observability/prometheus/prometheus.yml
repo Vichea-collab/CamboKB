@@ -1,0 +1,23 @@
+# Prometheus: scrapes every service's /metrics over the private Docker network.
+# Open http://localhost:9090/targets to see whether each service is up.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: api
+    static_configs: [{ targets: ['api:4000'], labels: { service: api } }]
+  - job_name: file
+    static_configs: [{ targets: ['file:4100'], labels: { service: file } }]
+  - job_name: report
+    static_configs: [{ targets: ['report:4200'], labels: { service: report } }]
+  - job_name: notification
+    static_configs: [{ targets: ['notification:4300'], labels: { service: notification } }]
+  # CPU and memory of every container (the services, the databases, nginx).
+  - job_name: cadvisor
+    static_configs: [{ targets: ['cadvisor:8080'] }]
+  - job_name: prometheus
+    static_configs: [{ targets: ['localhost:9090'] }]

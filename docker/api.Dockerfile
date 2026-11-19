@@ -6,9 +6,11 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/
+COPY service-kit/package.json service-kit/
 COPY api/package.json api/
 RUN npm ci --workspace api --include-workspace-root
 COPY shared shared
+COPY service-kit service-kit
 COPY api api
 RUN npx prisma generate --schema api/prisma/schema.prisma \
  && npm run build --workspace api \

@@ -8,9 +8,11 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/
+COPY service-kit/package.json service-kit/
 COPY report/package.json report/
 RUN npm ci --workspace report --include-workspace-root
 COPY shared shared
+COPY service-kit service-kit
 COPY report report
 RUN npm run build --workspace report \
  && npm prune --omit=dev --workspace report --include-workspace-root
@@ -24,6 +26,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules node_modules
 COPY --from=build --chown=node:node /app/report/package.json report/package.json
 COPY --from=build --chown=node:node /app/report/dist report/dist
+COPY --from=build --chown=node:node /app/report/migrations report/migrations
 COPY --from=build --chown=node:node /app/report/templates report/templates
 USER node
 WORKDIR /app/report

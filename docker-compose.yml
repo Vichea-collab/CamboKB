@@ -1,61 +1,107 @@
-# Local stack: Postgres + all four services.
-#   docker compose up --build        → shop on http://localhost:8080
-#   docker compose up db             → just Postgres, for `npm run dev`
+# Local stack: every service with its own database, plus (optionally) monitoring.
+#
+#   docker compose up --build                              the shop on http://localhost:${WEB_PORT:-8080}
+#   docker compose --profile observability up --build     + Grafana :3001, Prometheus :9090
+#   docker compose up db                                   just the api's Postgres, for `npm run dev`
+#
 # Development secrets only. Production: see docker-compose.prod.yml.
+#
+# One Postgres per service: nothing reads another service's database. Services talk over REST
+# (and events the api queues for them), never through a shared table.
 
 name: cambo-supply
 
+x-postgres: &postgres
+  image: postgres:17-alpine
+  restart: unless-stopped
+
 services:
+  # --- databases (one each) -------------------------------------------------
   db:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: cambo
-      POSTGRES_PASSWORD: cambo
-      POSTGRES_DB: cambo_supply
+    <<: *postgres
+    environment: { POSTGRES_USER: cambo, POSTGRES_PASSWORD: cambo, POSTGRES_DB: cambo_supply }
     # Set DB_PORT if 5432 is already used by a Postgres on this machine.
     ports: ['${DB_PORT:-5432}:5432']
     volumes: [db-data:/var/lib/postgresql/data]
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_supply']
-      interval: 5s
-      retries: 10
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_supply'], interval: 5s, retries: 10 }
 
+  file-db:
+    <<: *postgres
+    environment: { POSTGRES_USER: cambo, POSTGRES_PASSWORD: cambo, POSTGRES_DB: cambo_files }
+    volumes: [file-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_files'], interval: 5s, retries: 10 }
+
+  report-db:
+    <<: *postgres
+    environment: { POSTGRES_USER: cambo, POSTGRES_PASSWORD: cambo, POSTGRES_DB: cambo_reports }
+    volumes: [report-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_reports'], interval: 5s, retries: 10 }
+
+  notification-db:
+    <<: *postgres
+    environment: { POSTGRES_USER: cambo, POSTGRES_PASSWORD: cambo, POSTGRES_DB: cambo_notifications }
+    volumes: [notification-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_notifications'], interval: 5s, retries: 10 }
+
+  # --- services ---------------------------------------------------------------
   file:
     build: { context: ., dockerfile: docker/file.Dockerfile }
+    restart: unless-stopped
     environment:
+      FILE_DATABASE_URL: postgresql://cambo:cambo@file-db:5432/cambo_files
       FILE_SERVICE_SECRET: local-compose-file-secret-0f3a9c71d2e84b65a7
-      CORS_ORIGIN: http://localhost:8080
+      CORS_ORIGIN: http://localhost:${WEB_PORT:-8080}
     volumes: [uploads:/data/uploads]
+    depends_on: { file-db: { condition: service_healthy } }
 
   report:
     build: { context: ., dockerfile: docker/report.Dockerfile }
+    restart: unless-stopped
     environment:
-      REPORT_DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
+      REPORT_DATABASE_URL: postgresql://cambo:cambo@report-db:5432/cambo_reports
       REPORT_SERVICE_SECRET: local-compose-report-secret-5b2e8d90c1f7a346
-    depends_on: { db: { condition: service_healthy } }
+    depends_on: { report-db: { condition: service_healthy } }
+
+  notification:
+    build: { context: ., dockerfile: docker/notification.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NOTIFICATION_DATABASE_URL: postgresql://cambo:cambo@notification-db:5432/cambo_notifications
+      NOTIFICATION_SERVICE_SECRET: local-compose-notification-secret-7d41c9e0
+      API_URL: http://api:4000
+      API_INTERNAL_SECRET: local-compose-api-internal-secret-3c8f20a9d6
+      WEB_ORIGIN: http://localhost:${WEB_PORT:-8080}
+      # Telegram: copy your bot settings from notification/.env (never commit the token)
+      TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+    depends_on: { notification-db: { condition: service_healthy } }
 
   api:
     build: { context: ., dockerfile: docker/api.Dockerfile }
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://cambo:cambo@db:5432/cambo_supply
-      WEB_ORIGIN: http://localhost:8080
+      WEB_ORIGIN: http://localhost:${WEB_PORT:-8080}
       TRUST_PROXY: 'true'
       # The local stack is plain http (the containers run in production mode, whose cookies need https).
       COOKIE_SECURE: 'false'
       FILE_SERVICE_URL: http://file:4100
       FILE_SERVICE_SECRET: local-compose-file-secret-0f3a9c71d2e84b65a7
-      PUBLIC_FILES_URL: http://localhost:8080/files
+      PUBLIC_FILES_URL: http://localhost:${WEB_PORT:-8080}/files
       REPORT_SERVICE_URL: http://report:4200
       REPORT_SERVICE_SECRET: local-compose-report-secret-5b2e8d90c1f7a346
-      # Telegram: copy your bot settings from api/.env (never commit the token)
-      TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      NOTIFICATION_SERVICE_URL: http://notification:4300
+      NOTIFICATION_SERVICE_SECRET: local-compose-notification-secret-7d41c9e0
+      API_INTERNAL_SECRET: local-compose-api-internal-secret-3c8f20a9d6
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
-      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
     depends_on:
       db: { condition: service_healthy }
       file: { condition: service_started }
       report: { condition: service_started }
+      notification: { condition: service_started }
 
   web:
     build:
@@ -63,10 +109,81 @@ services:
       dockerfile: docker/web.Dockerfile
       args:
         VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME:-}'
-        VITE_SITE_URL: http://localhost:8080
-    ports: ['8080:80']
-    depends_on: [api, file]
+        VITE_SITE_URL: http://localhost:${WEB_PORT:-8080}
+    restart: unless-stopped
+    ports: ['${WEB_PORT:-8080}:80']
+    depends_on: [api, file, notification]
+
+  # --- observability (profile "observability") --------------------------------
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.2.1
+    restart: unless-stopped
+    command: ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=7d']
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports: ['127.0.0.1:${PROMETHEUS_PORT:-9090}:9090']
+
+  cadvisor:
+    profiles: [observability]
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    command: ['--docker_only=true', '--housekeeping_interval=15s']
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  loki:
+    profiles: [observability]
+    image: grafana/loki:3.4.2
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+
+  alloy:
+    profiles: [observability]
+    image: grafana/alloy:v1.7.1
+    restart: unless-stopped
+    command: ['run', '--server.http.listen-addr=0.0.0.0:12345', '--storage.path=/var/lib/alloy/data', '/etc/alloy/config.alloy']
+    environment:
+      # Which Compose project's containers to collect logs from.
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-cambo-supply}
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on: [loki]
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:11.5.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/services.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ['127.0.0.1:${GRAFANA_PORT:-3001}:3000']
+    depends_on: [prometheus, loki]
 
 volumes:
   db-data:
+  file-db-data:
+  report-db-data:
+  notification-db-data:
   uploads:
+  prometheus-data:
+  loki-data:
+  alloy-data:
+  grafana-data:
