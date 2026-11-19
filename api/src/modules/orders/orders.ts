@@ -24,6 +24,16 @@ export const orderInclude = {
   promoCode: true,
 } as const;
 
+/**
+ * An order closed because its KHQR payment ran out. Nobody paid on Bakong, so there is nothing for the shop
+ * to do (the stock already went back): the admin lists and counts leave these out. A payment that FAILED is
+ * different, someone tried and it went wrong, so those stay visible.
+ */
+export const abandonedOrder: Prisma.OrderWhereInput = {
+  status: 'CANCELLED',
+  payment: { is: { status: 'EXPIRED' } },
+};
+
 export type OrderWithRelations = Order & {
   items: OrderItem[];
   events: OrderStatusEvent[];

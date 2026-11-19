@@ -13,7 +13,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { AppDeps } from '../../http/app';
 import { toPublicUser } from '../auth/sessions';
-import { orderInclude, toOrderDto } from './orders';
+import { abandonedOrder, orderInclude, toOrderDto } from './orders';
 import { kickEvents } from '../events/outbox';
 import { announceSnapshot, announceTrackingSet } from '../events/snapshot';
 import { changeOrderStatus, publishOrderUpdate } from './status';
@@ -46,7 +46,11 @@ export function adminOrdersRouter(deps: AppDeps): Router {
 
   // Counts per status for the Orders tabs (registered before /orders/:id).
   r.get('/orders/counts', async (_req, res) => {
-    const rows = await prisma.order.groupBy({ by: ['status'], _count: { _all: true } });
+    const rows = await prisma.order.groupBy({
+      by: ['status'],
+      where: { NOT: abandonedOrder },
+      _count: { _all: true },
+    });
     const counts: Record<string, number> = {
       PENDING: 0,
       CONFIRMED: 0,
@@ -63,6 +67,8 @@ export function adminOrdersRouter(deps: AppDeps): Router {
     const { status, q, from, to, page, pageSize } = req.valid.query as z.infer<typeof listQuery>;
     const where: Prisma.OrderWhereInput = {};
     if (status) where.status = status;
+    // Unpaid orders whose payment ran out are left out, unless the admin looks for a specific one.
+    if (!q) where.NOT = abandonedOrder;
     if (q) {
       const phone = normalizePhone(q);
       where.OR = [

@@ -215,6 +215,53 @@ describe('admin operations', () => {
     });
   });
 
+  describe('orders whose KHQR payment ran out', () => {
+    // A KHQR order, closed the way the payment sweep does it: cancelled, with the payment marked EXPIRED or FAILED.
+    const closedKhqrOrder = async (paymentStatus: 'EXPIRED' | 'FAILED') => {
+      const o = await placeOrder({
+        region: 'PROVINCE',
+        deliveryService: 'VET',
+        pin: undefined,
+        paymentMethod: 'KHQR',
+      });
+      await ctx.prisma.order.update({ where: { id: o.id }, data: { status: 'CANCELLED' } });
+      await ctx.prisma.payment.update({
+        where: { orderId: o.id },
+        data: { status: paymentStatus },
+      });
+      return o;
+    };
+
+    beforeEach(async () => {
+      await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 30 } });
+    });
+
+    it('are left out of the order list and the tab counts, because nobody paid and there is nothing to do', async () => {
+      const kept = await placeOrder();
+      const expired = await closedKhqrOrder('EXPIRED');
+      const list = await admin.get('/api/v1/admin/orders');
+      expect(list.body.items.map((o: { id: string }) => o.id)).toEqual([kept.id]);
+      expect(list.body.total).toBe(1);
+      const counts = (await admin.get('/api/v1/admin/orders/counts')).body;
+      expect(counts).toMatchObject({ all: 1, PENDING: 1, CANCELLED: 0 });
+      // Still there: searching for the number finds it.
+      const found = await admin.get('/api/v1/admin/orders').query({ q: expired.number });
+      expect(found.body.items.map((o: { id: string }) => o.id)).toEqual([expired.id]);
+      expect((await admin.get(`/api/v1/admin/orders/${expired.id}`)).status).toBe(200);
+    });
+
+    it('keeps a failed payment visible, and a cancelled order that someone cancelled', async () => {
+      const failed = await closedKhqrOrder('FAILED');
+      const cancelled = await placeOrder();
+      await setStatus(cancelled.id, 'CANCELLED');
+      const list = await admin.get('/api/v1/admin/orders').query({ status: 'CANCELLED' });
+      expect(list.body.items.map((o: { id: string }) => o.id).sort()).toEqual(
+        [failed.id, cancelled.id].sort(),
+      );
+      expect((await admin.get('/api/v1/admin/orders/counts')).body).toMatchObject({ CANCELLED: 2 });
+    });
+  });
+
   it('keeps the order counts for admins only', async () => {
     expect((await customer.get('/api/v1/admin/orders/counts')).status).toBe(403);
   });
