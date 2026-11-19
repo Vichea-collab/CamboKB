@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureTelegramApp, isTelegramMiniApp, loadTelegramScript } from './telegram';
 
-const scripts = () => [...document.head.querySelectorAll('script[src*="telegram-web-app"]')] as HTMLScriptElement[];
+const scripts = () =>
+  [...document.head.querySelectorAll('script[src*="telegram-web-app"]')] as HTMLScriptElement[];
 
 describe('Telegram Mini App script', () => {
   beforeEach(() => {
@@ -68,7 +69,58 @@ describe('Telegram Mini App set-up', () => {
   });
 
   it('works with older Telegram versions that lack the newer calls, and when there is no Telegram at all', () => {
-    expect(() => configureTelegramApp({ ready: vi.fn(), expand: vi.fn() }, '#12151a')).not.toThrow();
+    expect(() =>
+      configureTelegramApp({ ready: vi.fn(), expand: vi.fn() }, '#12151a'),
+    ).not.toThrow();
     expect(() => configureTelegramApp(undefined, '#12151a')).not.toThrow();
+  });
+});
+
+describe('Telegram Mini App colours follow the phone', () => {
+  const themed = (colorScheme: 'light' | 'dark', bg_color: string) => ({
+    ready: vi.fn(),
+    expand: vi.fn(),
+    setHeaderColor: vi.fn(),
+    setBackgroundColor: vi.fn(),
+    setBottomBarColor: vi.fn(),
+    colorScheme,
+    themeParams: { bg_color },
+    onEvent: vi.fn(),
+  });
+  afterEach(() => document.documentElement.style.removeProperty('--color-bg'));
+
+  it("on a dark phone uses the phone's own background for Telegram's header, the page and the bottom bar", () => {
+    const app = themed('dark', '#000000');
+    configureTelegramApp(app, '#12151a');
+    expect(app.setHeaderColor).toHaveBeenCalledWith('#000000');
+    expect(app.setBackgroundColor).toHaveBeenCalledWith('#000000');
+    expect(app.setBottomBarColor).toHaveBeenCalledWith('#000000');
+    expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('#000000');
+  });
+
+  it('keeps the shop colour on a light phone, because the shop is dark only and its text is light', () => {
+    const app = themed('light', '#ffffff');
+    configureTelegramApp(app, '#12151a');
+    expect(app.setHeaderColor).toHaveBeenCalledWith('#12151a');
+    expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('');
+  });
+
+  it('ignores a colour it cannot trust', () => {
+    const app = themed('dark', 'not-a-colour');
+    configureTelegramApp(app, '#12151a');
+    expect(app.setHeaderColor).toHaveBeenCalledWith('#12151a');
+  });
+
+  it('follows the phone when its theme changes', () => {
+    const app = themed('dark', '#000000');
+    configureTelegramApp(app, '#12151a');
+    const repaint = app.onEvent.mock.calls.find(
+      ([event]) => event === 'themeChanged',
+    )![1] as () => void;
+    app.colorScheme = 'light';
+    app.themeParams.bg_color = '#ffffff';
+    repaint();
+    expect(app.setHeaderColor).toHaveBeenLastCalledWith('#12151a');
+    expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('');
   });
 });

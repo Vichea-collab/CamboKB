@@ -43,20 +43,39 @@ export type TelegramWebApp = {
   setBackgroundColor?(color: string): void;
   setBottomBarColor?(color: string): void;
   disableVerticalSwipes?(): void;
+  /** The phone's own light or dark theme, and its colours. */
+  colorScheme?: 'light' | 'dark';
+  themeParams?: { bg_color?: string };
+  onEvent?(event: string, cb: () => void): void;
 };
 
+/** The phone's own background, but only on a dark theme: the shop is dark only, so on a light phone it keeps its own. */
+function phoneBackground(app: TelegramWebApp): string | undefined {
+  const bg = app.themeParams?.bg_color;
+  return app.colorScheme === 'dark' && bg && /^#[0-9a-f]{6}$/i.test(bg) ? bg : undefined;
+}
+
 /**
- * Make the store feel like part of Telegram: full height, our colours in Telegram's own header, background
- * and bottom bar (so no light strip shows while the page loads or overscrolls), and no accidental
- * close or collapse when a swipe down at the top of a long list is meant as scrolling.
+ * Make the store feel like part of Telegram: full height, and no accidental close or collapse when a swipe
+ * down at the top of a long list is meant as scrolling. On a dark phone the header, page and bottom bar all
+ * use the phone's own background, so the store blends into Telegram instead of showing a different shade
+ * (and it follows the phone if the theme changes). `color` is the shop's own colour, used otherwise.
  */
 export function configureTelegramApp(app: TelegramWebApp | undefined, color: string): void {
   if (!app) return;
   app.ready();
   app.expand();
-  app.setHeaderColor?.(color);
-  app.setBackgroundColor?.(color);
-  app.setBottomBarColor?.(color);
+  const paint = () => {
+    const phone = phoneBackground(app);
+    const bg = phone ?? color;
+    app.setHeaderColor?.(bg);
+    app.setBackgroundColor?.(bg);
+    app.setBottomBarColor?.(bg);
+    if (phone) document.documentElement.style.setProperty('--color-bg', phone);
+    else document.documentElement.style.removeProperty('--color-bg');
+  };
+  paint();
+  app.onEvent?.('themeChanged', paint);
   app.disableVerticalSwipes?.();
 }
 
