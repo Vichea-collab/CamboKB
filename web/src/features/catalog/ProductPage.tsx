@@ -1,5 +1,5 @@
 import { formatUsd } from '@cambo/shared';
-import { ChevronRight, PackageSearch, QrCode, ShieldCheck, Truck, Wallet } from 'lucide-react';
+import { ChevronRight, PackageSearch } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { isApiError } from '../../shared/lib/api';
@@ -10,7 +10,6 @@ import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
 import { MAX_QTY } from '../cart/cart-store';
 import { useAddToCart } from '../cart/useAddToCart';
-import { useStore } from '../info/store-api';
 import { useProduct, useProducts } from './api';
 import { ImageGallery } from './ImageGallery';
 import { ProductCard } from './ProductCard';
@@ -20,7 +19,6 @@ const SPECS_PREVIEW = 6;
 export default function ProductDetail() {
   const { slug = '' } = useParams();
   const product = useProduct(slug);
-  const store = useStore();
   const addToCart = useAddToCart();
   const [qty, setQty] = useState(1);
   const [allSpecs, setAllSpecs] = useState(false);
@@ -46,7 +44,6 @@ export default function ProductDetail() {
 
   const p = product.data;
   const max = Math.min(MAX_QTY, Math.max(1, p.stock));
-  const d = store.data?.delivery;
   const specs = allSpecs ? p.specs : p.specs.slice(0, SPECS_PREVIEW);
   const more = (related.data?.items ?? []).filter((x) => x.id !== p.id).slice(0, 6);
   const lowStock = !p.isSoldOut && p.stock <= 3;
@@ -109,31 +106,6 @@ export default function ProductDetail() {
             </button>
           </div>
 
-          <ul className="mt-6 divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-            <Perk icon={Truck} title={t.product.deliveryTitle}>
-              {d
-                ? t.product.deliveryFrom(
-                    formatUsd(
-                      Math.min(d.phnomPenhStandardFeeCents, ...d.grabTiers.map((x) => x.feeCents)),
-                    ),
-                    formatUsd(d.provinceFeeCents),
-                  )
-                : t.product.feesShown}{' '}
-              <Link to="/delivery" className="link">
-                {t.product.details}
-              </Link>
-            </Perk>
-            <Perk icon={store.data?.payments.khqr ? QrCode : Wallet} title={t.product.payTitle}>
-              {store.data?.payments.khqr ? t.product.payKhqr : t.product.payCod}
-            </Perk>
-            <Perk icon={ShieldCheck} title={t.product.warrantyTitle}>
-              {t.product.warrantyBlurb}{' '}
-              <Link to="/warranty" className="link">
-                {t.product.readMore}
-              </Link>
-            </Perk>
-          </ul>
-
           <section className="mt-8">
             <h2 className="title-section">{t.product.specs}</h2>
             {p.specs.length ? (
@@ -187,27 +159,5 @@ export default function ProductDetail() {
         </section>
       )}
     </div>
-  );
-}
-
-function Perk({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: typeof Truck;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <li className="flex gap-3.5 p-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-raised text-yellow">
-        <Icon className="size-[18px]" aria-hidden />
-      </span>
-      <div className="min-w-0 text-sm">
-        <p className="font-bold">{title}</p>
-        <p className="mt-0.5 text-muted">{children}</p>
-      </div>
-    </li>
   );
 }

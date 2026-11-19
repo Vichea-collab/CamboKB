@@ -25,6 +25,7 @@ import { canShareLocationInTelegram } from '../../shared/lib/telegram';
 import type { Order } from '../../shared/lib/types';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useCart } from '../cart/cart-store';
+import { ShopPerks } from '../info/ShopPerks';
 import { useStore } from '../info/store-api';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
@@ -486,6 +487,7 @@ export default function Checkout() {
               </div>
             </div>
           </Section>
+          <ShopPerks className="mt-5" />
         </aside>
       </div>
     </form>
