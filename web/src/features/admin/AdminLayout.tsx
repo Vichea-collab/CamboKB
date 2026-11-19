@@ -40,6 +40,11 @@ const SETUP: Item[] = [
 // Phones: four daily tabs, everything else under "More".
 const TABS = MAIN.slice(0, 4);
 
+const tabCell = 'group relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold outline-none min-[340px]:text-[11px]';
+/** The icon sits on a pill that fills in yellow for the page you are on (same look as the shop's bar). */
+const pill = (active: boolean) =>
+  `relative grid h-8 w-14 place-items-center rounded-full transition-[background-color,transform] duration-200 group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-yellow ${active ? 'bg-yellow/15' : ''}`;
+
 const href = (to: string) => `/admin${to ? `/${to}` : ''}`;
 
 /** Orders waiting for you: shown as a badge so you notice without opening the page. */
@@ -142,28 +147,28 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             key={i.to}
             to={href(i.to)}
             end={i.to === ''}
-            className={({ isActive }) =>
-              `relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold min-[340px]:text-[11px] ${isActive ? 'text-yellow' : 'text-muted'}`
-            }
+            className={({ isActive }) => `${tabCell} ${isActive ? 'text-yellow' : 'text-muted'}`}
           >
-            <span className="relative">
-              <i.icon className="size-5" aria-hidden />
-              {i.to === 'orders' && pending > 0 && (
-                <span className="absolute -right-2.5 -top-1.5 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums">
-                  {pending > 99 ? '99+' : pending}
+            {({ isActive }) => (
+              <>
+                <span className={pill(isActive)}>
+                  <i.icon className="size-[22px]" strokeWidth={isActive ? 2.6 : 2.1} aria-hidden />
+                  {i.to === 'orders' && pending > 0 && (
+                    <span className="absolute right-2 top-0 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums ring-2 ring-surface">
+                      {pending > 99 ? '99+' : pending}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-            <span className="max-w-full truncate px-0.5">{i.label}</span>
+                <span className="max-w-full truncate px-0.5 leading-none">{i.label}</span>
+              </>
+            )}
           </NavLink>
         ))}
-        <button
-          onClick={() => setMore(true)}
-          className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold min-[340px]:text-[11px] ${moreActive ? 'text-yellow' : 'text-muted'}`}
-          aria-haspopup="dialog"
-        >
-          <Ellipsis className="size-5" aria-hidden />
-          <span className="max-w-full truncate px-0.5">More</span>
+        <button onClick={() => setMore(true)} className={`${tabCell} ${moreActive ? 'text-yellow' : 'text-muted'}`} aria-haspopup="dialog">
+          <span className={pill(moreActive)}>
+            <Ellipsis className="size-[22px]" strokeWidth={moreActive ? 2.6 : 2.1} aria-hidden />
+          </span>
+          <span className="max-w-full truncate px-0.5 leading-none">More</span>
         </button>
       </nav>
 

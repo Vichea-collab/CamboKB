@@ -1,6 +1,7 @@
 import { Search, SearchX, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { useFocusSearch } from './useFocusSearch';
 import { t } from '../../shared/lib/strings';
 import { EmptyState, ErrorState } from '../../shared/ui/Page';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
@@ -22,6 +23,7 @@ export default function Home() {
     SORTS.includes(params.get('sort') as SortKey) ? params.get('sort') : 'featured'
   ) as SortKey;
   const [draft, setDraft] = useState(q);
+  const searchBox = useFocusSearch<HTMLInputElement>();
 
   const update = (key: string, value: string) =>
     setParams(
@@ -61,6 +63,7 @@ export default function Home() {
         <Search className="size-5 shrink-0 text-muted" aria-hidden />
         <span className="sr-only">{t.home.searchLabel}</span>
         <input
+          ref={searchBox}
           type="search"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

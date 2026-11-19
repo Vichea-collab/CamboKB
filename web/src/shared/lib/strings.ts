@@ -12,6 +12,7 @@ const en = {
   nav: {
     cart: 'Cart',
     main: 'Main',
+    search: 'Search',
     home: 'Home',
     ordersTab: 'Orders',
     cartLabel: (n: number) => `Cart, ${n} ${n === 1 ? 'item' : 'items'}`,
@@ -376,6 +377,7 @@ const km: Strings = {
   nav: {
     cart: 'កន្ត្រក',
     main: 'ម៉ឺនុយមេ',
+    search: 'ស្វែងរក',
     home: 'ទំព័រដើម',
     ordersTab: 'ការបញ្ជាទិញ',
     cartLabel: (n) => `កន្ត្រក ${n} ទំនិញ`,

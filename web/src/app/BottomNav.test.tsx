@@ -31,14 +31,26 @@ describe('shop bottom navigation (phones)', () => {
     useUi.setState({ cartOpen: false });
   });
 
-  it('puts home, orders, cart and account one tap away', async () => {
+  it('puts home, search, cart, orders and account one tap away, with the cart in the middle', async () => {
     show('/');
     const nav = screen.getByRole('navigation', { name: 'Main' });
     expect(nav).toBeInTheDocument();
+    const items = [...nav.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label') ?? el.textContent ?? '');
+    expect(items).toEqual(['Home', 'Search', 'Cart, 0 items', 'Orders', 'Account']); // never a wrong "Log in" while the session loads
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/?focus=search');
     expect(screen.getByRole('link', { name: 'Orders' })).toHaveAttribute('href', '/account/orders');
-    expect(screen.getByRole('button', { name: /^Cart/ })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
+  });
+
+  it('keeps the filters the customer chose when they tap Search on the shop page', () => {
+    show('/?category=mice&sort=price-asc');
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/?category=mice&sort=price-asc&focus=search');
+  });
+
+  it('starts a fresh search from any other page', () => {
+    show('/account/orders');
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/?focus=search');
   });
 
   it('sends a visitor who is not logged in to log in instead', async () => {
