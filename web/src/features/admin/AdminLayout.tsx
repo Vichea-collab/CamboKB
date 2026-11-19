@@ -134,7 +134,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Phone tab bar */}
       <nav
-        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
         aria-label="Admin"
       >
         {TABS.map((i) => (
@@ -143,7 +143,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             to={href(i.to)}
             end={i.to === ''}
             className={({ isActive }) =>
-              `relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive ? 'text-yellow' : 'text-muted'}`
+              `relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold min-[340px]:text-[11px] ${isActive ? 'text-yellow' : 'text-muted'}`
             }
           >
             <span className="relative">
@@ -154,16 +154,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                 </span>
               )}
             </span>
-            {i.label}
+            <span className="max-w-full truncate px-0.5">{i.label}</span>
           </NavLink>
         ))}
         <button
           onClick={() => setMore(true)}
-          className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${moreActive ? 'text-yellow' : 'text-muted'}`}
+          className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold min-[340px]:text-[11px] ${moreActive ? 'text-yellow' : 'text-muted'}`}
           aria-haspopup="dialog"
         >
           <Ellipsis className="size-5" aria-hidden />
-          More
+          <span className="max-w-full truncate px-0.5">More</span>
         </button>
       </nav>
 

@@ -34,7 +34,7 @@ export function RevenueChart({ buckets, groupBy }: { buckets: Bucket[]; groupBy:
   const measure = useCallback((el: HTMLDivElement | null) => {
     observer.current?.disconnect();
     if (!el) return;
-    observer.current = new ResizeObserver(([e]) => e && setWidth(Math.max(280, e.contentRect.width)));
+    observer.current = new ResizeObserver(([e]) => e && setWidth(Math.max(180, e.contentRect.width)));
     observer.current.observe(el);
   }, []);
 

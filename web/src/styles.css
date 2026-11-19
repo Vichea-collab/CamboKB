@@ -37,6 +37,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* No 300ms wait or accidental zoom on double-tap: taps act at once (pinch zoom still works). */
+  touch-action: manipulation;
   scroll-padding-top: 5rem;
 }
 
@@ -69,6 +71,16 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* iPhones zoom the whole page when a field with text under 16px gets focus. On touch screens a field is
+   never smaller than that, whatever size it would inherit from its card. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 @utility field {

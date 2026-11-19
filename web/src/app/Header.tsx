@@ -19,7 +19,7 @@ export function BrandMark({ tagline = true }: { tagline?: boolean }) {
         alt=""
         className="size-10 rounded-xl border border-line shadow-pop sm:size-11"
       />
-      <span className="flex flex-col">
+      <span className="flex flex-col max-[339px]:sr-only">
         <span className="font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.03em] sm:text-[1.5rem]">
           Cambo<span className="text-yellow">Supply</span>
         </span>
@@ -72,9 +72,9 @@ export function Header() {
     <header
       className={`sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none ${hidden ? '-translate-y-full' : ''}`}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between gap-3 px-3 min-[360px]:px-4 sm:px-6 lg:px-8">
         <BrandMark />
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1 min-[360px]:gap-2">
           {me.data?.role === 'ADMIN' && (
             <Link to="/admin" className="chip hidden sm:inline-flex">
               {t.nav.admin}

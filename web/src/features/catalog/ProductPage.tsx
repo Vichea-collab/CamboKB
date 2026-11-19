@@ -73,7 +73,7 @@ export default function ProductDetail() {
         </span>
       </nav>
 
-      <div className="grid gap-8 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:gap-12">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] md:gap-12">
         <div className="md:sticky md:top-24 md:self-start">
           <ImageGallery images={p.images} name={p.name} />
         </div>

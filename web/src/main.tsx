@@ -6,12 +6,12 @@ import { LanguageBoundary } from './app/LanguageToggle';
 import { queryClient } from './app/queryClient';
 import { router } from './app/router';
 import './styles.css';
+import { configureTelegramApp, loadTelegramScript, telegramApp } from './shared/lib/telegram';
 
 // Inside the Telegram app, make the web view full height and match our colours.
-const tg = (window as { Telegram?: { WebApp?: { ready(): void; expand(): void; setHeaderColor?(c: string): void } } }).Telegram?.WebApp;
-tg?.ready();
-tg?.expand();
-tg?.setHeaderColor?.('#14171c');
+// (Ordinary visitors never load Telegram's script, so the first paint doesn't wait for telegram.org.)
+await loadTelegramScript();
+configureTelegramApp(telegramApp(), getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim() || '#12151a');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
