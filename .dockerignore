@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/uploads
+**/coverage
+**/playwright-report
+**/test-results
+.git
+.superpowers
+scrape
+docs
+*.log
+.DS_Store

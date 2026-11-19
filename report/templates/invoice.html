@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Invoice {{number}}</title>
+<style>
+  /* Printed on white paper: black ink, brand yellow as the one accent. Local fonts only (no network during rendering). */
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  :root { --ink: #14171c; --gold: #e8b23f; --muted: #4a5260; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans', 'Noto Sans Khmer', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ink);
+    font-size: 9.5pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* On screen (the preview) the invoice is shown as a sheet of paper; the PDF is printed without this. */
+  @media screen {
+    html { background: #e7eaf0; }
+    body { padding: 16px 0; }
+    .page { width: 210mm; margin: 0 auto; background: #fff; box-shadow: 0 2px 18px rgba(20, 23, 28, 0.18); }
+  }
+  .page { padding: 10mm 12mm 16mm; min-height: 297mm; position: relative; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3mm; background: var(--gold); }
+
+  .top { position: relative; height: 34mm; }
+  .logo { position: absolute; left: 0; top: 0; width: 30mm; height: 30mm; border-radius: 50%; }
+  .title { text-align: center; padding: 6mm 0 0 30mm; }
+  .title .shop { font-family: 'Anton', 'Oswald', 'Impact', 'Noto Sans', Arial, sans-serif; font-weight: 800; font-size: 19pt; letter-spacing: 0.22em; text-transform: uppercase; line-height: 1.1; }
+  .title .doc { font-family: 'Anton', 'Oswald', 'Impact', 'Noto Sans', Arial, sans-serif; font-weight: 800; font-size: 31pt; letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.1; margin-top: 2mm; }
+
+  .parties { display: grid; grid-template-columns: 1fr 44mm 1fr; align-items: start; margin: 2mm 0 9mm; }
+  .parties h2 { margin: 0 0 3mm; font-size: 12.5pt; font-weight: 800; }
+  .from { text-align: right; }
+  .bill div { margin-top: 0.5mm; }
+  .bill b { font-weight: 500; display: inline-block; min-width: 15mm; }
+  .mid { text-align: center; padding-top: 11mm; }
+  .mid .no { font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { border: 0.35mm solid var(--ink); padding: 0 2.5mm; height: 7.4mm; }
+  thead th { background: var(--gold); font-weight: 800; font-size: 9.5pt; text-align: center; }
+  tbody td { vertical-align: middle; overflow: hidden; }
+  td.c { text-align: center; }
+  td.r { text-align: right; font-variant-numeric: tabular-nums; }
+  td.desc { padding-top: 1mm; padding-bottom: 1mm; height: auto; min-height: 7.4mm; }
+  tr { break-inside: avoid; }
+  .sum td { text-align: right; font-weight: 800; }
+  .sum td.val { font-variant-numeric: tabular-nums; }
+  .sum.total td.val { background: var(--gold); }
+
+  .lower { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 5mm; break-inside: avoid; }
+  .lower h3 { margin: 0 0 2mm; font-size: 11pt; font-weight: 800; }
+  .terms h3 { text-align: right; font-size: 12.5pt; }
+  .terms p { margin: 0; font-size: 8.8pt; line-height: 1.45; }
+  .pill { display: inline-block; padding: 0.4mm 2.5mm; border-radius: 99px; background: #fff3cc; color: #7a5600; font-weight: 700; font-size: 8.5pt; }
+  .pill.paid { background: #d1fae5; color: #065f46; }
+  .pay .method { font-size: 10pt; font-weight: 600; margin-bottom: 1.5mm; }
+  .pay .status { color: var(--muted); margin-top: 1.5mm; font-size: 8.8pt; }
+  .note { margin-top: 6mm; break-inside: avoid; }
+  .note b { font-size: 11pt; font-weight: 800; }
+  .note .line { display: block; width: 62mm; border-bottom: 0.35mm solid var(--ink); min-height: 6mm; padding: 0 1mm; margin-top: 1mm; }
+  .note .line.wide { width: 100%; }
+  .thanks { margin-top: 8mm; text-align: center; color: var(--muted); font-size: 8.5pt; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <img class="logo" src="{{{logo}}}" alt="" />
+    <div class="title">
+      <div class="shop">Cambo Keyboard Supply</div>
+      <div class="doc">Invoice</div>
+    </div>
+  </div>
+
+  <section class="parties">
+    <div class="bill">
+      <h2>Bill To:</h2>
+      <div><b>Name:</b> {{contactName}}</div>
+      <div><b>Tel:</b> {{phone}}</div>
+      <div><b>Location:</b> {{addressLine}}, {{region}}</div>
+    </div>
+    <div class="mid">
+      <div>Date : {{date}}</div>
+      <div class="no">{{number}}</div>
+    </div>
+    <div class="from">
+      <h2>From:</h2>
+      <div>Cambo Keyboard Supply</div>
+      <div>017 312 404/087 522 210</div>
+      <div>Khan Daun Penh, Phnom Penh</div>
+    </div>
+  </section>
+
+  <table>
+    <colgroup><col style="width:13%" /><col /><col style="width:11%" /><col style="width:17%" /><col style="width:19%" /></colgroup>
+    <thead>
+      <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr><td class="c">{{index}}</td><td class="desc">{{name}}</td><td class="c">{{quantity}}</td><td class="r">{{price}}</td><td class="r">{{lineTotal}}</td></tr>
+      {{/each}}
+      {{#each blankRows}}
+      <tr><td></td><td></td><td></td><td></td><td></td></tr>
+      {{/each}}
+      <tr class="sum"><td colspan="4">Delivery ({{service}})</td><td class="val">{{delivery}}</td></tr>
+      {{#if discount}}<tr class="sum"><td colspan="4">Discount{{#if promoCode}} ({{promoCode}}){{/if}}</td><td class="val">-{{discount}}</td></tr>{{/if}}
+      <tr class="sum total"><td colspan="4">Total</td><td class="val">{{total}}</td></tr>
+    </tbody>
+  </table>
+
+  <section class="lower">
+    <div class="pay">
+      <h3>Payment Method</h3>
+      <div class="method">{{paymentMethod}}</div>
+      <span class="pill {{#if isPaid}}paid{{/if}}">{{paymentStatus}}</span>
+      <div class="status">Order status: {{status}}</div>
+    </div>
+    <div class="terms">
+      <h3>Terms and Conditions</h3>
+      <p>-Goods once purchased are non-refundable.</p>
+      <p>-This receipt serves exclusively as proof of purchase and warranty validation. It is not an official tax invoice and cannot be used for tax deduction or claiming purposes..</p>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Note:</b>
+    {{#if note}}<span class="line wide">{{note}}</span>{{else}}<span class="line"></span><span class="line"></span>{{/if}}
+  </div>
+
+  <div class="thanks">Thank you for shopping with {{storeName}}!</div>
+  <div class="bar"></div>
+</div>
+</body>
+</html>

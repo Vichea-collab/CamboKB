@@ -1,0 +1,11 @@
+# Included in every location: nginx drops server-level add_header lines in any
+# location that sets its own, so each one pulls these in explicitly.
+#
+# CSP notes: styles need 'unsafe-inline' (React style props, the drawer's keyframes);
+# map tiles come from OpenStreetMap; the Telegram script enables the Mini App;
+# CSP_EXTRA_IMG lets you allow an images CDN (e.g. https://files.example.com).
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org ${CSP_EXTRA_IMG}; connect-src 'self'; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+add_header X-Content-Type-Options nosniff always;
+add_header Referrer-Policy strict-origin-when-cross-origin always;
+add_header Permissions-Policy "camera=(), microphone=(), payment=()" always;

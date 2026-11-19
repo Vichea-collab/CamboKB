@@ -1,0 +1,54 @@
+// Grafana Alloy: collects the logs of every container of this Compose project and ships them to Loki.
+// (It replaces Promtail, which has reached end of life.)
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  // service = the Compose service name (api, file, report, notification, web, db ...)
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.containers.output
+  forward_to    = [loki.process.logs.receiver]
+  labels        = { job = "docker" }
+}
+
+// Our services log one JSON object per line: turn its level into a label so it can be filtered cheaply.
+// Everything else (postgres, nginx) is kept as plain text.
+loki.process "logs" {
+  stage.match {
+    selector = "{service=~\"api|file|report|notification\"}"
+    stage.json {
+      expressions = { level = "level" }
+    }
+    stage.labels {
+      values = { level = "" }
+    }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

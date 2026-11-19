@@ -59,7 +59,7 @@ operate and grow.
 
 | | A. Separate SPA + API (chosen) | B. Express serves built SPA | C. Next.js full-stack |
 |---|---|---|---|
-| Shape | `apps/web` (React/Vite) + `apps/api` (Express) in one monorepo | Same code, single server | One framework for UI + API |
+| Shape | `web` (React/Vite) + `api` + `file` + `report` services in one monorepo | Same code, single server | One framework for UI + API |
 | Deploy | Web on a CDN (Cloudflare Pages, as today); API + Postgres on a Node host | One process | Vercel/Node |
 | Trade-off | Two deploy targets; best caching and scaling | Simplest hosting; no CDN benefits | Owner asked for Express |
 
@@ -121,7 +121,9 @@ From the current page's code:
 - **Categories:** name, slug, sort order.
 - **Promo codes:** code, type (fixed / percent), value, minimum subtotal,
   start/end date, usage limit total and per user, active toggle.
-- **Customers:** list, view orders, disable account.
+- **Customers:** list, view orders, disable account, change role (admin ↔ customer).
+- **Reports:** sales by day/month with chart, top products, payment and
+  region breakdown, CSV export; invoice PDF on every order.
 - **Settings:** store name, store coordinates, delivery rates and distance
   tiers, Telegram notification on/off.
 
@@ -130,22 +132,39 @@ to customers' first load).
 
 ## 6. Architecture
 
+Four services (owner's decision), each in its own top-level folder and
+deployable on its own, plus shared code:
+
 ```
 cambo-supply/
-  apps/
-    web/        React 19 + Vite 7 + TypeScript 5.9
-    api/        Express 5 + TypeScript + Prisma
-  packages/
-    shared/     zod schemas, types, constants (shared by web + api)
-  docker/       Dockerfiles, nginx config (optional)
-  docker-compose.yml        dev: postgres + api + web
+  web/      React 19 + Vite 7 SPA                        :5173 (dev)
+  api/      Express 5 + Prisma — auth, catalog, orders   :4000  ← the only service the browser calls for data
+  file/     Express 5 + sharp — uploads, image variants,
+            serves /files/* (local) or writes to S3/R2   :4100
+  report/   Express 5 + jsreport + pg — invoice PDFs,
+            sales reports, CSV export                    :4200
+  shared/   zod schemas, money/phone/delivery rules (used by all)
+  docker/   one Dockerfile per service, nginx config
+  docker-compose.yml        dev: postgres (+ all services)
   docker-compose.prod.yml   prod example
 ```
 
+```
+browser ──► web (static)          browser ──► file  GET /files/* (images, public, cached)
+browser ──► api ──► Postgres (read/write)
+             ├──► file    POST/DELETE /internal/*  (bearer FILE_SERVICE_SECRET)
+             └──► report  GET /internal/*          (bearer REPORT_SERVICE_SECRET)
+                             └──► Postgres (read-only role)
+```
+
+- **Auth stays in the api.** file and report have no user accounts; their
+  `/internal/*` routes accept only the api's shared secret and are not
+  exposed publicly (private network / firewall). The api checks who the
+  user is and what they may see, then calls the service.
 - Package manager: npm workspaces (Node 22+).
 - TypeScript everywhere (strict). Shared zod schemas validate on both sides.
 
-### 6.1 Frontend (`apps/web`)
+### 6.1 Frontend (`web`)
 - React 19, Vite 7, TypeScript, React Router (data routers, lazy routes).
 - TanStack Query for server state; Zustand for cart/UI state.
 - Tailwind CSS v4 with the current site's design tokens (`--bg #14171c`,
@@ -160,7 +179,7 @@ cambo-supply/
   checked against the dark palette.
 - SEO basics: per-page titles/meta, Open Graph tags for product pages.
 
-### 6.2 API (`apps/api`)
+### 6.2 API (`api`)
 - Express 5, TypeScript, Prisma ORM with migrations, PostgreSQL 17 (Prisma 6).
 - Layered: routes → controllers → services → Prisma. Services hold business
   rules (pricing, stock, promo) and are unit-tested.
@@ -188,7 +207,8 @@ cambo-supply/
 - Account: `GET/PATCH /me`.
 - Admin: `/admin/products`, `/admin/categories`, `/admin/banners`,
   `/admin/promos`, `/admin/orders`, `/admin/customers`, `/admin/settings`,
-  `/admin/uploads`, `/admin/stats`.
+  `/admin/uploads`, `/admin/stats`, `/admin/reports/*`.
+- Invoices: `GET /orders/:number/invoice.pdf` (owner), `GET /admin/orders/:id/invoice.pdf`.
 
 ## 7. Data model (Prisma, summarized)
 
@@ -302,19 +322,49 @@ All money in **integer cents (USD)**. All tables have `createdAt`, `updatedAt`.
 - **Headers**: helmet (CSP for the API), body size limits, uploads limited by
   type (jpeg/png/webp) and size (≤8 MB), filenames never trusted.
 - **First admin**: the owner signs up normally through Telegram, then a CLI
-  script promotes that phone (`npm run admin:promote -w apps/api -- +855…`).
-  Admin role is never granted through the public API.
+  script promotes that phone (`npm run admin:promote -w api -- +855…`).
+  After that, admins can make other accounts admin (or back to customer) from
+  Admin → Customers; nobody can change their own role and the last admin can't
+  be removed. Customer-facing endpoints never grant roles.
 - **Secrets** only in server env. The current site's exposed Telegram bot
   token and Firebase key should be rotated by the owner.
 
-## 10. Images
+## 10. File service (`file`)
 
-- Uploaded via admin to the API (multer, memory), processed with sharp:
-  strip metadata, auto-rotate, resize to 3 widths (400, 800, 1200), WebP.
-- Storage adapter interface with two implementations: local disk (dev, small
-  deployments, served with long cache headers) and S3-compatible (Cloudflare
-  R2 / S3) for production. Selected by env.
-- DB stores the storage key; API returns full URLs per size.
+- Admin uploads go to the api (which checks the admin session, size ≤8 MB,
+  type jpeg/png/webp), and the api forwards the bytes to the file service.
+- File service processes images with sharp: strip metadata, auto-rotate,
+  resize to 3 widths (400, 800, 1200, no upscaling), WebP. Returns
+  `{ storageKey, width, height }`; the api stores the key in Postgres.
+- Storage adapter inside the file service: local disk (dev, single box;
+  served at `GET /files/*` with immutable cache headers) or S3-compatible
+  (Cloudflare R2 / S3) for production, where a CDN/bucket domain serves files.
+- Also accepts generic files (`POST /internal/files`, e.g. future payment
+  proofs) with a type allowlist.
+- Image URLs are built from `PUBLIC_FILES_URL` + key; the api returns full
+  URLs per size.
+
+## 10b. Report service (`report`)
+
+Owner's decision: invoices and sales reports.
+
+- **Invoice PDF** per order (owner's decision: jsreport — an HTML/CSS Handlebars
+  template, `report/templates/invoice.html`, printed to A4 by headless Chrome,
+  embedded in the report service; English, Khmer addresses render correctly): store name and
+  logo, order number and date, customer name and phone, delivery
+  region/service/address, line items (qty, name, unit price, line total),
+  subtotal, delivery fee, discount (with code), total, payment method and
+  status, order status. Generated on demand (no stored copies), filename
+  `invoice-CS-250001.pdf`.
+  - Customer downloads from their order page; admin downloads/prints from
+    the order detail.
+- **Sales reports** (admin only): for a date range in Asia/Phnom_Penh time,
+  grouped by day or month — orders, units, revenue (non-cancelled orders),
+  average order value; top products by units and revenue; breakdown by
+  payment method and delivery region. CSV export of the orders in the range.
+  Shown in the admin dashboard with a chart.
+- Reads Postgres through a **read-only role** with plain SQL (`pg`), so a bug
+  in reporting can never change data.
 
 ## 11. Seed data
 
@@ -342,15 +392,37 @@ All money in **integer cents (USD)**. All tables have `createdAt`, `updatedAt`.
 - **Docs**: README (setup, env vars, deploy, creating an admin) and
   `.env.example` for each app.
 
-## 13. Payment readiness (for the KHQR / Bakong phase)
+## 13. KHQR payments (Bakong)
 
-Not built now, but the design leaves a clean slot:
-- `Payment` table already holds provider ref, QR string, expiry, raw payload.
-- A `PaymentProvider` interface in the API (`createCharge`, `checkStatus`,
-  `handleWebhook`) with a `CodProvider` implemented now; `KhqrProvider` added
-  later (generate KHQR via Bakong, poll/check transaction by md5, mark PAID).
-- Checkout UI already has the payment-method step; KHQR option is shown as
-  "coming soon".
+Owner's decisions (2026-11-17, window shortened 2026-11-18): unpaid KHQR orders
+are cancelled after 10 minutes; a confirmed payment auto-confirms the order.
+
+- **QR:** generated server-side with NBC's official `bakong-khqr` SDK as an
+  *individual* KHQR to the store's Bakong account (`BAKONG_ACCOUNT_ID`, e.g.
+  `name@aclb`), USD, exact order total, bill number = order number. Dynamic
+  KHQR must carry an expiry: each QR lives 10 minutes (`KHQR_QR_TTL_MINUTES`)
+  and never past the order's 10-minute hold (`KHQR_ORDER_HOLD_MINUTES`), so no
+  valid QR exists once an order can be cancelled. The customer can ask for a
+  new QR; every QR's md5 is kept (`KhqrCode` table) and checked, so paying an
+  older, still-valid QR is never missed.
+- **Verification:** the api asks the Bakong Open API
+  (`POST /v1/check_transaction_by_md5`, bearer `BAKONG_TOKEN`) — while the
+  customer waits on the payment page (polled, throttled to one Bakong call per
+  payment every 5 s) and from a background sweep every 20 s. A transaction only
+  counts if amount, currency (USD) and receiving account match.
+- **Paid:** payment → PAID (hash, payer account, raw response kept), order
+  PENDING → CONFIRMED (system event "Paid with KHQR"), Telegram to customer and
+  admin. Paid after the order was already cancelled → payment PAID, order left
+  cancelled, admin alerted to refund or restore by hand.
+- **Unpaid:** at hold expiry plus a 2-minute grace, one last Bakong check;
+  still unpaid → payment EXPIRED, order CANCELLED, stock and promo use given
+  back, customer told on Telegram.
+- **Where it's offered:** everywhere (Phnom Penh and provinces) when both
+  `BAKONG_ACCOUNT_ID` and `BAKONG_TOKEN` are set; COD stays Phnom Penh only.
+- **Operational:** the Bakong token expires every 90 days; a rejected token
+  alerts the admin chat (at most hourly) and payments fall back to "waiting".
+  The Bakong API may only answer requests from Cambodian IP addresses:
+  `BAKONG_API_URL` can point at a relay if the api is hosted abroad.
 
 ## 14. Decided by the owner
 
@@ -358,6 +430,9 @@ Not built now, but the design leaves a clean slot:
 - Customer auth and an admin role.
 - Telegram bot sign-up by sharing phone number, then set a password; no
   email.
+- Four separate services in top-level folders: web, api, file (storage),
+  report (invoices + sales reports).
+- Invoices built with jsreport (HTML template → PDF).
 - Production quality, responsive, dark mode only like the current site.
 - Payment skipped for now; KHQR / Bakong later.
 
@@ -376,7 +451,10 @@ Not built now, but the design leaves a clean slot:
 7. Telegram new-order alert kept (server-side, optional).
 8. Leaflet/OpenStreetMap map for pin adjustment (no Google Maps key).
 9. English only; no automatic Mini App login this phase.
-10. Images stored on local disk in dev and S3/R2 in production.
+10. Images stored on local disk in dev and S3/R2 in production, owned by the
+    file service.
+11. Uploads pass through the api (auth) to the file service; report reads
+    Postgres with a read-only role; internal calls use shared secrets.
 
 ## 16. Left to the builder
 

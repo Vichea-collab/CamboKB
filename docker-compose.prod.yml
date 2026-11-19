@@ -1,0 +1,251 @@
+# Production example (single server). Put real values in .env.production next to this file (never commit
+# it) and run, on the server:
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production pull
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# The images are built and published by CI (.github/workflows/ci.yml) to ${IMAGE_REPO}-<service>:${IMAGE_TAG}.
+# To build them on this machine instead:  ... up -d --build
+#
+# Put a TLS-terminating proxy (Caddy, Cloudflare Tunnel, a load balancer) in front of `web` on port 80.
+# Only `web` is public. The databases and every service stay on the private network; Grafana and
+# Prometheus listen on 127.0.0.1 only (reach them through an SSH tunnel: ssh -L 3001:127.0.0.1:3001 server).
+#
+# Each service has its own database. Nothing reads another service's database.
+
+name: cambokb-prod
+
+x-postgres: &postgres
+  image: postgres:17-alpine
+  restart: unless-stopped
+
+# Docker keeps container logs on the server's disk without limit unless told otherwise. Keep the last 30 MB
+# per container (Loki keeps the history).
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '3' }
+
+x-image: &repo
+  # e.g. ghcr.io/vichea-collab/cambokb (CI publishes <repo>-api, -file, -report, -notification, -web)
+  pull_policy: always
+
+services:
+  # --- databases (one each) -------------------------------------------------
+  db:
+    <<: [*postgres, *logging]
+    environment: { POSTGRES_USER: '${POSTGRES_USER}', POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}', POSTGRES_DB: cambo_supply }
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d cambo_supply'], interval: 10s, retries: 10 }
+
+  file-db:
+    <<: [*postgres, *logging]
+    environment: { POSTGRES_USER: '${POSTGRES_USER}', POSTGRES_PASSWORD: '${FILE_DB_PASSWORD}', POSTGRES_DB: cambo_files }
+    volumes: [file-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d cambo_files'], interval: 10s, retries: 10 }
+
+  report-db:
+    <<: [*postgres, *logging]
+    environment: { POSTGRES_USER: '${POSTGRES_USER}', POSTGRES_PASSWORD: '${REPORT_DB_PASSWORD}', POSTGRES_DB: cambo_reports }
+    volumes: [report-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d cambo_reports'], interval: 10s, retries: 10 }
+
+  notification-db:
+    <<: [*postgres, *logging]
+    environment: { POSTGRES_USER: '${POSTGRES_USER}', POSTGRES_PASSWORD: '${NOTIFICATION_DB_PASSWORD}', POSTGRES_DB: cambo_notifications }
+    volumes: [notification-db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d cambo_notifications'], interval: 10s, retries: 10 }
+
+  # --- services ---------------------------------------------------------------
+  file:
+    <<: [*repo, *logging]
+    image: ${IMAGE_REPO:-ghcr.io/vichea-collab/cambokb}-file:${IMAGE_TAG:-latest}
+    build: { context: ., dockerfile: docker/file.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      FILE_DATABASE_URL: postgresql://${POSTGRES_USER}:${FILE_DB_PASSWORD}@file-db:5432/cambo_files
+      FILE_SERVICE_SECRET: ${FILE_SERVICE_SECRET}
+      CORS_ORIGIN: ${PUBLIC_ORIGIN}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+    volumes: [uploads:/data/uploads]
+    depends_on: { file-db: { condition: service_healthy } }
+
+  report:
+    <<: [*repo, *logging]
+    image: ${IMAGE_REPO:-ghcr.io/vichea-collab/cambokb}-report:${IMAGE_TAG:-latest}
+    build: { context: ., dockerfile: docker/report.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      REPORT_DATABASE_URL: postgresql://${POSTGRES_USER}:${REPORT_DB_PASSWORD}@report-db:5432/cambo_reports
+      REPORT_SERVICE_SECRET: ${REPORT_SERVICE_SECRET}
+      STORE_NAME: ${STORE_NAME:-Cambo Supply}
+    depends_on: { report-db: { condition: service_healthy } }
+
+  notification:
+    <<: [*repo, *logging]
+    image: ${IMAGE_REPO:-ghcr.io/vichea-collab/cambokb}-notification:${IMAGE_TAG:-latest}
+    build: { context: ., dockerfile: docker/notification.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/cambo_notifications
+      NOTIFICATION_SERVICE_SECRET: ${NOTIFICATION_SERVICE_SECRET}
+      API_URL: http://api:4000
+      API_INTERNAL_SECRET: ${API_INTERNAL_SECRET}
+      WEB_ORIGIN: ${PUBLIC_ORIGIN}
+      TELEGRAM_MODE: webhook
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
+      TELEGRAM_WEBHOOK_URL: ${PUBLIC_ORIGIN}/telegram/webhook
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+    depends_on: { notification-db: { condition: service_healthy } }
+
+  api:
+    <<: [*repo, *logging]
+    image: ${IMAGE_REPO:-ghcr.io/vichea-collab/cambokb}-api:${IMAGE_TAG:-latest}
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/cambo_supply
+      WEB_ORIGIN: ${PUBLIC_ORIGIN}
+      TRUST_PROXY: 'true'
+      FILE_SERVICE_URL: http://file:4100
+      FILE_SERVICE_SECRET: ${FILE_SERVICE_SECRET}
+      PUBLIC_FILES_URL: ${PUBLIC_FILES_URL:-${PUBLIC_ORIGIN}/files}
+      REPORT_SERVICE_URL: http://report:4200
+      REPORT_SERVICE_SECRET: ${REPORT_SERVICE_SECRET}
+      NOTIFICATION_SERVICE_URL: http://notification:4300
+      NOTIFICATION_SERVICE_SECRET: ${NOTIFICATION_SERVICE_SECRET}
+      API_INTERNAL_SECRET: ${API_INTERNAL_SECRET}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      # KHQR payments (on when both are set)
+      BAKONG_ACCOUNT_ID: ${BAKONG_ACCOUNT_ID:-}
+      BAKONG_TOKEN: ${BAKONG_TOKEN:-}
+      BAKONG_API_URL: ${BAKONG_API_URL:-https://api-bakong.nbc.gov.kh}
+      BAKONG_MERCHANT_NAME: ${STORE_NAME:-Cambo Supply}
+    depends_on:
+      db: { condition: service_healthy }
+      file: { condition: service_started }
+      report: { condition: service_started }
+      notification: { condition: service_started }
+
+  web:
+    <<: [*repo, *logging]
+    image: ${IMAGE_REPO:-ghcr.io/vichea-collab/cambokb}-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_TELEGRAM_BOT_USERNAME: '${TELEGRAM_BOT_USERNAME}'
+        VITE_SITE_URL: ${PUBLIC_ORIGIN}
+    restart: unless-stopped
+    environment:
+      # Extra image origin for the Content-Security-Policy when STORAGE_DRIVER=s3 serves from a CDN
+      CSP_EXTRA_IMG: ${CSP_EXTRA_IMG:-}
+    # 0.0.0.0:80 by default. With a Cloudflare Tunnel set WEB_BIND=127.0.0.1:80 so the server exposes nothing.
+    ports: ['${WEB_BIND:-0.0.0.0:80}:80']
+    depends_on: [api, file, notification]
+
+  # --- Cloudflare Tunnel (profile "tunnel") -----------------------------------------
+  # Cloudflare reaches the shop through an outbound connection from here, so no port needs to be open to the
+  # internet and TLS is handled by Cloudflare. The tunnel is made once with the cloudflared command line
+  # (docs/deployment.md): `cloudflared tunnel create cambokb` writes a credentials file; give its path in
+  # CLOUDFLARED_CREDENTIALS_FILE and the tunnel's id in CLOUDFLARE_TUNNEL_ID. The hostname -> web:80 route is
+  # fixed here, so nothing else needs configuring in the Cloudflare dashboard.
+  # Turn on with COMPOSE_PROFILES=tunnel (in your shell) or `--profile tunnel`.
+  cloudflared:
+    <<: *logging
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --credentials-file=/etc/cloudflared/credentials.json
+      - --url=http://web:80
+      - ${CLOUDFLARE_TUNNEL_ID:-unset}
+    volumes:
+      - ${CLOUDFLARED_CREDENTIALS_FILE:-./cloudflared-credentials.json}:/etc/cloudflared/credentials.json:ro
+    depends_on: [web]
+
+  # --- observability ------------------------------------------------------------
+  prometheus:
+    <<: *logging
+    image: prom/prometheus:v3.2.1
+    restart: unless-stopped
+    command: ['--config.file=/etc/prometheus/prometheus.yml', '--storage.tsdb.retention.time=15d']
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports: ['127.0.0.1:9090:9090']
+
+  cadvisor:
+    <<: *logging
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    command: ['--docker_only=true', '--housekeeping_interval=15s']
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  loki:
+    <<: *logging
+    image: grafana/loki:3.4.2
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+
+  alloy:
+    <<: *logging
+    image: grafana/alloy:v1.7.1
+    restart: unless-stopped
+    command: ['run', '--server.http.listen-addr=0.0.0.0:12345', '--storage.path=/var/lib/alloy/data', '/etc/alloy/config.alloy']
+    environment:
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-cambokb-prod}
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on: [loki]
+
+  grafana:
+    <<: *logging
+    image: grafana/grafana:11.5.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/services.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ['127.0.0.1:3001:3000']
+    depends_on: [prometheus, loki]
+
+volumes:
+  db-data:
+  file-db-data:
+  report-db-data:
+  notification-db-data:
+  uploads:
+  prometheus-data:
+  loki-data:
+  alloy-data:
+  grafana-data:
