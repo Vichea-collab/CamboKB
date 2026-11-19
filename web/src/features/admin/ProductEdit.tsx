@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { Archive, ExternalLink, RotateCcw, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { Section } from '../../shared/ui/Page';
 import { useUi } from '../../shared/lib/ui-store';
@@ -129,6 +129,38 @@ export default function ProductEdit() {
       await api<AdminProduct>(`/admin/products/${id}/images/${imageId}`, { method: 'DELETE' }),
     );
   };
+
+  const archive = useMutation({
+    mutationFn: () => api(`/admin/products/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'products'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      showToast('Product archived and hidden from shop');
+      navigate('/admin/products');
+    },
+    onError: (err) => showToast((err as Error).message),
+  });
+
+  const restore = useMutation({
+    mutationFn: () => api<AdminProduct>(`/admin/products/${id}`, { method: 'PATCH', body: { isActive: true } }),
+    onSuccess: (p) => {
+      refresh(p);
+      set('isActive', true);
+      showToast('Product restored to shop');
+    },
+    onError: (err) => showToast((err as Error).message),
+  });
+
+  const removePermanent = useMutation({
+    mutationFn: () => api(`/admin/products/${id}?permanent=1`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'products'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      showToast('Product deleted permanently');
+      navigate('/admin/products');
+    },
+    onError: (err) => showToast((err as Error).message),
+  });
 
   if (!isNew && !product.data) return <Loading />;
   const onSubmit = (e: FormEvent) => {
@@ -305,6 +337,58 @@ export default function ProductEdit() {
               </div>
             </div>
           </Section>
+          {!isNew && product.data && (
+            <Section title="Danger zone">
+              <div className="space-y-3">
+                <p className="text-xs text-muted">
+                  {product.data.orderCount > 0
+                    ? `This product appears in ${product.data.orderCount} order(s). It cannot be permanently deleted to preserve historical receipts, but you can archive it to hide it from the shop.`
+                    : 'This product has no order history. You can archive it to hide it, or delete it permanently.'}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {product.data.isActive ? (
+                    <button
+                      type="button"
+                      className="btn-danger btn-sm w-full justify-center"
+                      disabled={archive.isPending}
+                      onClick={() =>
+                        confirm(`Archive "${product.data!.name}" and remove from shop?`) &&
+                        archive.mutate()
+                      }
+                    >
+                      <Archive className="size-4" aria-hidden />
+                      {archive.isPending ? 'Archiving…' : 'Archive product'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm w-full justify-center"
+                      disabled={restore.isPending}
+                      onClick={() => restore.mutate()}
+                    >
+                      <RotateCcw className="size-4" aria-hidden />
+                      {restore.isPending ? 'Restoring…' : 'Restore to shop'}
+                    </button>
+                  )}
+                  {product.data.orderCount === 0 && (
+                    <button
+                      type="button"
+                      className="btn-danger btn-sm w-full justify-center"
+                      disabled={removePermanent.isPending}
+                      onClick={() =>
+                        confirm(
+                          `Permanently delete "${product.data!.name}"? This cannot be undone.`,
+                        ) && removePermanent.mutate()
+                      }
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                      {removePermanent.isPending ? 'Deleting…' : 'Delete permanently'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Section>
+          )}
         </aside>
       </div>
       <SaveBar

@@ -1,11 +1,15 @@
 import { formatPhone, formatUsdExact } from '@cambo/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../../shared/lib/api';
 import type { Paged } from '../../shared/lib/types';
-import { Search, Users } from 'lucide-react';
+import { Plus, Search, Users } from 'lucide-react';
 import { Badge, EmptyState } from '../../shared/ui/Page';
+import { Drawer } from '../../shared/ui/Drawer';
+import { FormError } from '../../shared/ui/FormCard';
+import { PhoneInput } from '../../shared/ui/PhoneInput';
+import { useUi } from '../../shared/lib/ui-store';
 import { Loading, PageHeader, Table, td, th } from './components/ui';
 import { Pager } from './Orders';
 import type { Customer } from './types';
@@ -14,6 +18,7 @@ export default function Customers() {
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
   const list = useQuery({
     queryKey: ['admin', 'customers', query, page],
     queryFn: () =>
@@ -24,7 +29,14 @@ export default function Customers() {
   });
   return (
     <div>
-      <PageHeader title="Customers" />
+      <PageHeader
+        title="Customers"
+        actions={
+          <button className="btn-primary" onClick={() => setCreating(true)}>
+            <Plus className="size-4" strokeWidth={3} aria-hidden /> New customer
+          </button>
+        }
+      />
       <form
         className="relative mb-5 max-w-md"
         onSubmit={(e) => {
@@ -97,6 +109,108 @@ export default function Customers() {
           />
         </>
       )}
+      <NewCustomerDrawer open={creating} onClose={() => setCreating(false)} />
     </div>
+  );
+}
+
+function NewCustomerDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const showToast = useUi((s) => s.showToast);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'CUSTOMER' | 'ADMIN'>('CUSTOMER');
+  const [error, setError] = useState<string>();
+
+  const create = useMutation({
+    mutationFn: () =>
+      api<Customer>('/admin/customers', {
+        method: 'POST',
+        body: { name: name.trim(), phone, password: password || undefined, role },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast('Customer created');
+      setName('');
+      setPhone('');
+      setPassword('');
+      setError(undefined);
+      onClose();
+    },
+    onError: (err) => setError((err as Error).message),
+  });
+
+  return (
+    <Drawer open={open} onClose={onClose} title="New customer">
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          create.mutate();
+        }}
+      >
+        <FormError>{error}</FormError>
+        <div>
+          <label htmlFor="new-cust-name" className="label">
+            Full name
+          </label>
+          <input
+            id="new-cust-name"
+            className="field"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={60}
+          />
+        </div>
+        <div>
+          <label htmlFor="new-cust-phone" className="label">
+            Phone number
+          </label>
+          <PhoneInput id="new-cust-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        </div>
+        <div>
+          <label htmlFor="new-cust-pw" className="label">
+            Password (optional)
+          </label>
+          <input
+            id="new-cust-pw"
+            type="password"
+            className="field"
+            placeholder="Auto-generated if left empty"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+          />
+        </div>
+        <div>
+          <label htmlFor="new-cust-role" className="label">
+            Role
+          </label>
+          <select
+            id="new-cust-role"
+            className="field"
+            value={role}
+            onChange={(e) => setRole(e.target.value as 'CUSTOMER' | 'ADMIN')}
+          >
+            <option value="CUSTOMER">Customer</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-3 pt-3">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={create.isPending || !name.trim() || !phone.trim()}
+          >
+            {create.isPending ? 'Creating…' : 'Create customer'}
+          </button>
+        </div>
+      </form>
+    </Drawer>
   );
 }

@@ -41,6 +41,7 @@ describe('KHQR payment page', () => {
     vi.mocked(api).mockResolvedValue(view());
     renderPay();
     expect(await screen.findByRole('img', { name: 'KHQR code for order CS-250001' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Order' })).toHaveAttribute('href', '/account/orders/CS-250001');
     expect(screen.getAllByText('$44').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Save QR image' })).toBeInTheDocument();
     expect(screen.getAllByText(/scan/i).length).toBeGreaterThan(0);

@@ -110,7 +110,7 @@ export function invoiceView(d: InvoiceData, store: { name: string }, logo = '') 
 export async function createInvoiceRenderer(
   opts: { chromePath?: string; workers?: number } = {},
 ): Promise<InvoiceRenderer> {
-  const template = await readFile(TEMPLATE_PATH, 'utf8');
+  const getTemplate = () => readFile(TEMPLATE_PATH, 'utf8');
   // Inlined: the renderer has no network and the template stays one self-contained document.
   const logo = `data:image/png;base64,${(await readFile(LOGO_PATH)).toString('base64')}`;
   const reporter = jsreport({
@@ -137,6 +137,7 @@ export async function createInvoiceRenderer(
 
   return {
     async renderHtml(data, store) {
+      const template = await getTemplate();
       const res = await reporter.render({
         template: { content: template, engine: 'handlebars', recipe: 'html' },
         data: invoiceView(data, store, logo),
@@ -144,6 +145,7 @@ export async function createInvoiceRenderer(
       return res.content.toString('utf8');
     },
     async render(data, store) {
+      const template = await getTemplate();
       const res = await reporter.render({
         template: {
           content: template,

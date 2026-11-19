@@ -20,6 +20,7 @@ export default function ForgotPassword() {
   return (
     <AuthCard
       title={t.auth.resetTitle}
+      back={{ to: '/login', label: t.auth.loginButton }}
       intro={tg.status === 'verified' ? t.auth.verifiedReset : t.auth.resetIntro}
       footer={
         <Link to="/login" className="link inline-flex min-h-10 items-center">

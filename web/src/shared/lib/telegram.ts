@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+
 /**
  * Telegram's Mini App script (window.Telegram.WebApp) is only useful when the store is opened inside
  * Telegram. It used to sit in the page head, where it blocked the first paint of every visitor for as
@@ -35,6 +38,15 @@ export function loadTelegramScript(timeoutMs = 3000): Promise<void> {
   });
 }
 
+/** Telegram's native top-bar back button controls. */
+export type TelegramBackButton = {
+  isVisible?: boolean;
+  show(): void;
+  hide(): void;
+  onClick(cb: () => void): void;
+  offClick(cb: () => void): void;
+};
+
 /** The parts of Telegram's WebApp object we use. Older Telegram versions lack the newer calls. */
 export type TelegramWebApp = {
   ready(): void;
@@ -47,6 +59,7 @@ export type TelegramWebApp = {
   colorScheme?: 'light' | 'dark';
   themeParams?: { bg_color?: string };
   onEvent?(event: string, cb: () => void): void;
+  BackButton?: TelegramBackButton;
 };
 
 /** The phone's own background, but only on a dark theme: the shop is dark only, so on a light phone it keeps its own. */
@@ -81,3 +94,37 @@ export function configureTelegramApp(app: TelegramWebApp | undefined, color: str
 
 export const telegramApp = () =>
   (window as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+
+/**
+ * Keeps Telegram's native top-bar back button in sync with the router:
+ * shows when navigated into a subpage, hides at the home page, and walks back on click.
+ */
+export function useTelegramBackButton(): void {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const app = telegramApp();
+    const btn = app?.BackButton;
+    if (!btn) return;
+
+    if (location.pathname === '/') {
+      btn.hide();
+      return;
+    }
+
+    const handleClick = () => {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate('/');
+      }
+    };
+
+    btn.show();
+    btn.onClick(handleClick);
+    return () => {
+      btn.offClick(handleClick);
+    };
+  }, [location.pathname, navigate]);
+}

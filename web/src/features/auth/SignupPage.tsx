@@ -39,6 +39,7 @@ export default function Signup() {
   return (
     <AuthCard
       title={t.auth.signupTitle}
+      back={{ to: '/', label: t.product.backToShop }}
       intro={
         tg.status === 'verified'
           ? tg.firstName

@@ -37,6 +37,11 @@ const renderPage = (node: React.ReactNode, data = store()) => {
 describe('info pages', () => {
   beforeEach(() => vi.mocked(api).mockReset());
 
+  it('offers a back link to the shop', async () => {
+    renderPage(<Contact />);
+    expect(await screen.findByRole('link', { name: 'Back to the shop' })).toHaveAttribute('href', '/');
+  });
+
   it('Contact shows only the details the owner has filled in', async () => {
     renderPage(<Contact />, store({ phone: '087 522 210', telegram: 'Cambo_KB_Bot', hours: 'Daily 8:00–20:00' }));
     expect(await screen.findByRole('link', { name: /087 522 210/ })).toHaveAttribute('href', 'tel:+85587522210');

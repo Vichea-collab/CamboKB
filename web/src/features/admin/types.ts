@@ -6,6 +6,7 @@ export type AdminProduct = ProductDetailData & {
   isActive: boolean;
   sortOrder: number;
   categoryId: string;
+  orderCount: number;
   images: (ProductDetailData['images'][number] & { storageKey: string })[];
 };
 export type AdminBanner = { id: string; storageKey: string; linkUrl: string | null; isActive: boolean; sortOrder: number; image: { sm: string; md: string; lg: string } };

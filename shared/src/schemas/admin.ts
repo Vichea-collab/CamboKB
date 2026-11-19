@@ -82,6 +82,20 @@ export const orderStatusUpdateSchema = z.object({
 
 export const paymentStatusUpdateSchema = z.object({ status: z.enum(PAYMENT_STATUSES) });
 
+export const customerInputSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  phone: z.string().trim().min(8).max(20),
+  password: z.string().min(8).max(128).optional(),
+  role: z.enum(['CUSTOMER', 'ADMIN']).default('CUSTOMER'),
+});
+
+export const customerPatchSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+  phone: z.string().trim().min(8).max(20).optional(),
+});
+
+export type CustomerInput = z.infer<typeof customerInputSchema>;
+export type CustomerPatch = z.infer<typeof customerPatchSchema>;
 export type ProductInput = z.infer<typeof productInputSchema>;
 export type ProductPatch = z.infer<typeof productPatchSchema>;
 export type CategoryInput = z.infer<typeof categoryInputSchema>;

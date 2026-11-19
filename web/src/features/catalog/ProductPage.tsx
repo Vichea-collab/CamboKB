@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { isApiError } from '../../shared/lib/api';
 import { categoryName, t } from '../../shared/lib/strings';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
-import { Badge, EmptyState, LoadingState } from '../../shared/ui/Page';
+import { BackLink, Badge, EmptyState, LoadingState } from '../../shared/ui/Page';
 import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
 import { MAX_QTY } from '../cart/cart-store';
@@ -50,9 +50,15 @@ export default function ProductDetail() {
 
   return (
     <div className="pb-24 md:pb-0">
+      {/* Phones: a clean back button with arrow. Tablets and desktop: the full breadcrumb. */}
+      <div className="mb-2 sm:hidden">
+        <BackLink to={p.category.slug ? `/?category=${p.category.slug}` : '/'}>
+          {categoryName(p.category.slug, p.category.name)}
+        </BackLink>
+      </div>
       <nav
         aria-label={t.product.breadcrumb}
-        className="mb-3 flex items-center gap-1 text-sm font-semibold text-muted"
+        className="mb-3 hidden sm:flex items-center gap-1 text-sm font-semibold text-muted"
       >
         <Link to="/" className="inline-flex min-h-10 items-center rounded-lg px-1 hover:text-ink">
           {t.product.shop}

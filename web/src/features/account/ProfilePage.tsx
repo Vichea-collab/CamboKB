@@ -11,7 +11,6 @@ import { passwordProblem } from '../auth/passwordCheck';
 import { t } from '../../shared/lib/strings';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useUi } from '../../shared/lib/ui-store';
-import { AccountNav } from './AccountNav';
 import { ChevronRight, LayoutDashboard } from 'lucide-react';
 import { ErrorState, LoadingState, PageHeader, Section } from '../../shared/ui/Page';
 
@@ -26,7 +25,7 @@ type Profile = {
 };
 
 export default function ProfilePage() {
-  useDocumentTitle(t.account.title);
+  useDocumentTitle(t.account.profile);
   const profile = useQuery({ queryKey: ['profile'], queryFn: () => api<Profile>('/me') });
   const logout = useLogout();
   const navigate = useNavigate();
@@ -36,8 +35,7 @@ export default function ProfilePage() {
   if (!profile.data) return <LoadingState />;
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title={t.account.title} />
-      <AccountNav />
+      <PageHeader title={t.account.profile} back={{ to: '/', label: t.product.backToShop }} />
       <div className="space-y-5">
         {me.data?.role === 'ADMIN' && (
           <Link to="/admin" className="panel-link flex items-center gap-3 border-yellow/35 p-4">

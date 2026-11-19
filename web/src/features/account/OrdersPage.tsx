@@ -9,7 +9,6 @@ import { t } from '../../shared/lib/strings';
 import type { Order, Paged } from '../../shared/lib/types';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '../../shared/ui/Page';
-import { AccountNav } from './AccountNav';
 
 export default function OrdersPage() {
   useDocumentTitle(t.account.orders);
@@ -19,8 +18,7 @@ export default function OrdersPage() {
   });
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title={t.account.title} />
-      <AccountNav />
+      <PageHeader title={t.account.orders} back={{ to: '/', label: t.product.backToShop }} />
       {orders.isError ? (
         <ErrorState onRetry={() => orders.refetch()} />
       ) : !orders.data ? (

@@ -48,12 +48,12 @@ export async function seedOrder(opts: {
     lng: null,
     distanceKm: null,
     note: null,
+    trackingNumber: null,
     subtotalCents: subtotal,
     deliveryFeeCents: fee,
     discountCents: discount,
     totalCents: subtotal + fee - discount,
     promoCode: null,
-    trackingNumber: null,
     payment: { method: opts.method ?? 'COD', status: 'UNPAID' },
     items: opts.items.map((i) => ({ ...i, lineTotalCents: i.priceCents * i.quantity })),
   };

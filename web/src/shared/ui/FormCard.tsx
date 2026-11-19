@@ -1,15 +1,18 @@
 import { MessageCircle, QrCode, Truck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t } from '../lib/strings';
+import { BackLink } from './Page';
 
 export function AuthCard({
   title,
   intro,
+  back,
   children,
   footer,
 }: {
   title: string;
   intro?: string;
+  back?: { to: string; label: string };
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -44,6 +47,7 @@ export function AuthCard({
 
       <div className="mx-auto w-full max-w-md">
         <div className="rounded-3xl bg-surface p-6 ring-1 ring-line sm:p-8">
+          {back && <BackLink to={back.to}>{back.label}</BackLink>}
           <h1 className="title-page">{title}</h1>
           {intro && <p className="mt-2 text-sm leading-relaxed text-muted">{intro}</p>}
           <div className="mt-6">{children}</div>

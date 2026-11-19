@@ -39,6 +39,7 @@ export default function Login() {
   return (
     <AuthCard
       title={t.auth.loginTitle}
+      back={{ to: '/', label: t.product.backToShop }}
       footer={
         <>
           {t.auth.noAccount}{' '}
