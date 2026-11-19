@@ -68,6 +68,21 @@ const renderCheckout = () =>
 describe('Checkout', () => {
   beforeEach(() => {
     useCart.setState({ items: [{ productId: PID, quantity: 1 }] });
+    // Sharing a location through the Telegram bot is offered on phones (see the desktop test below).
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
+    );
+  });
+
+  it('does not offer Telegram location sharing on a computer, where Telegram cannot send a location', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+    );
+    mockServer();
+    renderCheckout();
+    expect(await screen.findByRole('button', { name: /Use my location/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Share location in Telegram/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Telegram on a computer can’t send a location/)).toBeInTheDocument();
   });
 
   it('hides Grab and disables cash on delivery for provinces', async () => {

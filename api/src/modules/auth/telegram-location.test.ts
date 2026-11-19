@@ -116,6 +116,13 @@ describe('sharing the delivery location through the Telegram bot', () => {
     expect((await status(agent, requestId)).body).toEqual({ status: 'PENDING' });
   });
 
+  it('explains it when the app cannot send a location and posts the button label as text instead', async () => {
+    await webhook(ctx, { from: tgUser(777), text: '📍 Share my location' });
+    expect(said.at(-1)!.text).toMatch(/can.t send a location/i);
+    expect(said.at(-1)!.text).toMatch(/Use my location/);
+    expect(JSON.stringify(said.at(-1)!.replyMarkup)).toContain('remove_keyboard');
+  });
+
   it('ignores a location sent without opening the checkout link first', async () => {
     const { agent } = await signedIn();
     const { requestId } = await startShare(agent); // link never opened in Telegram

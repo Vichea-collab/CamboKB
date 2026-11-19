@@ -21,7 +21,9 @@ export const BOT_TEXT = {
   noPending: 'Please open the sign-up link from the Cambo Supply website first.',
   invalidPhone: "That phone number doesn't look valid.",
   askLocation:
-    'Tap the button below to share where we should deliver. You can also send any other spot from the 📎 menu → Location.',
+    "Tap the button below to share where we should deliver. You can also send any other spot from the 📎 menu → Location. (Telegram on a computer can't send a location: use your phone, or tap “Use my location” on the checkout page.)",
+  locationUnsupported:
+    "Your Telegram app can't send a location (Telegram on a computer can't). Open Telegram on your phone, or go back to checkout and tap “Use my location” or drag the pin on the map.",
   shareLocationButton: '📍 Share my location',
   locationSaved: '✅ Got your location! Go back to checkout: your delivery fee is updated.',
   locationNotYours:
@@ -56,6 +58,9 @@ export async function handleTelegramUpdate(deps: AppDeps, update: TgUpdate): Pro
   if (msg.text?.startsWith('/start')) await handleStart(deps, msg, say);
   else if (msg.contact) await handleContact(deps, msg, say);
   else if (msg.location) await handleLocation(deps, msg, say);
+  // An app that can't send locations posts the button's label as an ordinary message instead.
+  else if (msg.text === BOT_TEXT.shareLocationButton)
+    say(msg.chat.id, BOT_TEXT.locationUnsupported, { replyMarkup: removeKeyboard });
   else {
     const command = /^\/(\w+)(?:@\w+)?/.exec(msg.text ?? '')?.[1]?.toLowerCase();
     if (command === 'orders') await handleOrders(deps, msg, say);

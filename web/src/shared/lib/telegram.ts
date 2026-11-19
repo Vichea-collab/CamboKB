@@ -8,6 +8,18 @@ const SCRIPT_SRC = 'https://telegram.org/js/telegram-web-app.js';
 /** Telegram opens a Mini App with launch parameters (tgWebAppData, tgWebAppVersion, ...) in the address. */
 export const isTelegramMiniApp = () => window.location.hash.includes('tgWebApp');
 
+/**
+ * The bot's "Share my location" button only works in Telegram's phone and tablet apps. Telegram Desktop
+ * and Telegram Web can't send a location (the button does nothing there), so offer it only on a touch device.
+ */
+export function canShareLocationInTelegram(): boolean {
+  const ua = navigator.userAgent;
+  // iPadOS announces itself as a Mac, but has a touch screen.
+  return (
+    /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  );
+}
+
 /** Load the script when inside Telegram; resolves when it is ready, or after `timeoutMs` so the store never waits for it. */
 export function loadTelegramScript(timeoutMs = 3000): Promise<void> {
   if (!isTelegramMiniApp()) return Promise.resolve();
@@ -48,4 +60,5 @@ export function configureTelegramApp(app: TelegramWebApp | undefined, color: str
   app.disableVerticalSwipes?.();
 }
 
-export const telegramApp = () => (window as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+export const telegramApp = () =>
+  (window as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;

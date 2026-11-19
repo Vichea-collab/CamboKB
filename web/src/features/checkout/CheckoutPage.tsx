@@ -21,6 +21,7 @@ import { useMe } from '../auth/auth';
 import { useTelegramVerification } from '../auth/useTelegramVerification';
 import { useCartProducts } from '../catalog/api';
 import { t } from '../../shared/lib/strings';
+import { canShareLocationInTelegram } from '../../shared/lib/telegram';
 import type { Order } from '../../shared/lib/types';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useCart } from '../cart/cart-store';
@@ -146,6 +147,7 @@ export default function Checkout() {
 
   // Or share it from the phone's Telegram: the bot sends the location back and the pin follows it.
   const tgLocation = useTelegramVerification('SHARE_LOCATION');
+  const telegramShare = canShareLocationInTelegram();
   const sharedLocation = tgLocation.status === 'verified' ? tgLocation.location : undefined;
   useEffect(() => {
     if (sharedLocation) setPin(sharedLocation);
@@ -282,17 +284,20 @@ export default function Checkout() {
                     >
                       📍 {locating ? t.checkout.locating : t.checkout.useLocation}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void tgLocation.start()}
-                      disabled={tgLocation.status === 'starting' || tgLocation.status === 'waiting'}
-                      className="btn-ghost btn-sm"
-                    >
-                      ✈️ {tgLocation.status === 'waiting' ? t.checkout.shareWaiting : t.checkout.shareTelegram}
-                    </button>
+                    {telegramShare && (
+                      <button
+                        type="button"
+                        onClick={() => void tgLocation.start()}
+                        disabled={tgLocation.status === 'starting' || tgLocation.status === 'waiting'}
+                        className="btn-ghost btn-sm"
+                      >
+                        ✈️ {tgLocation.status === 'waiting' ? t.checkout.shareWaiting : t.checkout.shareTelegram}
+                      </button>
+                    )}
                   </div>
                 </div>
-                {tgLocation.status === 'waiting' && (
+                {!telegramShare && <p className="text-sm text-muted">{t.checkout.shareDesktopHint}</p>}
+                {telegramShare && tgLocation.status === 'waiting' && (
                   <p className="text-sm text-muted" aria-live="polite">
                     {t.checkout.shareHelp}{' '}
                     {tgLocation.deepLink && (
