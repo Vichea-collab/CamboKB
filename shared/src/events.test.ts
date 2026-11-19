@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVENT_TARGETS, eventDataSchemas, parseEvent, type OrderSnapshot } from './events';
+import { EVENT_TARGETS, eventDataSchemas, orderSnapshotSchema, parseEvent, type OrderSnapshot } from './events';
 
 const EVENT_ID = '0d3b9a52-1c61-4c4e-9d7e-6a1f4b2c8e90';
 
@@ -22,6 +22,7 @@ const order: OrderSnapshot = {
   discountCents: 0,
   totalCents: 4350,
   promoCode: null,
+  trackingNumber: null,
   payment: { method: 'COD', status: 'UNPAID' },
   items: [
     {
@@ -63,5 +64,18 @@ describe('event contracts', () => {
 
   it('admin alerts default to on', () => {
     expect(eventDataSchemas['admin.alert'].parse({ text: 'hi' }).adminAlerts).toBe(true);
+  });
+
+  it('a tracking number is part of the order, and orders queued before it existed still parse', () => {
+    const { trackingNumber: _omit, ...old } = order;
+    void _omit;
+    expect(orderSnapshotSchema.parse(old).trackingNumber).toBeNull();
+    expect(orderSnapshotSchema.parse({ ...order, trackingNumber: 'VET123456' }).trackingNumber).toBe('VET123456');
+  });
+
+  it('announces a tracking number to the notification service', () => {
+    expect(EVENT_TARGETS['order.tracking_set']).toBe('notification');
+    const data = eventDataSchemas['order.tracking_set'].parse({ order: { ...order, trackingNumber: 'VET1' }, customerChatId: '7001' });
+    expect(data.order.trackingNumber).toBe('VET1');
   });
 });

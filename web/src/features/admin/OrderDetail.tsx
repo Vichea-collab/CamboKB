@@ -11,6 +11,7 @@ import { formatTime } from '../../shared/lib/format';
 import { t } from '../../shared/lib/strings';
 import { Loading, PageHeader } from './components/ui';
 import { StatusActions } from './components/StatusActions';
+import { TrackingCard } from './components/TrackingCard';
 import type { AdminOrder } from './types';
 
 export default function OrderDetail() {
@@ -98,6 +99,7 @@ export default function OrderDetail() {
                 </div>
               )}
             </Section>
+            {o.deliveryService !== 'GRAB' && o.status !== 'CANCELLED' && <TrackingCard key={o.trackingNumber ?? ''} orderId={o.id} current={o.trackingNumber} carrier={t.service[o.deliveryService] ?? o.deliveryService} onSaved={onDone} />}
             <Section title="Payment">
               {o.payment?.method === 'KHQR' && o.payment.status === 'PENDING' && (
                 <div className="mb-4 rounded-xl border border-yellow/30 bg-yellow/5 p-3 text-sm">

@@ -283,6 +283,9 @@ const en = {
     details: 'Delivery and payment',
     mapPin: 'Open map pin',
     noPin: 'No map pin on this order. Ask the customer where to deliver.',
+    tracking: 'Tracking number',
+    copyTracking: 'Copy tracking number',
+    copied: 'Copied',
   },
   info: {
     contact: {
@@ -643,6 +646,9 @@ const km: Strings = {
     details: 'ការដឹកជញ្ជូន និងការបង់ប្រាក់',
     mapPin: 'បើកម្ជុលផែនទី',
     noPin: 'ការបញ្ជាទិញនេះគ្មានម្ជុលផែនទីទេ។ សូមសួរអតិថិជនថាត្រូវដឹកទៅទីណា។',
+    tracking: 'លេខតាមដាន',
+    copyTracking: 'ចម្លងលេខតាមដាន',
+    copied: 'បានចម្លង',
   },
   info: {
     contact: {

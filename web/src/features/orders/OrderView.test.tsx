@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Order } from '../../shared/lib/types';
 import { OrderSummary } from './OrderView';
 
@@ -18,6 +19,7 @@ const order = (over: Partial<Order> = {}): Order => ({
   lng: null,
   distanceKm: null,
   note: null,
+  trackingNumber: null,
   subtotalCents: 2100,
   deliveryFeeCents: 150,
   discountCents: 0,
@@ -55,5 +57,21 @@ describe('order delivery details', () => {
   it('does not warn about the pin for deliveries that do not need one', () => {
     show(order({ deliveryService: 'VET' }));
     expect(screen.queryByText(/No map pin/)).not.toBeInTheDocument();
+  });
+
+  it('shows the carrier tracking number, with a button to copy it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show(order({ deliveryService: 'VET', trackingNumber: 'VET-778899' }));
+    expect(screen.getByText('Tracking number')).toBeInTheDocument();
+    expect(screen.getByText('VET-778899')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy tracking number' }));
+    expect(writeText).toHaveBeenCalledWith('VET-778899');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('shows nothing about tracking before the parcel has a number', () => {
+    show(order({ deliveryService: 'VET', trackingNumber: null }));
+    expect(screen.queryByText('Tracking number')).not.toBeInTheDocument();
   });
 });

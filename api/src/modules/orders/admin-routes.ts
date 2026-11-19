@@ -15,9 +15,9 @@ import type { AppDeps } from '../../http/app';
 import { toPublicUser } from '../auth/sessions';
 import { orderInclude, toOrderDto } from './orders';
 import { kickEvents } from '../events/outbox';
-import { announceSnapshot } from '../events/snapshot';
+import { announceSnapshot, announceTrackingSet } from '../events/snapshot';
 import { changeOrderStatus, publishOrderUpdate } from './status';
-import { notFound } from '../../http/errors';
+import { AppError, notFound } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
 import { checkKhqrPayment } from '../payments/khqr';
 
@@ -103,6 +103,30 @@ export function adminOrdersRouter(deps: AppDeps): Router {
       const { id } = req.valid.params as { id: string };
       const { status, note } = req.valid.body as { status: OrderStatus; note?: string };
       await changeOrderStatus(deps, id, status, req.user!.id, note);
+      res.json(await detail(id));
+    },
+  );
+
+  // The carrier's tracking number: shown to the customer and sent to them on Telegram (once per number).
+  r.post(
+    '/orders/:id/tracking',
+    validate({ params: idParams, body: z.object({ trackingNumber: z.string().max(60).nullable() }) }),
+    async (req, res) => {
+      const { id } = req.valid.params as { id: string };
+      const typed = (req.valid.body as { trackingNumber: string | null }).trackingNumber?.trim();
+      const trackingNumber = typed ? typed : null;
+      const order = await prisma.order.findUnique({ where: { id }, select: { status: true, trackingNumber: true } });
+      if (!order) throw notFound('Order');
+      if (order.status === 'CANCELLED') throw new AppError(409, 'ORDER_CLOSED', 'A cancelled order cannot be shipped');
+      if (order.trackingNumber !== trackingNumber) {
+        await prisma.$transaction(async (tx) => {
+          await tx.order.update({ where: { id }, data: { trackingNumber } });
+          if (trackingNumber) await announceTrackingSet(tx, id);
+          else await announceSnapshot(tx, id);
+        });
+        kickEvents(deps);
+        void publishOrderUpdate(deps, id, 'order');
+      }
       res.json(await detail(id));
     },
   );

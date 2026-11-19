@@ -160,6 +160,7 @@ export function order(over: Partial<OrderSnapshot> = {}): OrderSnapshot {
     discountCents: 0,
     totalCents: 4350,
     promoCode: null,
+    trackingNumber: null,
     payment: { method: 'COD', status: 'UNPAID' },
     items: [
       {

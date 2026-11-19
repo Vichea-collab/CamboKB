@@ -24,6 +24,7 @@ export type EventResult = 'applied' | 'duplicate';
 const NOTIFICATION_EVENTS = [
   'order.placed',
   'order.status_changed',
+  'order.tracking_set',
   'payment.confirmed',
   'payment.expired',
   'admin.alert',
@@ -52,7 +53,7 @@ export function messagesFor<T extends NotificationEvent>(
         chatId,
         text: customerMessage(kind, o, { webOrigin: config.webOrigin, holdMinutes }),
         replyMarkup: customerKeyboard(kind, o, config.webOrigin),
-        dedupeKey: `order:${o.id}:customer:${kind === 'status' ? o.status : kind}`,
+        dedupeKey: `order:${o.id}:customer:${kind === 'status' ? o.status : kind === 'tracking' ? `tracking:${o.trackingNumber}` : kind}`,
       });
   };
   const admin = (msg: Omit<OutboxMessage, 'chatId'>, on: boolean, topic: TopicKey) => {
@@ -84,6 +85,11 @@ export function messagesFor<T extends NotificationEvent>(
     case 'order.status_changed': {
       const d = data as EventData<'order.status_changed'>;
       customer(d.customerChatId, d.order, 'status');
+      break;
+    }
+    case 'order.tracking_set': {
+      const d = data as EventData<'order.tracking_set'>;
+      customer(d.customerChatId, d.order, 'tracking');
       break;
     }
     case 'payment.confirmed': {

@@ -50,7 +50,7 @@ export const canOpenInTelegram = (webOrigin: string) => webOrigin.startsWith('ht
 export const orderUrl = (webOrigin: string, number: string) =>
   `${webOrigin}/account/orders/${encodeURIComponent(number)}`;
 
-export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired';
+export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired' | 'tracking';
 
 const STATUS_MESSAGE: Record<string, string> = {
   CONFIRMED: '👍 Your order {n} is confirmed.',
@@ -76,12 +76,16 @@ export function customerMessage(
   else if (kind === 'expired')
     text =
       "⏰ Order {n} was cancelled because it wasn't paid within {hold} minutes. You can order again any time.";
+  else if (kind === 'tracking')
+    text = "📮 Tracking number for order {n}: {tracking} ({carrier}). Use it on the carrier's app or website to follow your parcel.";
   else text = STATUS_MESSAGE[o.status] ?? '📌 Your order {n} is now {status}.';
   const body = text
     .replace('{n}', o.number)
     .replace('{total}', formatUsd(o.totalCents))
     .replace('{hold}', String(ctx.holdMinutes ?? 10))
-    .replace('{status}', o.status.toLowerCase());
+    .replace('{status}', o.status.toLowerCase())
+    .replace('{tracking}', o.trackingNumber ?? '')
+    .replace('{carrier}', SERVICE[o.deliveryService]);
   // With the button (https) the link would only repeat it.
   return canOpenInTelegram(ctx.webOrigin)
     ? body

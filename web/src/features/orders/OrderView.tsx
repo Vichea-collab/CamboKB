@@ -1,6 +1,6 @@
 import { formatPhone, formatUsdExact } from '@cambo/shared';
-import { Check } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Check, Copy } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { t } from '../../shared/lib/strings';
 import type { Order } from '../../shared/lib/types';
 import { formatDateTime as when } from '../../shared/lib/format';
@@ -99,6 +99,7 @@ export function OrderSummary({ order, actions }: { order: Order; actions?: React
                 {t.region[order.region]} · {t.service[order.deliveryService]}
               </p>
               <p className="text-ink/85">{order.addressLine}</p>
+              {order.trackingNumber && <TrackingLine value={order.trackingNumber} />}
               {order.lat !== null && order.lng !== null && (
                 <a
                   className="link inline-flex min-h-10 items-center"
@@ -148,6 +149,33 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between text-muted">
       <dt>{label}</dt>
       <dd className="text-ink tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/** The carrier's tracking code, easy to copy into the carrier's app. */
+function TrackingLine({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-raised px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-muted">{t.orderView.tracking}</p>
+        <p className="truncate font-display font-bold tabular-nums">{value}</p>
+      </div>
+      <button
+        type="button"
+        aria-label={t.orderView.copyTracking}
+        className="btn-ghost btn-sm shrink-0"
+        onClick={() => {
+          void navigator.clipboard?.writeText(value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          });
+        }}
+      >
+        {copied ? <Check className="size-4 text-green" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+        {copied && t.orderView.copied}
+      </button>
     </div>
   );
 }

@@ -50,6 +50,8 @@ export type Order = {
   lng: number | null;
   distanceKm: number | null;
   note: string | null;
+  /** The carrier's tracking code, once the shop has shipped the parcel. */
+  trackingNumber: string | null;
   subtotalCents: number;
   deliveryFeeCents: number;
   discountCents: number;

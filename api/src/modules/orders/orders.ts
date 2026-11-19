@@ -46,6 +46,7 @@ export function toOrderDto(o: OrderWithRelations, files: FileClient) {
     lng: o.lng,
     distanceKm: o.distanceKm,
     note: o.note,
+    trackingNumber: o.trackingNumber,
     subtotalCents: o.subtotalCents,
     deliveryFeeCents: o.deliveryFeeCents,
     discountCents: o.discountCents,

@@ -140,6 +140,26 @@ describe('events from the api become Telegram messages', () => {
     expect(keyboardTexts(owner.opts)).toEqual(['✅ Confirmed', '📦 Mark packed', '❌ Cancel']);
   });
 
+  it('gives the customer the tracking number and the carrier, and tells nobody else', async () => {
+    const o = order({ status: 'SHIPPING', deliveryService: 'VET', trackingNumber: 'VET-778899' });
+    await send(event('order.tracking_set', { order: o, customerChatId: String(CUSTOMER) }));
+    await flush();
+    const msg = ctx.telegram.to(CUSTOMER)[0]!;
+    expect(msg.text).toContain(`${o.number}`);
+    expect(msg.text).toContain('VET-778899');
+    expect(msg.text).toContain('VET Express');
+    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0);
+  });
+
+  it('does not repeat a tracking message for the same number, but sends one when the number changes', async () => {
+    const o = order({ status: 'SHIPPING', trackingNumber: 'A1' });
+    await send(event('order.tracking_set', { order: o, customerChatId: String(CUSTOMER) }));
+    await send(event('order.tracking_set', { order: o, customerChatId: String(CUSTOMER) }));
+    await send(event('order.tracking_set', { order: { ...o, trackingNumber: 'B2' }, customerChatId: String(CUSTOMER) }));
+    await flush();
+    expect(ctx.telegram.to(CUSTOMER).map((m) => /A1|B2/.exec(m.text)![0])).toEqual(['A1', 'B2']);
+  });
+
   it("tells the customer an unpaid order was cancelled, using the api's hold time", async () => {
     await send(
       event('payment.expired', {

@@ -256,6 +256,8 @@ model Order {
   totalCents       Int
   promoCodeId      String?         @db.Uuid
   note             String?
+  /// The carrier's tracking code (VET, J&T...), set by the shop when the parcel is handed over.
+  trackingNumber   String?
   idempotencyKey   String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt

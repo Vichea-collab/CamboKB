@@ -37,6 +37,7 @@ export async function loadSnapshot(
       discountCents: o.discountCents,
       totalCents: o.totalCents,
       promoCode: o.promoCode?.code ?? null,
+      trackingNumber: o.trackingNumber,
       payment: o.payment ? { method: o.payment.method, status: o.payment.status } : null,
       items: o.items.map((i) => ({
         productId: i.productId,
@@ -86,6 +87,18 @@ export async function announceStatusChanged(db: Db, orderId: string) {
     'order.status_changed',
     { order, customerChatId },
     { dedupeKey: `order:${orderId}:status:${order.status}` },
+  );
+}
+
+/** The shop entered (or changed) the carrier's tracking number: tell the customer. */
+export async function announceTrackingSet(db: Db, orderId: string) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'order.tracking_set',
+    { order, customerChatId },
+    { dedupeKey: `order:${orderId}:tracking:${order.trackingNumber}` },
   );
 }
 

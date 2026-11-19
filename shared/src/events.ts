@@ -28,6 +28,8 @@ export const orderSnapshotSchema = z.object({
   discountCents: z.number().int(),
   totalCents: z.number().int(),
   promoCode: z.string().nullable(),
+  /** The carrier's tracking code once the shop has handed the parcel over. Older queued events lack it. */
+  trackingNumber: z.string().nullable().default(null),
   payment: z
     .object({ method: z.enum(PAYMENT_METHODS), status: z.enum(PAYMENT_STATUSES) })
     .nullable(),
@@ -60,6 +62,7 @@ export const eventDataSchemas = {
     holdMinutes: z.number().int().positive(),
   }),
   'order.status_changed': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
+  'order.tracking_set': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
   'payment.confirmed': z.object({
     order: orderSnapshotSchema,
     customerChatId: chat,
@@ -84,6 +87,7 @@ export const EVENT_TARGETS = {
   'order.snapshot': 'report',
   'order.placed': 'notification',
   'order.status_changed': 'notification',
+  'order.tracking_set': 'notification',
   'payment.confirmed': 'notification',
   'payment.expired': 'notification',
   'admin.alert': 'notification',
