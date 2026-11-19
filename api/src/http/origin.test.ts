@@ -24,8 +24,8 @@ describe('origin check', () => {
     expect(res.status).not.toBe(403);
   });
 
-  it('allows the Telegram webhook without an origin', async () => {
-    const res = await request(app).post('/api/v1/telegram/webhook').send({});
+  it('allows service-to-service calls without an origin (they carry a secret instead)', async () => {
+    const res = await request(app).post('/internal/telegram/updates').send({});
     expect(res.status).not.toBe(403);
   });
 });

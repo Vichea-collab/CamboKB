@@ -1,3 +1,4 @@
+import { createMetrics } from '@cambo/service-kit';
 import { createApp } from './http/app';
 import { loadConfig } from './config';
 import { createLogger } from './lib/logger';
@@ -5,36 +6,56 @@ import { createPrisma } from './db/prisma';
 import { HttpBakongClient } from './integrations/bakong/client';
 import { HttpFileClient } from './integrations/files/client';
 import { HttpReportClient } from './integrations/reports/client';
-import { HttpTelegramClient, NoopTelegramClient, type TelegramClient } from './integrations/telegram/client';
-import { startPolling } from './modules/bot/poller';
-import { startOutboxWorker } from './modules/bot/outbox';
-import { setupBot } from './modules/bot/setup';
+import { HttpEventSender } from './integrations/services/events';
+import { HttpNotificationClient } from './integrations/services/notification';
+import { startEventWorker } from './modules/events/outbox';
 import { startKhqrSweeper } from './modules/payments/khqr';
 
 async function main() {
   const config = loadConfig();
   const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
   const prisma = createPrisma(config.databaseUrl);
-  const telegram: TelegramClient =
-    config.telegram.mode === 'off' || !config.telegram.botToken
-      ? new NoopTelegramClient((m) => logger.info(m))
-      : new HttpTelegramClient(config.telegram.botToken);
-  const files = new HttpFileClient(config.services.fileUrl, config.services.fileSecret, config.services.publicFilesUrl);
+  const files = new HttpFileClient(
+    config.services.fileUrl,
+    config.services.fileSecret,
+    config.services.publicFilesUrl,
+  );
   const reports = new HttpReportClient(config.services.reportUrl, config.services.reportSecret);
   const bakong = new HttpBakongClient(config.bakong.apiUrl, config.bakong.token);
-  const deps = { config, prisma, files, reports, bakong, telegram, logger };
+  const events = new HttpEventSender({
+    report: { url: config.services.reportUrl, secret: config.services.reportSecret },
+    notification: {
+      url: config.services.notificationUrl,
+      secret: config.services.notificationSecret,
+    },
+  });
+  const notification = new HttpNotificationClient(
+    config.services.notificationUrl,
+    config.services.notificationSecret,
+  );
+  const deps = {
+    config,
+    prisma,
+    files,
+    reports,
+    bakong,
+    events,
+    notification,
+    metrics: createMetrics('api'),
+    logger,
+  };
 
   const app = createApp(deps);
   const server = app.listen(config.port, () => logger.info(`API listening on :${config.port}`));
-  const stopBackground = await startBackground(deps);
-  const stopOutbox = startOutboxWorker(deps);
+  // Delivers what the other services have not received yet, and retries what failed.
+  const stopEvents = startEventWorker(deps);
   const stopSweeper = config.bakong.enabled ? startKhqrSweeper(deps) : () => {};
-  if (!config.bakong.enabled) logger.info('KHQR payments off (set BAKONG_ACCOUNT_ID and BAKONG_TOKEN to turn them on)');
+  if (!config.bakong.enabled)
+    logger.info('KHQR payments off (set BAKONG_ACCOUNT_ID and BAKONG_TOKEN to turn them on)');
 
   const shutdown = (signal: string) => {
     logger.info(`${signal} received, shutting down`);
-    stopBackground();
-    stopOutbox();
+    stopEvents();
     stopSweeper();
     server.close(async () => {
       await prisma.$disconnect();
@@ -44,23 +65,6 @@ async function main() {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-}
-
-/** Telegram: long polling in development, webhook registration in production. */
-async function startBackground(deps: Parameters<typeof createApp>[0]): Promise<() => void> {
-  const { telegram, config, logger } = deps;
-  if (config.telegram.mode !== 'off') await setupBot(deps);
-  if (config.telegram.mode === 'polling') {
-    logger.info('Telegram: polling for updates');
-    return startPolling(deps);
-  }
-  if (config.telegram.mode === 'webhook' && config.telegram.webhookUrl && config.telegram.webhookSecret) {
-    await telegram
-      .setWebhook(config.telegram.webhookUrl, config.telegram.webhookSecret)
-      .then(() => logger.info('Telegram: webhook registered'))
-      .catch((err) => logger.error({ err }, 'Telegram: webhook registration failed'));
-  }
-  return () => {};
 }
 
 main().catch((err) => {

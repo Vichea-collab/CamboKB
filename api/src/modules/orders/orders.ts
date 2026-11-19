@@ -1,9 +1,18 @@
-import { Prisma, type Order, type OrderItem, type OrderStatusEvent, type Payment, type PromoCode } from '@prisma/client';
+import {
+  Prisma,
+  type Order,
+  type OrderItem,
+  type OrderStatusEvent,
+  type Payment,
+  type PromoCode,
+} from '@prisma/client';
 import type { CreateOrderInput } from '@cambo/shared';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import type { FileClient } from '../../integrations/files/client';
-import { notifyCustomer, notifyNewOrder } from '../bot/notify';
+import { appMetrics } from '../../lib/app-metrics';
+import { kickEvents } from '../events/outbox';
+import { announceOrderPlaced } from '../events/snapshot';
 import { publishAdminEvent } from '../../lib/events';
 import { getPaymentProvider } from '../payments/providers';
 import { buildQuote } from './quote';
@@ -50,15 +59,29 @@ export function toOrderDto(o: OrderWithRelations, files: FileClient) {
       lineTotalCents: i.lineTotalCents,
       image: i.imageKey ? files.imageUrls(i.imageKey, 400).sm : null,
     })),
-    events: o.events.map((e) => ({ fromStatus: e.fromStatus, toStatus: e.toStatus, note: e.note, at: e.at })),
+    events: o.events.map((e) => ({
+      fromStatus: e.fromStatus,
+      toStatus: e.toStatus,
+      note: e.note,
+      at: e.at,
+    })),
     payment: o.payment
-      ? { method: o.payment.method, status: o.payment.status, amountCents: o.payment.amountCents, paidAt: o.payment.paidAt, payBefore: o.payment.expiresAt }
+      ? {
+          method: o.payment.method,
+          status: o.payment.status,
+          amountCents: o.payment.amountCents,
+          paidAt: o.payment.paidAt,
+          payBefore: o.payment.expiresAt,
+        }
       : null,
   };
 }
 
 const findByKey = (deps: AppDeps, userId: string, key: string) =>
-  deps.prisma.order.findUnique({ where: { userId_idempotencyKey: { userId, idempotencyKey: key } }, include: orderInclude });
+  deps.prisma.order.findUnique({
+    where: { userId_idempotencyKey: { userId, idempotencyKey: key } },
+    include: orderInclude,
+  });
 
 /** Place an order: lock rows, re-price, take stock and promo use, record payment — all in one transaction. */
 export async function createOrder(
@@ -76,7 +99,9 @@ export async function createOrder(
     throw new AppError(
       422,
       'PAYMENT_METHOD_UNAVAILABLE',
-      input.paymentMethod === 'KHQR' ? 'KHQR payment is not available right now' : 'Cash on delivery is only available in Phnom Penh',
+      input.paymentMethod === 'KHQR'
+        ? 'KHQR payment is not available right now'
+        : 'Cash on delivery is only available in Phnom Penh',
     );
   }
 
@@ -86,9 +111,16 @@ export async function createOrder(
       async (tx) => {
         const q = await buildQuote(tx, input, userId, { lock: true });
         for (const item of q.items) {
-          await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } });
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
         }
-        if (q.promo) await tx.promoCode.update({ where: { id: q.promo.id }, data: { usedCount: { increment: 1 } } });
+        if (q.promo)
+          await tx.promoCode.update({
+            where: { id: q.promo.id },
+            data: { usedCount: { increment: 1 } },
+          });
         const created = await tx.order.create({
           data: {
             userId,
@@ -121,22 +153,34 @@ export async function createOrder(
           },
         });
         await provider.createPayment(deps, tx, created);
+        // Part of the same transaction: the order and what the other services are told about it stand or fall together.
+        await announceOrderPlaced(tx, created.id, deps.config.bakong.holdMinutes);
         return tx.order.findUniqueOrThrow({ where: { id: created.id }, include: orderInclude });
       },
       { maxWait: 10_000, timeout: 20_000 },
     );
   } catch (err) {
     // Same key raced in from a double tap: the other request won, return its order.
-    if (idempotencyKey && err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (
+      idempotencyKey &&
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
       const existing = await findByKey(deps, userId, idempotencyKey);
       if (existing) return { order: existing, created: false };
     }
     throw err;
   }
 
-  void notifyNewOrder(deps, order.id);
-  void notifyCustomer(deps, order.id, 'PENDING');
-  publishAdminEvent({ type: 'order.created', orderId: order.id, number: order.number, totalCents: order.totalCents, customer: order.contactName });
+  kickEvents(deps);
+  appMetrics(deps).ordersCreated.inc({ payment_method: order.payment?.method ?? 'unknown' });
+  publishAdminEvent({
+    type: 'order.created',
+    orderId: order.id,
+    number: order.number,
+    totalCents: order.totalCents,
+    customer: order.contactName,
+  });
   return { order, created: true };
 }
 
@@ -149,13 +193,25 @@ export async function cancelOrder(
   note?: string,
 ) {
   for (const item of order.items) {
-    await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+    await tx.product.update({
+      where: { id: item.productId },
+      data: { stock: { increment: item.quantity } },
+    });
   }
   if (order.promoCodeId) {
-    await tx.promoCode.updateMany({ where: { id: order.promoCodeId, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+    await tx.promoCode.updateMany({
+      where: { id: order.promoCodeId, usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
   }
   await tx.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } });
   await tx.orderStatusEvent.create({
-    data: { orderId: order.id, fromStatus: order.status, toStatus: 'CANCELLED', note: note ?? null, actorUserId },
+    data: {
+      orderId: order.id,
+      fromStatus: order.status,
+      toStatus: 'CANCELLED',
+      note: note ?? null,
+      actorUserId,
+    },
   });
 }

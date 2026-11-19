@@ -6,9 +6,16 @@ import { createLogger } from '../src/lib/logger';
 import { buildImageUrls, type FileClient } from '../src/integrations/files/client';
 import { AppError } from '../src/http/errors';
 import type { ReportClient } from '../src/integrations/reports/client';
-import { BakongError, type BakongCheck, type BakongClient } from '../src/integrations/bakong/client';
-import type { TelegramClient } from '../src/integrations/telegram/client';
-import { outboxIdle } from '../src/modules/bot/outbox';
+import {
+  BakongError,
+  type BakongCheck,
+  type BakongClient,
+} from '../src/integrations/bakong/client';
+import { EventDeliveryError, type EventSender } from '../src/integrations/services/events';
+import type { NotificationClient } from '../src/integrations/services/notification';
+import { createMetrics } from '@cambo/service-kit';
+import type { EventData, EventEnvelope, EventTarget, EventType } from '@cambo/shared';
+import { eventsIdle } from '../src/modules/events/outbox';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
 export const WEB_ORIGIN = 'http://localhost:5173';
@@ -24,46 +31,46 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     NODE_ENV: 'test',
     DATABASE_URL: process.env.DATABASE_URL_TEST,
     WEB_ORIGIN,
-    TELEGRAM_BOT_TOKEN: 'test-token',
     TELEGRAM_BOT_USERNAME: 'CamboSupplyBot',
-    TELEGRAM_WEBHOOK_SECRET: 'test-webhook-secret',
-    TELEGRAM_ADMIN_CHAT_ID: '5000',
-    TELEGRAM_MODE: 'webhook',
+    API_INTERNAL_SECRET: 'test-internal-secret-0123456789abcdef',
     BAKONG_ACCOUNT_ID: 'cambosupply@aclb',
     BAKONG_TOKEN: 'test-bakong-token',
   });
   return { ...base, ...overrides };
 }
 
-export class FakeTelegramClient implements TelegramClient {
-  sent: { chatId: number | string; text: string; opts?: Parameters<TelegramClient['sendMessage']>[2] }[] = [];
-  failSends = false;
-  /** When set, the next sends fail with this error (e.g. a 429 or 403) until cleared. */
-  failWith: Error | null = null;
-  answers: { id: string; text?: string; alert?: boolean }[] = [];
-  edits: { chatId: number | string; messageId: number; replyMarkup: unknown }[] = [];
-  async sendMessage(chatId: number | string, text: string, opts?: Parameters<TelegramClient['sendMessage']>[2]) {
+/** Stands in for the report and notification services: records every event, or fails on demand. */
+export class FakeEventSender implements EventSender {
+  sent: { target: EventTarget; envelope: EventEnvelope }[] = [];
+  /** When set, every delivery fails with this error until cleared. */
+  failWith: EventDeliveryError | null = null;
+  async send(target: EventTarget, envelope: EventEnvelope) {
     if (this.failWith) throw this.failWith;
-    if (this.failSends) throw new Error('telegram down');
-    this.sent.push({ chatId, text, opts });
+    this.sent.push({ target, envelope });
   }
-  async answerCallbackQuery(id: string, text?: string, alert?: boolean) {
-    this.answers.push({ id, text, alert });
+  /** The data of every delivered event of a type, oldest first. */
+  data<T extends EventType>(type: T): EventData<T>[] {
+    return this.sent
+      .filter((e) => e.envelope.type === type)
+      .map((e) => e.envelope.data as EventData<T>);
   }
-  async editReplyMarkup(chatId: number | string, messageId: number, replyMarkup: unknown) {
-    this.edits.push({ chatId, messageId, replyMarkup });
+}
+
+export class FakeNotificationClient implements NotificationClient {
+  tests = 0;
+  reachable = true;
+  async status() {
+    if (!this.reachable) throw new AppError(503, 'NOTIFICATION_SERVICE_UNAVAILABLE', 'down');
+    return {
+      mode: 'webhook' as const,
+      botConfigured: true,
+      adminChatSet: true,
+      outbox: { pending: 0, failed: 0, oldestPendingAgeSec: null, lastError: null },
+    };
   }
-  async getUpdates() {
-    return [];
-  }
-  async setWebhook() {}
-  commands: { command: string; description: string }[] = [];
-  menuButton: { url: string; text: string } | null = null;
-  async setCommands(commands: { command: string; description: string }[]) {
-    this.commands = commands;
-  }
-  async setMenuButton(url: string, text: string) {
-    this.menuButton = { url, text };
+  async sendTest() {
+    if (!this.reachable) throw new AppError(503, 'NOTIFICATION_SERVICE_UNAVAILABLE', 'down');
+    this.tests++;
   }
 }
 
@@ -102,10 +109,18 @@ export class FakeReportClient implements ReportClient {
     this.calls.push({ path: `/internal/invoices/${orderId}.pdf`, query: {} });
     return Buffer.from(`%PDF-1.7 fake invoice ${orderId}`);
   }
+  async invoiceHtml(orderId: string) {
+    this.calls.push({ path: `/internal/invoices/${orderId}.html`, query: {} });
+    return `<!doctype html><title>fake invoice ${orderId}</title>`;
+  }
   async get(path: string, query: Record<string, string>) {
     this.calls.push({ path, query });
-    if (path.endsWith('.csv')) return { body: Buffer.from('number,total\r\n'), contentType: 'text/csv; charset=utf-8' };
-    return { body: Buffer.from(JSON.stringify({ path, query })), contentType: 'application/json; charset=utf-8' };
+    if (path.endsWith('.csv'))
+      return { body: Buffer.from('number,total\r\n'), contentType: 'text/csv; charset=utf-8' };
+    return {
+      body: Buffer.from(JSON.stringify({ path, query })),
+      contentType: 'application/json; charset=utf-8',
+    };
   }
 }
 
@@ -139,7 +154,7 @@ export { BakongError };
 export const TINY_PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 
 export async function resetDb(db: PrismaClient = testPrisma()) {
-  await outboxIdle();
+  await eventsIdle();
   const tables = await db.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length) {
@@ -152,8 +167,18 @@ export async function resetDb(db: PrismaClient = testPrisma()) {
 
 export async function createTestApp(
   overrides: Partial<AppDeps> = {},
-): Promise<{ app: Express; prisma: PrismaClient; telegram: FakeTelegramClient; files: FakeFileClient; reports: FakeReportClient; bakong: FakeBakongClient; deps: AppDeps }> {
-  const telegram = new FakeTelegramClient();
+): Promise<{
+  app: Express;
+  prisma: PrismaClient;
+  events: FakeEventSender;
+  notification: FakeNotificationClient;
+  files: FakeFileClient;
+  reports: FakeReportClient;
+  bakong: FakeBakongClient;
+  deps: AppDeps;
+}> {
+  const events = new FakeEventSender();
+  const notification = new FakeNotificationClient();
   const files = new FakeFileClient();
   const reports = new FakeReportClient();
   const bakong = new FakeBakongClient();
@@ -163,11 +188,22 @@ export async function createTestApp(
     files,
     reports,
     bakong,
-    telegram,
+    events,
+    notification,
+    metrics: createMetrics('api'),
     logger: createLogger('silent'),
     ...overrides,
   };
-  return { app: createApp(deps), prisma: deps.prisma, telegram, files, reports, bakong: deps.bakong as FakeBakongClient, deps };
+  return {
+    app: createApp(deps),
+    prisma: deps.prisma,
+    events,
+    notification,
+    files,
+    reports,
+    bakong: deps.bakong as FakeBakongClient,
+    deps,
+  };
 }
 
 import request from 'supertest';
@@ -183,9 +219,17 @@ export function nextPhone(): string {
 
 export const TEST_PASSWORD = 'kb-store-2026';
 
+export const INTERNAL_AUTH = { Authorization: 'Bearer test-internal-secret-0123456789abcdef' };
+
 export async function createUser(
   db: PrismaClient,
-  opts: { phone?: string; password?: string; role?: Role; name?: string; telegramUserId?: number } = {},
+  opts: {
+    phone?: string;
+    password?: string;
+    role?: Role;
+    name?: string;
+    telegramUserId?: number;
+  } = {},
 ) {
   return db.user.create({
     data: {
@@ -201,23 +245,38 @@ export async function createUser(
 
 export async function loginAs(app: Express, phone: string, password = TEST_PASSWORD) {
   const agent = request.agent(app);
-  const res = await agent.post('/api/v1/auth/login').set('Origin', WEB_ORIGIN).send({ phone, password });
-  if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
+  const res = await agent
+    .post('/api/v1/auth/login')
+    .set('Origin', WEB_ORIGIN)
+    .send({ phone, password });
+  if (res.status !== 200)
+    throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
   return agent;
 }
 
 /** Create a user and return a logged-in supertest agent. */
-export async function signedInAgent(app: Express, db: PrismaClient, opts: Parameters<typeof createUser>[1] = {}) {
+export async function signedInAgent(
+  app: Express,
+  db: PrismaClient,
+  opts: Parameters<typeof createUser>[1] = {},
+) {
   const user = await createUser(db, opts);
   const agent = await loginAs(app, user.phone, opts.password);
   return { user, agent };
 }
 
 let slugSeq = 0;
-export async function createCategory(db: PrismaClient, opts: { name?: string; slug?: string; sortOrder?: number } = {}) {
+export async function createCategory(
+  db: PrismaClient,
+  opts: { name?: string; slug?: string; sortOrder?: number } = {},
+) {
   slugSeq += 1;
   return db.category.create({
-    data: { name: opts.name ?? `Category ${slugSeq}`, slug: opts.slug ?? `category-${slugSeq}`, sortOrder: opts.sortOrder ?? 0 },
+    data: {
+      name: opts.name ?? `Category ${slugSeq}`,
+      slug: opts.slug ?? `category-${slugSeq}`,
+      sortOrder: opts.sortOrder ?? 0,
+    },
   });
 }
 

@@ -3,7 +3,7 @@ import { maskPhone, normalizePhone } from '@cambo/shared';
 import type { Request } from 'express';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
-import type { TgUser } from '../../integrations/telegram/client';
+import type { TgUser } from '../../integrations/telegram/types';
 import { randomToken, sha256 } from './sessions';
 
 export const TG_REQUEST_COOKIE = 'cs_tg_req';
@@ -16,9 +16,19 @@ export async function startTelegramAuth(
   const token = randomToken();
   const expiresAt = new Date(Date.now() + TG_REQUEST_TTL_MS);
   const req = await prisma.telegramAuthRequest.create({
-    data: { tokenHash: sha256(token), purpose: input.purpose, expectedPhone: input.phone, userId: input.userId, expiresAt },
+    data: {
+      tokenHash: sha256(token),
+      purpose: input.purpose,
+      expectedPhone: input.phone,
+      userId: input.userId,
+      expiresAt,
+    },
   });
-  return { requestId: req.id, deepLink: `https://t.me/${config.telegram.botUsername}?start=${token}`, expiresAt };
+  return {
+    requestId: req.id,
+    deepLink: `https://t.me/${config.telegram.botUsername}?start=${token}`,
+    expiresAt,
+  };
 }
 
 /** The customer's name as Telegram shows it, so sign-up never has to ask for one. */
@@ -37,7 +47,11 @@ export async function issueSignupLink(
   await prisma.$transaction([
     // Only the newest link works: sharing again replaces an earlier one.
     prisma.telegramAuthRequest.updateMany({
-      where: { telegramUserId: BigInt(input.from.id), purpose: 'SIGNUP', status: { in: ['PENDING', 'VERIFIED'] } },
+      where: {
+        telegramUserId: BigInt(input.from.id),
+        purpose: 'SIGNUP',
+        status: { in: ['PENDING', 'VERIFIED'] },
+      },
       data: { status: 'EXPIRED' },
     }),
     prisma.telegramAuthRequest.create({
@@ -59,7 +73,11 @@ export async function issueSignupLink(
 }
 
 export function effectiveStatus(r: TelegramAuthRequest) {
-  return r.status === 'PENDING' && r.expiresAt.getTime() <= Date.now() ? 'EXPIRED' : r.status;
+  const lapsed = r.expiresAt.getTime() <= Date.now();
+  if (r.status === 'PENDING' && lapsed) return 'EXPIRED';
+  // A shared location is only handed out inside the request's window; after that it is just a stale row.
+  if (r.status === 'VERIFIED' && r.purpose === 'SHARE_LOCATION' && lapsed) return 'EXPIRED';
+  return r.status;
 }
 
 /** Load a request that belongs to this browser (bound by cookie). */
@@ -73,6 +91,9 @@ export function statusView(r: TelegramAuthRequest) {
   return {
     status,
     ...(status === 'VERIFIED' && r.phone ? { phone: maskPhone(r.phone) } : {}),
+    ...(status === 'VERIFIED' && r.purpose === 'SHARE_LOCATION' && r.lat !== null && r.lng !== null
+      ? { lat: r.lat, lng: r.lng }
+      : {}),
     ...(r.firstName ? { firstName: r.firstName } : {}),
   };
 }
@@ -87,7 +108,11 @@ export async function consumeVerifiedRequest(
   requestId: string,
   purpose: TelegramAuthPurpose,
 ): Promise<TelegramAuthRequest> {
-  const notVerified = new AppError(409, 'TELEGRAM_NOT_VERIFIED', 'Phone verification is missing or expired. Please start again.');
+  const notVerified = new AppError(
+    409,
+    'TELEGRAM_NOT_VERIFIED',
+    'Phone verification is missing or expired. Please start again.',
+  );
   if (req.cookies?.[TG_REQUEST_COOKIE] !== requestId) throw notVerified;
   const { count } = await tx.telegramAuthRequest.updateMany({
     where: { id: requestId, purpose, status: 'VERIFIED', expiresAt: { gt: new Date() } },

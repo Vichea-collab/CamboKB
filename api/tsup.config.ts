@@ -2,7 +2,12 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   // Named so the output is dist/server.js, dist/seed.js, dist/promote-admin.js (what the Docker image runs).
-  entry: { server: 'src/server.ts', seed: 'scripts/seed.ts', 'promote-admin': 'scripts/promote-admin.ts' },
+  entry: {
+    server: 'src/server.ts',
+    seed: 'scripts/seed.ts',
+    'promote-admin': 'scripts/promote-admin.ts',
+    events: 'scripts/events.ts',
+  },
   format: ['esm'],
   platform: 'node',
   target: 'node22',
@@ -10,5 +15,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   // Bundle the workspace package (it ships TypeScript source); keep real deps external.
-  noExternal: ['@cambo/shared'],
+  noExternal: ['@cambo/shared', '@cambo/service-kit'],
 });

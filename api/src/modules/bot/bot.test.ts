@@ -1,105 +1,40 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProduct, createTestApp, createUser, resetDb, signedInAgent, WEB_ORIGIN } from '../../../test/helpers';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { BOT_COMMANDS, type BotAction } from '@cambo/shared';
+import {
+  createProduct,
+  createTestApp,
+  createUser,
+  INTERNAL_AUTH,
+  resetDb,
+  WEB_ORIGIN,
+} from '../../../test/helpers';
 
 type Ctx = Awaited<ReturnType<typeof createTestApp>>;
 const TG_ID = 7001;
 let updateId = 1;
 
-const send = (ctx: Ctx, text: string, fromId = TG_ID) =>
-  request(ctx.app)
-    .post('/api/v1/telegram/webhook')
-    .set('X-Telegram-Bot-Api-Secret-Token', 'test-webhook-secret')
+/** What the notification service does when someone messages the bot: forward it, then send the answer. */
+async function ask(ctx: Ctx, text: string, fromId = TG_ID): Promise<BotAction[]> {
+  const res = await request(ctx.app)
+    .post('/internal/telegram/updates')
+    .set(INTERNAL_AUTH)
     .send({
-      update_id: updateId++,
-      message: { message_id: updateId, from: { id: fromId, first_name: 'Dara' }, chat: { id: fromId, type: 'private' }, text },
+      update: {
+        update_id: updateId++,
+        message: {
+          message_id: updateId,
+          from: { id: fromId, first_name: 'Dara' },
+          chat: { id: fromId, type: 'private' },
+          text,
+        },
+      },
     });
+  expect(res.status).toBe(200);
+  return res.body.actions;
+}
 
-const toCustomer = (ctx: Ctx) => ctx.telegram.sent.filter((m) => m.chatId === TG_ID);
-
-describe('customer messages from the bot', () => {
-  let ctx: Ctx;
-  let customer: Awaited<ReturnType<typeof signedInAgent>>;
-  let admin: Awaited<ReturnType<typeof signedInAgent>>;
-  let product: Awaited<ReturnType<typeof createProduct>>;
-
-  beforeEach(async () => {
-    await resetDb();
-    ctx = await createTestApp();
-    customer = await signedInAgent(ctx.app, ctx.prisma, { name: 'Dara', telegramUserId: TG_ID });
-    admin = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
-    product = await createProduct(ctx.prisma, { name: 'Attack Shark X11 White', priceCents: 2100, stock: 10 });
-  });
-
-  const placeOrder = async () => {
-    const res = await customer.agent
-      .post('/api/v1/orders')
-      .set('Origin', WEB_ORIGIN)
-      .send({
-        items: [{ productId: product.id, quantity: 2 }],
-        region: 'PHNOM_PENH',
-        deliveryService: 'VET',
-        contactName: 'Dara',
-        contactPhone: '012345678',
-        addressLine: 'St. 315',
-        paymentMethod: 'COD',
-      });
-    expect(res.status).toBe(201);
-    return res.body as { id: string; number: string };
-  };
-  const setStatus = (id: string, status: string) => admin.agent.post(`/api/v1/admin/orders/${id}/status`).set('Origin', WEB_ORIGIN).send({ status });
-
-  it('confirms a new order to the customer on Telegram', async () => {
-    const o = await placeOrder();
-    await vi.waitFor(() => expect(toCustomer(ctx)).toHaveLength(1));
-    const text = toCustomer(ctx)[0]!.text;
-    expect(text).toContain(o.number);
-    expect(text).toContain('received');
-    expect(text).toContain('$43.50');
-    expect(text).toContain(`${WEB_ORIGIN}/account/orders/${o.number}`);
-  });
-
-  it.each([
-    ['CONFIRMED', 'confirmed'],
-    ['PACKED', 'packed'],
-    ['SHIPPING', 'on the way'],
-    ['DELIVERED', 'delivered'],
-  ])('tells the customer when the order is %s', async (status, phrase) => {
-    const o = await placeOrder();
-    await vi.waitFor(() => expect(toCustomer(ctx)).toHaveLength(1));
-    await setStatus(o.id, status);
-    await vi.waitFor(() => expect(toCustomer(ctx)).toHaveLength(2));
-    expect(toCustomer(ctx)[1]!.text.toLowerCase()).toContain(phrase);
-    expect(toCustomer(ctx)[1]!.text).toContain(o.number);
-  });
-
-  it('tells the customer about a cancellation but keeps the internal note private', async () => {
-    const o = await placeOrder();
-    await vi.waitFor(() => expect(toCustomer(ctx)).toHaveLength(1));
-    await admin.agent.post(`/api/v1/admin/orders/${o.id}/status`).set('Origin', WEB_ORIGIN).send({ status: 'CANCELLED', note: 'fraud suspicion' });
-    await vi.waitFor(() => expect(toCustomer(ctx)).toHaveLength(2));
-    expect(toCustomer(ctx)[1]!.text).toContain('cancelled');
-    expect(toCustomer(ctx)[1]!.text).not.toContain('fraud');
-  });
-
-  it("doesn't fail the order or the status change when Telegram is down", async () => {
-    ctx.telegram.failSends = true;
-    const o = await placeOrder();
-    expect((await setStatus(o.id, 'CONFIRMED')).status).toBe(200);
-  });
-
-  it('skips customers without a Telegram chat or with a disabled account', async () => {
-    const plain = await signedInAgent(ctx.app, ctx.prisma, { name: 'No Telegram' });
-    await plain.agent
-      .post('/api/v1/orders')
-      .set('Origin', WEB_ORIGIN)
-      .send({ items: [{ productId: product.id, quantity: 1 }], region: 'PHNOM_PENH', deliveryService: 'VET', contactName: 'X', contactPhone: '012345679', addressLine: 'A', paymentMethod: 'COD' });
-    await new Promise((r) => setTimeout(r, 150));
-    expect(ctx.telegram.sent.filter((m) => String(m.chatId) !== '5000')).toHaveLength(0);
-  });
-});
-
-describe('bot commands', () => {
+describe('bot commands (answered by the api, sent by the notification service)', () => {
   let ctx: Ctx;
   beforeEach(async () => {
     await resetDb();
@@ -112,67 +47,92 @@ describe('bot commands', () => {
     for (const [i, status] of (['DELIVERED', 'SHIPPING'] as const).entries()) {
       await ctx.prisma.order.create({
         data: {
-          userId: user.id, status, contactName: 'Dara', contactPhone: user.phone, region: 'PHNOM_PENH', deliveryService: 'VET', addressLine: 'A',
-          subtotalCents: 600, deliveryFeeCents: 150, totalCents: 750, createdAt: new Date(Date.now() - (2 - i) * 3600_000),
-          items: { create: { productId: product.id, name: product.name, priceCents: 600, quantity: 1, lineTotalCents: 600 } },
+          userId: user.id,
+          status,
+          contactName: 'Dara',
+          contactPhone: user.phone,
+          region: 'PHNOM_PENH',
+          deliveryService: 'VET',
+          addressLine: 'A',
+          subtotalCents: 600,
+          deliveryFeeCents: 150,
+          totalCents: 750,
+          createdAt: new Date(Date.now() - (2 - i) * 3600_000),
+          items: {
+            create: {
+              productId: product.id,
+              name: product.name,
+              priceCents: 600,
+              quantity: 1,
+              lineTotalCents: 600,
+            },
+          },
         },
       });
     }
-    await send(ctx, '/orders');
-    const text = toCustomer(ctx)[0]!.text;
-    expect(text).toMatch(/CS-\d{6} · On the way · \$7\.50/);
-    expect(text).toMatch(/CS-\d{6} · Delivered · \$7\.50/);
-    expect(text.indexOf('On the way')).toBeLessThan(text.indexOf('Delivered'));
+    const [reply] = await ask(ctx, '/orders');
+    expect(reply).toMatchObject({ type: 'send', chatId: TG_ID });
+    expect(reply!.text).toMatch(/CS-\d{6} · On the way · \$7\.50/);
+    expect(reply!.text).toMatch(/CS-\d{6} · Delivered · \$7\.50/);
+    expect(reply!.text.indexOf('On the way')).toBeLessThan(reply!.text.indexOf('Delivered'));
   });
 
   it('/orders invites a visitor without an account to sign up', async () => {
-    await send(ctx, '/orders');
-    expect(toCustomer(ctx)[0]!.text).toContain(`${WEB_ORIGIN}/signup`);
+    expect((await ask(ctx, '/orders'))[0]!.text).toContain(`${WEB_ORIGIN}/signup`);
   });
 
   it('/orders says when there are no orders yet', async () => {
     await createUser(ctx.prisma, { telegramUserId: TG_ID });
-    await send(ctx, '/orders');
-    expect(toCustomer(ctx)[0]!.text).toContain("haven't ordered");
+    expect((await ask(ctx, '/orders'))[0]!.text).toContain("haven't ordered");
   });
 
   it('/help lists the commands and /shop links to the store', async () => {
-    await send(ctx, '/help');
-    expect(toCustomer(ctx)[0]!.text).toContain('/orders');
-    expect(toCustomer(ctx)[0]!.text).toContain('/shop');
-    await send(ctx, '/shop');
-    expect(toCustomer(ctx)[1]!.text).toContain(WEB_ORIGIN);
+    const help = (await ask(ctx, '/help'))[0]!.text;
+    for (const c of BOT_COMMANDS) expect(help).toContain(`/${c.command}`);
+    expect((await ask(ctx, '/shop'))[0]!.text).toContain(WEB_ORIGIN);
   });
 
   it('/shop opens the store as a Telegram app when the site is on https', async () => {
-    const https = await createTestApp({ config: { ...ctx.deps.config, webOrigin: ['https://shop.example.com'] } });
-    await send(https, '/shop');
-    expect(JSON.stringify(toCustomer(https)[0]!.opts)).toContain('"web_app":{"url":"https://shop.example.com"}');
+    const https = await createTestApp({
+      config: { ...ctx.deps.config, webOrigin: ['https://shop.example.com'] },
+    });
+    const [reply] = await ask(https, '/shop');
+    expect(JSON.stringify(reply!.replyMarkup)).toContain(
+      '"web_app":{"url":"https://shop.example.com"}',
+    );
   });
 
-  it('a new person who types /start is asked to share their phone number right there', async () => {
-    await send(ctx, '/start', 9100);
-    const sent = ctx.telegram.sent.filter((m) => m.chatId === 9100);
-    expect(sent[0]!.text).toContain('Welcome to Cambo Supply');
-    expect(JSON.stringify(sent[0]!.opts)).toContain('request_contact');
+  it('ignores group chats and bots, and answers a stranger with how to start', async () => {
+    const group = await request(ctx.app)
+      .post('/internal/telegram/updates')
+      .set(INTERNAL_AUTH)
+      .send({
+        update: {
+          update_id: 1,
+          message: {
+            message_id: 1,
+            from: { id: 5 },
+            chat: { id: -9, type: 'group' },
+            text: '/orders',
+          },
+        },
+      });
+    expect(group.body.actions).toEqual([]);
+    expect((await ask(ctx, 'hello'))[0]!.text).toContain('sign-up link');
   });
 
-  it('someone who already has an account is welcomed back instead, with the commands', async () => {
-    await createUser(ctx.prisma, { name: 'Dara', telegramUserId: TG_ID });
-    await send(ctx, '/start');
-    const text = toCustomer(ctx)[0]!.text;
-    expect(text).toContain('Welcome back, Dara');
-    expect(text).toContain('/orders');
-    expect(JSON.stringify(toCustomer(ctx)[0]!.opts ?? {})).not.toContain('request_contact');
-  });
-
-  it('registers the command menu with Telegram', async () => {
-    const { setupBot } = await import('./setup');
-    await setupBot(ctx.deps);
-    expect(ctx.telegram.commands.map((c) => c.command)).toEqual(['shop', 'orders', 'help']);
-    expect(ctx.telegram.menuButton).toBeNull(); // http origin: no web app button
-    const https = await createTestApp({ config: { ...ctx.deps.config, webOrigin: ['https://shop.example.com'] } });
-    await setupBot(https.deps);
-    expect(https.telegram.menuButton).toEqual({ url: 'https://shop.example.com', text: 'Shop' });
+  it('only answers the notification service', async () => {
+    const res = await request(ctx.app)
+      .post('/internal/telegram/updates')
+      .send({ update: { update_id: 1 } });
+    expect(res.status).toBe(401);
+    expect(
+      (
+        await request(ctx.app)
+          .post('/internal/telegram/updates')
+          .set(INTERNAL_AUTH)
+          .send({ nope: true })
+      ).status,
+    ).toBe(400);
   });
 });

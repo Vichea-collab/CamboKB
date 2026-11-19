@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { Config } from '../config';
 import type { Logger } from '../lib/logger';
+import { currentRequestId, requestContext, type Metrics } from '@cambo/service-kit';
 import { adminRouter } from '../modules/admin';
 import { authRouter } from '../modules/auth/routes';
 import { loadUser } from './middleware/auth';
@@ -14,7 +15,6 @@ import { errorHandler, notFoundHandler } from './middleware/error';
 import { originCheck } from './middleware/origin';
 import { seoRouter } from '../modules/seo/routes';
 import { storeRouter } from '../modules/store/routes';
-import { telegramRouter } from '../modules/bot/webhook';
 import { accountRouter } from '../modules/account/routes';
 import { catalogRouter } from '../modules/catalog/routes';
 import { checkoutRouter } from '../modules/orders/routes';
@@ -23,7 +23,11 @@ import type { BakongClient } from '../integrations/bakong/client';
 import type { ReportClient } from '../integrations/reports/client';
 import { paymentRouter } from '../modules/payments/routes';
 import { customerInvoiceRouter } from '../modules/reports/routes';
-import type { TelegramClient } from '../integrations/telegram/client';
+import type { EventSender } from '../integrations/services/events';
+import type { NotificationClient } from '../integrations/services/notification';
+import { internalRouter } from '../modules/internal/routes';
+import { registerEventMetrics } from '../modules/events/outbox';
+import { registerAppMetrics } from '../lib/app-metrics';
 
 export type AppDeps = {
   config: Config;
@@ -31,25 +35,31 @@ export type AppDeps = {
   files: FileClient;
   reports: ReportClient;
   bakong: BakongClient;
-  telegram: TelegramClient;
+  /** Delivers events to the report and notification services. */
+  events: EventSender;
+  notification: NotificationClient;
+  metrics: Metrics;
   logger: Logger;
 };
 
 export function createApp(deps: AppDeps): express.Express {
-  const { config, prisma, logger } = deps;
+  const { config, prisma, logger, metrics } = deps;
+  registerEventMetrics(deps);
+  registerAppMetrics(deps.metrics);
   const app = express();
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
 
+  // One id per request, forwarded to every service we call and stamped on every log line.
+  app.use(requestContext());
+  app.use(metrics.middleware);
   app.use(
     pinoHttp({
       logger,
-      genReqId: (req, res) => {
-        const id = (req.headers['x-request-id'] as string) || randomUUID();
-        res.setHeader('x-request-id', id);
-        return id;
+      genReqId: () => currentRequestId() ?? randomUUID(),
+      autoLogging: {
+        ignore: (req) => req.url === '/healthz' || req.url === '/readyz' || req.url === '/metrics',
       },
-      autoLogging: { ignore: (req) => req.url === '/healthz' || req.url === '/readyz' },
     }),
   );
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -60,6 +70,8 @@ export function createApp(deps: AppDeps): express.Express {
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
   });
+  // Prometheus scrapes this on the private network. nginx never routes /metrics or /internal.
+  app.get('/metrics', metrics.handler);
   app.get('/readyz', async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -69,6 +81,7 @@ export function createApp(deps: AppDeps): express.Express {
     }
   });
 
+  app.use('/internal', internalRouter(deps));
   app.use(originCheck(config.webOrigin));
   app.use(seoRouter(deps));
 
@@ -82,7 +95,6 @@ export function createApp(deps: AppDeps): express.Express {
   api.use(checkoutRouter(deps));
   api.use(accountRouter(deps));
   api.use('/admin', adminRouter(deps));
-  api.use('/telegram', telegramRouter(deps));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

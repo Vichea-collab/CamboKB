@@ -2,6 +2,7 @@ import { AppError } from '../../http/errors';
 
 export interface ReportClient {
   invoicePdf(orderId: string): Promise<Buffer>;
+  invoiceHtml(orderId: string): Promise<string>;
   get(path: string, query: Record<string, string>): Promise<{ body: Buffer; contentType: string }>;
 }
 
@@ -32,5 +33,9 @@ export class HttpReportClient implements ReportClient {
 
   async invoicePdf(orderId: string) {
     return (await this.get(`/internal/invoices/${orderId}.pdf`, {})).body;
+  }
+
+  async invoiceHtml(orderId: string) {
+    return (await this.get(`/internal/invoices/${orderId}.html`, {})).body.toString('utf8');
   }
 }

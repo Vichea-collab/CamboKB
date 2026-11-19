@@ -56,6 +56,7 @@ enum TelegramAuthPurpose {
   SIGNUP
   RESET
   CHANGE_PHONE
+  SHARE_LOCATION
 }
 
 enum TelegramAuthStatus {
@@ -114,6 +115,9 @@ model TelegramAuthRequest {
   telegramUsername String?
   firstName        String?
   userId           String?             @db.Uuid
+  /** SHARE_LOCATION: where the customer said to deliver. Only shown while the request is valid. */
+  lat              Float?
+  lng              Float?
   expiresAt        DateTime
   verifiedAt       DateTime?
   completedAt      DateTime?
@@ -358,16 +362,21 @@ enum OutboxStatus {
   FAILED
 }
 
-/// Telegram messages waiting to be sent. Written in the same moment something happens
-/// (new order, status change, payment) so a restart or a Telegram outage never loses one.
-model TelegramOutbox {
+/// Messages to other services (report, notification), saved in the same transaction as the change
+/// that caused them, then delivered by a worker with retries. Nothing is lost when a service is down.
+model ServiceEvent {
   id            String       @id @default(uuid()) @db.Uuid
-  chatId        BigInt
-  text          String
-  parseMode     String?
-  replyMarkup   Json?
-  /// Stops the same event being queued twice (e.g. "order X confirmed").
-  dedupeKey     String?      @unique
+  /// 'report' or 'notification'
+  target        String
+  type          String
+  /// The event's data, as the contract in @cambo/shared describes it.
+  payload       Json
+  /// The request that caused it, so logs across services can be followed.
+  requestId     String?
+  /// Stops the same event being queued twice (e.g. "order X confirmed"). Unique per target.
+  dedupeKey     String?
+  /// When the change happened. Receivers keep the newest version of an order.
+  emittedAt     DateTime     @default(now())
   status        OutboxStatus @default(PENDING)
   attempts      Int          @default(0)
   nextAttemptAt DateTime     @default(now())
@@ -376,6 +385,8 @@ model TelegramOutbox {
   createdAt     DateTime     @default(now())
   sentAt        DateTime?
 
+  @@unique([target, dedupeKey])
   @@index([status, nextAttemptAt])
+  @@index([target, status])
   @@index([createdAt])
 }

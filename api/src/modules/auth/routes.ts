@@ -14,7 +14,7 @@ import {
   type TelegramStartInput,
 } from '@cambo/shared';
 import { z } from 'zod';
-import { Router, type Response } from 'express';
+import { Router, type RequestHandler, type Response } from 'express';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import { requireAuth } from '../../http/middleware/auth';
@@ -98,14 +98,21 @@ export function authRouter(deps: AppDeps): Router {
 
   // --- Telegram phone verification (sign up, reset password, change phone) ---
 
-  r.post('/telegram/start', limiter(10, 15 * 60 * 1000), validate({ body: telegramStartSchema }), async (req, res) => {
+  // Sharing a delivery location is something a signed-in customer retries at checkout, so it has its own,
+  // larger allowance and never uses up (or is blocked by) the sign-up / reset budget.
+  const startLimit = limiter(10, 15 * 60 * 1000);
+  const locationStartLimit = limiter(30, 15 * 60 * 1000);
+  const startLimiter: RequestHandler = (req, res, next) =>
+    (req.body?.purpose === 'SHARE_LOCATION' ? locationStartLimit : startLimit)(req, res, next);
+  r.post('/telegram/start', startLimiter, validate({ body: telegramStartSchema }), async (req, res) => {
     const { purpose, phone } = req.valid.body as TelegramStartInput;
-    if (purpose === 'CHANGE_PHONE' && !req.user) throw new AppError(401, 'UNAUTHENTICATED', 'Please log in');
+    const needsLogin = purpose === 'CHANGE_PHONE' || purpose === 'SHARE_LOCATION';
+    if (needsLogin && !req.user) throw new AppError(401, 'UNAUTHENTICATED', 'Please log in');
     if (purpose === 'RESET' && !phone) throw new AppError(400, 'VALIDATION_ERROR', 'Phone number is required');
     const result = await startTelegramAuth(deps, {
       purpose,
       phone: purpose === 'RESET' ? phone : undefined,
-      userId: purpose === 'CHANGE_PHONE' ? req.user!.id : undefined,
+      userId: needsLogin ? req.user!.id : undefined,
     });
     bindRequest(res, result.requestId);
     res.json(result);

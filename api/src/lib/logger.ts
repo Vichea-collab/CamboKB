@@ -1,14 +1,5 @@
-import pino from 'pino';
+import { createLogger as createKitLogger, type Logger } from '@cambo/service-kit';
 
-export type Logger = pino.Logger;
-
-export function createLogger(level: string, pretty = false): Logger {
-  return pino({
-    level,
-    redact: {
-      paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', '*.password', '*.passwordHash'],
-      remove: true,
-    },
-    transport: pretty ? { target: 'pino-pretty', options: { colorize: true } } : undefined,
-  });
-}
+export type { Logger };
+export const createLogger = (level: string, pretty = false) =>
+  createKitLogger({ service: 'api', level, pretty });

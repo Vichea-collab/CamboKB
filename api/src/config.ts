@@ -17,42 +17,57 @@ const envSchema = z
     TRUST_PROXY: bool,
     // Secure cookies need https. Defaults to on in production; set COOKIE_SECURE=false only for a plain-http local stack.
     COOKIE_SECURE: z.enum(['true', 'false']).optional(),
-    TELEGRAM_MODE: z.enum(['webhook', 'polling', 'off']).default('off'),
-    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    // The bot itself (token, webhook, admin chat) belongs to the notification service. The api only
+    // needs the bot's name to build the sign-up link.
     TELEGRAM_BOT_USERNAME: z.string().optional(),
-    TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
-    TELEGRAM_WEBHOOK_URL: z.url().optional(),
-    TELEGRAM_ADMIN_CHAT_ID: z.string().optional(),
+    NOTIFICATION_SERVICE_URL: z.url().default('http://localhost:4300'),
+    NOTIFICATION_SERVICE_SECRET: z.string().default('dev-notification-secret-change-me-012345'),
+    // What the notification service must send when it calls the api (/internal/*).
+    API_INTERNAL_SECRET: z.string().default('dev-api-internal-secret-change-me-0123456'),
     FILE_SERVICE_URL: z.url().default('http://localhost:4100'),
     FILE_SERVICE_SECRET: z.string().default('dev-file-secret-change-me-0123456789'),
     PUBLIC_FILES_URL: z.url().optional(),
     REPORT_SERVICE_URL: z.url().default('http://localhost:4200'),
     REPORT_SERVICE_SECRET: z.string().default('dev-report-secret-change-me-0123456789'),
     RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
-    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    RATE_LIMIT_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(15 * 60 * 1000),
     SERVE_WEB_DIR: z.string().optional(),
     // Bakong KHQR. Payments are offered only when both the account and the token are set.
-    BAKONG_ACCOUNT_ID: z.string().trim().regex(/^[^@\s]+@[a-z0-9]+$/i, 'Use a Bakong account ID like name@aclb').optional(),
+    BAKONG_ACCOUNT_ID: z
+      .string()
+      .trim()
+      .regex(/^[^@\s]+@[a-z0-9]+$/i, 'Use a Bakong account ID like name@aclb')
+      .optional(),
     BAKONG_TOKEN: z.string().optional(),
     BAKONG_API_URL: z.url().default('https://api-bakong.nbc.gov.kh'),
     BAKONG_MERCHANT_NAME: z.string().trim().min(1).max(25).default('Cambo Supply'),
     BAKONG_MERCHANT_CITY: z.string().trim().min(1).max(15).default('Phnom Penh'),
     KHQR_QR_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
-    KHQR_ORDER_HOLD_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(10),
+    KHQR_ORDER_HOLD_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(24 * 60)
+      .default(10),
   })
   .superRefine((e, ctx) => {
-    if (e.TELEGRAM_MODE !== 'off') {
-      for (const key of ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME'] as const) {
-        if (!e[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'required when TELEGRAM_MODE is not off' });
-      }
-    }
-    if (e.TELEGRAM_MODE === 'webhook' && !e.TELEGRAM_WEBHOOK_SECRET) {
-      ctx.addIssue({ code: 'custom', path: ['TELEGRAM_WEBHOOK_SECRET'], message: 'required for webhook mode' });
-    }
     if (e.NODE_ENV === 'production') {
-      for (const key of ['FILE_SERVICE_SECRET', 'REPORT_SERVICE_SECRET'] as const) {
+      for (const key of [
+        'FILE_SERVICE_SECRET',
+        'REPORT_SERVICE_SECRET',
+        'NOTIFICATION_SERVICE_SECRET',
+        'API_INTERNAL_SECRET',
+      ] as const) {
         if (e[key].length < 32 || e[key].startsWith('dev-')) {
-          ctx.addIssue({ code: 'custom', path: [key], message: 'set a random secret of at least 32 characters' });
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'set a random secret of at least 32 characters',
+          });
         }
       }
     }
@@ -69,15 +84,12 @@ export type Config = {
   cookieDomain?: string;
   sessionTtlDays: number;
   trustProxy: boolean;
-  telegram: {
-    mode: 'webhook' | 'polling' | 'off';
-    botToken?: string;
-    botUsername?: string;
-    webhookSecret?: string;
-    webhookUrl?: string;
-    adminChatId?: string;
-  };
+  telegram: { botUsername?: string };
   services: {
+    notificationUrl: string;
+    notificationSecret: string;
+    /** Required of the notification service when it calls the api. */
+    internalSecret: string;
     fileUrl: string;
     fileSecret: string;
     publicFilesUrl: string;
@@ -98,8 +110,12 @@ export type Config = {
   };
 };
 
+/** Docker Compose passes an unset variable as an empty string. Treat that as "not set". */
+const withoutEmpty = (env: NodeJS.ProcessEnv) =>
+  Object.fromEntries(Object.entries(env).filter(([, v]) => v !== ''));
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = envSchema.safeParse(env);
+  const parsed = envSchema.safeParse(withoutEmpty(env));
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
     throw new Error(`Invalid configuration:\n${lines.join('\n')}`);
@@ -112,22 +128,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: e.PORT,
     logLevel: e.LOG_LEVEL ?? (e.NODE_ENV === 'test' ? 'silent' : 'info'),
     databaseUrl: e.DATABASE_URL,
-    webOrigin: e.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
+    webOrigin: e.WEB_ORIGIN.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     cookieDomain: e.COOKIE_DOMAIN,
     sessionTtlDays: e.SESSION_TTL_DAYS,
     trustProxy: e.TRUST_PROXY,
-    telegram: {
-      mode: e.TELEGRAM_MODE,
-      botToken: e.TELEGRAM_BOT_TOKEN,
-      botUsername: e.TELEGRAM_BOT_USERNAME,
-      webhookSecret: e.TELEGRAM_WEBHOOK_SECRET,
-      webhookUrl: e.TELEGRAM_WEBHOOK_URL,
-      adminChatId: e.TELEGRAM_ADMIN_CHAT_ID,
-    },
+    telegram: { botUsername: e.TELEGRAM_BOT_USERNAME },
     services: {
+      notificationUrl: e.NOTIFICATION_SERVICE_URL.replace(/\/$/, ''),
+      notificationSecret: e.NOTIFICATION_SERVICE_SECRET,
+      internalSecret: e.API_INTERNAL_SECRET,
       fileUrl: e.FILE_SERVICE_URL.replace(/\/$/, ''),
       fileSecret: e.FILE_SERVICE_SECRET,
-      publicFilesUrl: (e.PUBLIC_FILES_URL ?? `${e.FILE_SERVICE_URL.replace(/\/$/, '')}/files`).replace(/\/$/, ''),
+      publicFilesUrl: (
+        e.PUBLIC_FILES_URL ?? `${e.FILE_SERVICE_URL.replace(/\/$/, '')}/files`
+      ).replace(/\/$/, ''),
       reportUrl: e.REPORT_SERVICE_URL.replace(/\/$/, ''),
       reportSecret: e.REPORT_SERVICE_SECRET,
     },

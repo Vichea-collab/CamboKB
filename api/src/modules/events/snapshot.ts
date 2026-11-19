@@ -1,0 +1,122 @@
+import type { OrderSnapshot } from '@cambo/shared';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { publishEvent } from './outbox';
+
+type Db = PrismaClient | Prisma.TransactionClient;
+
+const orderForSnapshot = {
+  items: { orderBy: { createdAt: 'asc' } },
+  payment: true,
+  promoCode: true,
+  user: true,
+} as const;
+
+/** The order as the other services need to see it, plus who to tell. Read inside the same transaction as the change. */
+export async function loadSnapshot(
+  db: Db,
+  orderId: string,
+): Promise<{ order: OrderSnapshot; customerChatId: string | null }> {
+  const o = await db.order.findUniqueOrThrow({ where: { id: orderId }, include: orderForSnapshot });
+  return {
+    order: {
+      id: o.id,
+      number: o.number,
+      status: o.status,
+      createdAt: o.createdAt.toISOString(),
+      contactName: o.contactName,
+      contactPhone: o.contactPhone,
+      region: o.region,
+      deliveryService: o.deliveryService,
+      addressLine: o.addressLine,
+      lat: o.lat,
+      lng: o.lng,
+      distanceKm: o.distanceKm,
+      note: o.note,
+      subtotalCents: o.subtotalCents,
+      deliveryFeeCents: o.deliveryFeeCents,
+      discountCents: o.discountCents,
+      totalCents: o.totalCents,
+      promoCode: o.promoCode?.code ?? null,
+      payment: o.payment ? { method: o.payment.method, status: o.payment.status } : null,
+      items: o.items.map((i) => ({
+        productId: i.productId,
+        name: i.name,
+        quantity: i.quantity,
+        priceCents: i.priceCents,
+        lineTotalCents: i.lineTotalCents,
+      })),
+    },
+    // Disabled customers get no messages.
+    customerChatId: o.user.disabledAt ? null : (o.user.telegramChatId?.toString() ?? null),
+  };
+}
+
+const adminAlertsOn = async (db: Db) =>
+  (await db.storeSetting.findUnique({ where: { id: 1 } }))?.telegramNotify ?? true;
+
+/**
+ * One function per thing that happens to an order. Each queues what the report service
+ * (the order as it is now) and the notification service (what to tell people) need.
+ * Call them with the transaction client, before the transaction ends.
+ */
+
+/** Only the report service needs to know (e.g. a payment status fixed by hand). */
+export async function announceSnapshot(db: Db, orderId: string) {
+  const { order } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+}
+
+export async function announceOrderPlaced(db: Db, orderId: string, holdMinutes: number) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'order.placed',
+    { order, customerChatId, adminAlerts: await adminAlertsOn(db), holdMinutes },
+    { dedupeKey: `order:${orderId}:placed` },
+  );
+}
+
+/** The status moved (confirmed, packed, shipped, delivered or cancelled). */
+export async function announceStatusChanged(db: Db, orderId: string) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'order.status_changed',
+    { order, customerChatId },
+    { dedupeKey: `order:${orderId}:status:${order.status}` },
+  );
+}
+
+export async function announcePaymentConfirmed(db: Db, orderId: string) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'payment.confirmed',
+    { order, customerChatId, adminAlerts: await adminAlertsOn(db) },
+    { dedupeKey: `order:${orderId}:paid` },
+  );
+}
+
+export async function announcePaymentExpired(db: Db, orderId: string, holdMinutes: number) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'payment.expired',
+    { order, customerChatId, holdMinutes },
+    { dedupeKey: `order:${orderId}:expired` },
+  );
+}
+
+/** A plain message for the shop owner ("Bakong token rejected", "paid but cancelled"...). */
+export async function alertAdmin(db: Db, text: string, dedupeKey?: string) {
+  await publishEvent(
+    db,
+    'admin.alert',
+    { text, adminAlerts: await adminAlertsOn(db) },
+    dedupeKey ? { dedupeKey } : {},
+  );
+}

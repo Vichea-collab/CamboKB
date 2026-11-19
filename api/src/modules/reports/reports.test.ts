@@ -35,10 +35,42 @@ describe('invoices and reports through the api', () => {
     expect(ctx.reports.calls.at(-1)?.path).toBe(`/internal/invoices/${order.id}.pdf`);
   });
 
+  it('lets a customer look at their invoice first, as a page that cannot run scripts or be framed by other sites', async () => {
+    const res = await customer.get(`/api/v1/orders/${order.number}/invoice.html`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^text\/html/);
+    expect(res.text).toContain(`fake invoice ${order.id}`);
+    expect(res.headers['content-security-policy']).toContain("script-src 'none'");
+    expect(res.headers['cache-control']).toBe('private, no-store');
+    expect(ctx.reports.calls.at(-1)?.path).toBe(`/internal/invoices/${order.id}.html`);
+  });
+
+  it('downloads the invoice as a file when asked, and shows it in the browser otherwise', async () => {
+    const dl = await customer.get(`/api/v1/orders/${order.number}/invoice.pdf?download=1`);
+    expect(dl.status).toBe(200);
+    expect(dl.headers['content-disposition']).toBe(`attachment; filename="invoice-${order.number}.pdf"`);
+    const view = await customer.get(`/api/v1/orders/${order.number}/invoice.pdf`);
+    expect(view.headers['content-disposition']).toBe(`inline; filename="invoice-${order.number}.pdf"`);
+  });
+
+  it("hides other customers' invoice pages too", async () => {
+    const { agent: other } = await signedInAgent(ctx.app, ctx.prisma);
+    expect((await other.get(`/api/v1/orders/${order.number}/invoice.html`)).status).toBe(404);
+    expect((await request(ctx.app).get(`/api/v1/orders/${order.number}/invoice.html`)).status).toBe(401);
+  });
+
   it("hides other customers' invoices", async () => {
     const { agent: other } = await signedInAgent(ctx.app, ctx.prisma);
     expect((await other.get(`/api/v1/orders/${order.number}/invoice.pdf`)).status).toBe(404);
     expect((await request(ctx.app).get(`/api/v1/orders/${order.number}/invoice.pdf`)).status).toBe(401);
+  });
+
+  it('lets an admin view any invoice page, but not a customer', async () => {
+    const { agent: admin } = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
+    const res = await admin.get(`/api/v1/admin/orders/${order.id}/invoice.html`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(`fake invoice ${order.id}`);
+    expect((await customer.get(`/api/v1/admin/orders/${order.id}/invoice.html`)).status).toBe(403);
   });
 
   it('keeps sales reports for admins', async () => {
