@@ -44,6 +44,9 @@ export function ProductCard({
               </span>
             </span>
           )}
+          {p.lowStock !== null && !p.isSoldOut && (
+            <span className="badge absolute bottom-2 left-2 bg-yellow text-yellow-ink">{t.product.inStock(p.lowStock)}</span>
+          )}
           {p.imageCount > 1 && (
             <span
               aria-label={t.product.photosLabel(p.imageCount)}

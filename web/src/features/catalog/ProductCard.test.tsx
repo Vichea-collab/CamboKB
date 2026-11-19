@@ -16,6 +16,7 @@ const product = (over: Partial<ProductCardData> = {}): ProductCardData => ({
   category: { slug: 'keyboards', name: 'Keyboards' },
   image: { sm: '/a-400.webp', md: '/a-800.webp', lg: '/a-1200.webp' },
   imageCount: 1,
+  lowStock: null,
   ...over,
 });
 
@@ -27,6 +28,20 @@ const renderCard = (p: ProductCardData, onAdd = vi.fn()) =>
   );
 
 describe('ProductCard', () => {
+  it('warns when only a few are left, and says nothing when there is plenty', () => {
+    const { unmount } = renderCard(product({ lowStock: 2 }));
+    expect(screen.getByText('Only 2 left')).toBeInTheDocument();
+    unmount();
+    renderCard(product({ lowStock: null }));
+    expect(screen.queryByText(/left/)).not.toBeInTheDocument();
+  });
+
+  it('shows Sold out, not a count, when nothing is left', () => {
+    renderCard(product({ isSoldOut: true, lowStock: null }));
+    expect(screen.getByText('Sold out')).toBeInTheDocument();
+    expect(screen.queryByText(/left/)).not.toBeInTheDocument();
+  });
+
   it('shows name, specs, price and links to the product page', () => {
     renderCard(product());
     expect(screen.getByText('Aula F75 Max Gradient Black')).toBeInTheDocument();

@@ -10,6 +10,8 @@ export type ProductCardData = {
   priceCents: number;
   compareAtCents: number | null;
   isSoldOut: boolean;
+  /** How many are left, only when it is few (1 to 3); otherwise null. */
+  lowStock: number | null;
   category: { slug: string; name: string };
   image: ImageUrls | null;
   imageCount: number;
