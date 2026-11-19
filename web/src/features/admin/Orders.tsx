@@ -54,7 +54,7 @@ export default function Orders() {
       <div
         role="tablist"
         aria-label="Order status"
-        className="-mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0"
+        className="-mx-4 mb-4 mt-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0"
       >
         {tabs.map((tab) => {
           const on = tab.key === status;
