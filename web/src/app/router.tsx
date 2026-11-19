@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Link, useRouteError } from 'react-router';
 import { RequireAdmin, RequireAuth } from '../features/auth/auth';
 import { t } from '../shared/lib/strings';
+import { LoadingState } from '../shared/ui/Page';
 import { StoreLayout } from './StoreLayout';
 import Home from '../features/catalog/HomePage';
 import ProductDetail from '../features/catalog/ProductPage';
@@ -15,22 +16,28 @@ const ForgotPassword = lazy(() => import('../features/auth/ForgotPasswordPage'))
 const Profile = lazy(() => import('../features/account/ProfilePage'));
 const Orders = lazy(() => import('../features/account/OrdersPage'));
 const OrderDetail = lazy(() => import('../features/account/OrderDetailPage'));
+const Invoice = lazy(() => import('../features/account/InvoicePage'));
 const Contact = lazy(() => import('../features/info/ContactPage'));
 const Delivery = lazy(() => import('../features/info/DeliveryPage'));
 const Warranty = lazy(() => import('../features/info/WarrantyPage'));
 const Privacy = lazy(() => import('../features/info/PrivacyPage'));
 const AdminApp = lazy(() => import('../features/admin/AdminApp'));
 
-const page = (node: ReactNode) => <Suspense fallback={<p className="py-10 text-center text-muted">{t.common.loading}</p>}>{node}</Suspense>;
+const page = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 const authed = (node: ReactNode) => page(<RequireAuth>{node}</RequireAuth>);
 
-function ErrorPage() {
+function ErrorPage({ notFound = false }: { notFound?: boolean }) {
   const err = useRouteError() as { status?: number } | undefined;
+  const is404 = notFound || err?.status === 404;
   return (
     <div className="mx-auto grid min-h-[70dvh] max-w-md place-items-center px-6 text-center">
       <div>
-        <p className="font-display text-5xl font-bold text-yellow">{err?.status === 404 ? '404' : 'Oops'}</p>
-        <p className="mt-3 text-muted">{err?.status === 404 ? "This page doesn't exist." : t.common.error}</p>
+        <h1 className="font-display text-6xl font-extrabold tracking-[-0.04em] text-yellow">
+          {is404 ? '404' : t.common.oops}
+        </h1>
+        <p className="mt-3 text-muted">
+          {is404 ? t.common.pageNotFound : t.common.error}
+        </p>
         <Link to="/" className="btn-primary mt-6">
           {t.product.backToShop}
         </Link>
@@ -55,12 +62,21 @@ export const router = createBrowserRouter([
       { path: 'account', element: authed(<Profile />) },
       { path: 'account/orders', element: authed(<Orders />) },
       { path: 'account/orders/:number', element: authed(<OrderDetail />) },
+      { path: 'account/orders/:number/invoice', element: authed(<Invoice />) },
       { path: 'contact', element: page(<Contact />) },
       { path: 'delivery', element: page(<Delivery />) },
       { path: 'warranty', element: page(<Warranty />) },
       { path: 'privacy', element: page(<Privacy />) },
-      { path: '*', element: <ErrorPage /> },
+      { path: '*', element: <ErrorPage notFound /> },
     ],
   },
-  { path: '/admin/*', errorElement: <ErrorPage />, element: page(<RequireAdmin><AdminApp /></RequireAdmin>) },
+  {
+    path: '/admin/*',
+    errorElement: <ErrorPage />,
+    element: page(
+      <RequireAdmin>
+        <AdminApp />
+      </RequireAdmin>,
+    ),
+  },
 ]);

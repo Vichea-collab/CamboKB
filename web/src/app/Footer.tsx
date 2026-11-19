@@ -3,12 +3,13 @@ import { useMe } from '../features/auth/auth';
 import { telHref, useStore } from '../features/info/store-api';
 import { t } from '../shared/lib/strings';
 
-const LINKS = [
-  ['/contact', 'Contact'],
-  ['/delivery', 'Delivery'],
-  ['/warranty', 'Warranty & returns'],
-  ['/privacy', 'Privacy'],
-] as const;
+const links = () =>
+  [
+    ['/contact', t.footer.contact],
+    ['/delivery', t.footer.delivery],
+    ['/warranty', t.footer.warranty],
+    ['/privacy', t.footer.privacy],
+  ] as const;
 
 export function Footer() {
   const store = useStore();
@@ -29,8 +30,8 @@ export function Footer() {
           )}
           {info?.hours && <p className="whitespace-pre-line">{info.hours}</p>}
         </div>
-        <nav aria-label="Store information" className="-my-2 flex flex-wrap gap-x-6">
-          {LINKS.map(([to, label]) => (
+        <nav aria-label={t.footer.info} className="-my-2 flex flex-wrap gap-x-6">
+          {links().map(([to, label]) => (
             <Link key={to} to={to} className="inline-flex min-h-11 items-center hover:text-ink">
               {label}
             </Link>

@@ -1,6 +1,16 @@
-import { DEFAULT_DELIVERY_SETTINGS, formatUsd } from '@cambo/shared';
+import { DEFAULT_DELIVERY_SETTINGS, formatPhone, formatUsdExact } from '@cambo/shared';
+import { PageHeader } from '../../shared/ui/Page';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router';
 import { FormError } from '../../shared/ui/FormCard';
@@ -19,7 +29,14 @@ const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
 
 type Region = QuoteInput['region'];
 type Service = QuoteInput['deliveryService'];
-type Profile = { defaultAddress: { region: Region; addressLine: string; lat: number | null; lng: number | null } | null };
+type Profile = {
+  defaultAddress: {
+    region: Region;
+    addressLine: string;
+    lat: number | null;
+    lng: number | null;
+  } | null;
+};
 
 export default function Checkout() {
   useDocumentTitle(t.checkout.title);
@@ -48,7 +65,7 @@ export default function Checkout() {
     if (prefilled.current || !me.data || !profile.data) return;
     prefilled.current = true;
     setName(me.data.name);
-    setPhone(me.data.phone);
+    setPhone(formatPhone(me.data.phone));
     const a = profile.data.defaultAddress;
     if (a) {
       setRegion(a.region);
@@ -70,13 +87,23 @@ export default function Checkout() {
     if (!codAvailable && payment === 'COD' && khqrAvailable) setPayment('KHQR');
   }, [codAvailable, payment, khqrAvailable]);
 
-  const quoteInput: QuoteInput = { items: cartItems, region, deliveryService: service, pin: region === 'PHNOM_PENH' ? pin : null, promoCode: promo };
+  const quoteInput: QuoteInput = {
+    items: cartItems,
+    region,
+    deliveryService: service,
+    pin: region === 'PHNOM_PENH' ? pin : null,
+    promoCode: promo,
+  };
   const quote = useQuote(quoteInput);
 
   // A promo that stops being valid (e.g. cart dropped below the minimum) is removed with its reason.
   useEffect(() => {
     if (promo && isApiError(quote.error, 'PROMO_INVALID')) {
-      setPromoError(t.checkout.promoErrors[(quote.error.details as { reason?: string })?.reason ?? 'NOT_FOUND'] ?? t.checkout.promoErrors.NOT_FOUND);
+      setPromoError(
+        t.checkout.promoErrors[
+          (quote.error.details as { reason?: string })?.reason ?? 'NOT_FOUND'
+        ] ?? t.checkout.promoErrors.NOT_FOUND,
+      );
       setPromo(undefined);
     }
   }, [quote.error, promo]);
@@ -89,7 +116,12 @@ export default function Checkout() {
       await api('/checkout/quote', { method: 'POST', body: { ...quoteInput, promoCode: code } });
       setPromo(code);
     } catch (err) {
-      setPromoError(isApiError(err, 'PROMO_INVALID') ? (t.checkout.promoErrors[(err.details as { reason?: string })?.reason ?? ''] ?? t.checkout.promoErrors.NOT_FOUND) : (err as Error).message);
+      setPromoError(
+        isApiError(err, 'PROMO_INVALID')
+          ? (t.checkout.promoErrors[(err.details as { reason?: string })?.reason ?? ''] ??
+              t.checkout.promoErrors.NOT_FOUND)
+          : (err as Error).message,
+      );
     }
   };
 
@@ -115,35 +147,60 @@ export default function Checkout() {
 
   if (cartItems.length === 0 && !placing) return <Navigate to="/" replace />;
 
-  const canSubmit = Boolean(quote.data) && !quote.isFetching && name.trim() && phone.trim() && address.trim() && !placing && (payment === 'COD' ? codAvailable : khqrAvailable);
+  const canSubmit =
+    Boolean(quote.data) &&
+    !quote.isFetching &&
+    name.trim() &&
+    phone.trim() &&
+    address.trim() &&
+    !placing &&
+    (payment === 'COD' ? codAvailable : khqrAvailable);
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    submit({ ...quoteInput, contactName: name.trim(), contactPhone: phone, addressLine: address.trim(), note: note.trim() || undefined, paymentMethod: payment });
+    submit({
+      ...quoteInput,
+      contactName: name.trim(),
+      contactPhone: phone,
+      addressLine: address.trim(),
+      note: note.trim() || undefined,
+      paymentMethod: payment,
+    });
   };
 
   return (
     <form onSubmit={onSubmit} className="pb-28 lg:pb-0" noValidate>
-      <h1 className="mb-4 font-display text-[1.7rem] font-extrabold tracking-[-0.03em]">{t.checkout.title}</h1>
+      <PageHeader title={t.checkout.title} />
 
       {/* Phones: the order stays in view at the top, folded away until you want to check it. */}
-      <details className="group mb-5 overflow-hidden rounded-2xl bg-surface ring-1 ring-line lg:hidden">
+      <details className="panel group mb-5 overflow-hidden lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-2 text-sm font-semibold">
             {t.checkout.summary}
-            <ChevronDown className="size-4 text-muted transition-transform group-open:rotate-180" aria-hidden />
+            <ChevronDown
+              className="size-4 text-muted transition-transform group-open:rotate-180"
+              aria-hidden
+            />
           </span>
-          <span className="font-display text-lg font-extrabold tabular-nums">{quote.data ? formatUsd(quote.data.totalCents) : '—'}</span>
+          <span className="font-display text-lg font-extrabold tabular-nums">
+            {quote.data ? formatUsdExact(quote.data.totalCents) : '—'}
+          </span>
         </summary>
         <ul className="divide-y divide-line border-t border-line px-4">
           {lines.map((l) => (
             <li key={l.productId} className="flex items-center gap-3 py-3">
-              <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-[#090c10]">{l.product.image && <img src={l.product.image.sm} alt="" className="size-full object-cover" />}</div>
+              <div className="media size-12 shrink-0 rounded-xl">
+                {l.product.image && (
+                  <img src={l.product.image.sm} alt="" className="size-full object-cover" />
+                )}
+              </div>
               <p className="min-w-0 flex-1 text-sm leading-snug">
                 <span className="line-clamp-2 font-semibold">{l.product.name}</span>
                 <span className="text-xs text-muted">× {l.quantity}</span>
               </p>
-              <span className="text-sm font-bold tabular-nums">{formatUsd(l.product.priceCents * l.quantity)}</span>
+              <span className="text-sm font-bold tabular-nums">
+                {formatUsdExact(l.product.priceCents * l.quantity)}
+              </span>
             </li>
           ))}
         </ul>
@@ -154,10 +211,23 @@ export default function Checkout() {
           <Section step={1} title={t.checkout.contact} done={Boolean(name.trim() && phone.trim())}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="contact-name" label={t.checkout.name}>
-                <input id="contact-name" className="field" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
+                <input
+                  id="contact-name"
+                  className="field"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={60}
+                  required
+                />
               </Field>
               <Field id="contact-phone" label={t.checkout.phone}>
-                <PhoneInput id="contact-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                <PhoneInput
+                  id="contact-phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
               </Field>
             </div>
           </Section>
@@ -165,13 +235,23 @@ export default function Checkout() {
           <Section step={2} title={t.checkout.delivery} done={Boolean(address.trim())}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="region" label={t.checkout.region}>
-                <select id="region" className="field" value={region} onChange={(e) => chooseRegion(e.target.value as Region)}>
+                <select
+                  id="region"
+                  className="field"
+                  value={region}
+                  onChange={(e) => chooseRegion(e.target.value as Region)}
+                >
                   <option value="PHNOM_PENH">{t.checkout.phnomPenh}</option>
                   <option value="PROVINCE">{t.checkout.province}</option>
                 </select>
               </Field>
               <Field id="service" label={t.checkout.service}>
-                <select id="service" className="field" value={service} onChange={(e) => setService(e.target.value as Service)}>
+                <select
+                  id="service"
+                  className="field"
+                  value={service}
+                  onChange={(e) => setService(e.target.value as Service)}
+                >
                   {region === 'PHNOM_PENH' && <option value="GRAB">🚀 {t.checkout.grab}</option>}
                   <option value="VET">📦 {t.checkout.vet}</option>
                   <option value="JNT">🚚 {t.checkout.jnt}</option>
@@ -182,32 +262,66 @@ export default function Checkout() {
               <div className="mt-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-muted">{t.checkout.pinHelp}</p>
-                  <button type="button" onClick={locate} disabled={locating} className="btn-ghost px-3 py-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={locate}
+                    disabled={locating}
+                    className="btn-ghost btn-sm"
+                  >
                     📍 {locating ? t.checkout.locating : t.checkout.useLocation}
                   </button>
                 </div>
                 {locError && <p className="text-sm text-danger">{locError}</p>}
-                <Suspense fallback={<div className="h-56 animate-pulse rounded-xl bg-raised/50 sm:h-64" />}>
-                  <MapPicker value={pin} fallback={DEFAULT_DELIVERY_SETTINGS.store} onChange={onPin} />
+                <Suspense
+                  fallback={<div className="h-56 animate-pulse rounded-xl bg-raised/50 sm:h-64" />}
+                >
+                  <MapPicker
+                    value={pin}
+                    fallback={DEFAULT_DELIVERY_SETTINGS.store}
+                    onChange={onPin}
+                  />
                 </Suspense>
-                {quote.data?.distanceKm != null && <p className="text-xs text-muted">{t.checkout.distance(quote.data.distanceKm)}</p>}
+                {quote.data?.distanceKm != null && (
+                  <p className="text-xs text-muted">{t.checkout.distance(quote.data.distanceKm)}</p>
+                )}
               </div>
             )}
             <div className="mt-4">
               <Field id="address" label={t.checkout.address}>
-                <textarea id="address" rows={2} className="field resize-none" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t.checkout.addressPlaceholder} maxLength={500} required />
+                <textarea
+                  id="address"
+                  rows={2}
+                  className="field resize-none"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={t.checkout.addressPlaceholder}
+                  maxLength={500}
+                  required
+                />
               </Field>
             </div>
             <div className="mt-4">
               <Field id="note" label={t.checkout.note}>
-                <input id="note" className="field" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+                <input
+                  id="note"
+                  className="field"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  maxLength={500}
+                />
               </Field>
             </div>
           </Section>
 
           <Section step={3} title={t.checkout.payment} done>
             <div className="space-y-2" role="radiogroup" aria-label={t.checkout.payment}>
-              <PaymentOption checked={payment === 'COD'} disabled={!codAvailable} onSelect={() => setPayment('COD')} label={t.checkout.cod} hint={!codAvailable ? t.checkout.codProvinceHint : undefined} />
+              <PaymentOption
+                checked={payment === 'COD'}
+                disabled={!codAvailable}
+                onSelect={() => setPayment('COD')}
+                label={t.checkout.cod}
+                hint={!codAvailable ? t.checkout.codProvinceHint : undefined}
+              />
               <PaymentOption
                 checked={payment === 'KHQR'}
                 disabled={!khqrAvailable}
@@ -225,12 +339,18 @@ export default function Checkout() {
             <ul className="hidden divide-y divide-line lg:block">
               {lines.map((l) => (
                 <li key={l.productId} className="flex items-center gap-3 py-2.5 first:pt-0">
-                  <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-[#090c10]">{l.product.image && <img src={l.product.image.sm} alt="" className="size-full object-cover" />}</div>
+                  <div className="media size-12 shrink-0 rounded-xl">
+                    {l.product.image && (
+                      <img src={l.product.image.sm} alt="" className="size-full object-cover" />
+                    )}
+                  </div>
                   <p className="min-w-0 flex-1 text-sm leading-snug">
                     <span className="line-clamp-2 font-semibold">{l.product.name}</span>
                     <span className="text-xs text-muted">× {l.quantity}</span>
                   </p>
-                  <span className="text-sm font-bold tabular-nums">{formatUsd(l.product.priceCents * l.quantity)}</span>
+                  <span className="text-sm font-bold tabular-nums">
+                    {formatUsdExact(l.product.priceCents * l.quantity)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -240,16 +360,35 @@ export default function Checkout() {
                 {t.checkout.promo}
               </label>
               {promo ? (
-                <div className="flex items-center justify-between rounded-xl bg-green/10 px-3.5 py-2.5 text-sm font-semibold text-green">
-                  <span>✓ {promo}</span>
-                  <button type="button" className="text-muted hover:text-ink" onClick={() => setPromo(undefined)}>
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-green/10 py-1 pl-3.5 pr-1 text-sm font-semibold text-green">
+                  <span className="flex items-center gap-2">
+                    <Check className="size-4" strokeWidth={3} aria-hidden />
+                    {promo}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-sm rounded-lg text-muted hover:text-ink"
+                    onClick={() => setPromo(undefined)}
+                  >
                     {t.checkout.removePromo}
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <input id="promo" className="field uppercase" value={promoDraft} onChange={(e) => setPromoDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyPromo())} autoCapitalize="characters" />
-                  <button type="button" className="btn-ghost shrink-0" onClick={applyPromo} disabled={!promoDraft.trim()}>
+                  <input
+                    id="promo"
+                    className="field uppercase"
+                    value={promoDraft}
+                    onChange={(e) => setPromoDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyPromo())}
+                    autoCapitalize="characters"
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost shrink-0"
+                    onClick={applyPromo}
+                    disabled={!promoDraft.trim()}
+                  >
                     {t.checkout.apply}
                   </button>
                 </div>
@@ -258,17 +397,37 @@ export default function Checkout() {
             </div>
 
             <dl className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm" aria-live="polite">
-              <Line label={t.checkout.subtotal} value={quote.data ? formatUsd(quote.data.subtotalCents) : '—'} />
-              <Line label={t.checkout.deliveryFee} value={quote.data ? formatUsd(quote.data.deliveryFeeCents) : '—'} />
-              {quote.data && quote.data.discountCents > 0 && <Line label={t.checkout.discount} value={`-${formatUsd(quote.data.discountCents)}`} />}
+              <Line
+                label={t.checkout.subtotal}
+                value={quote.data ? formatUsdExact(quote.data.subtotalCents) : '—'}
+              />
+              <Line
+                label={t.checkout.deliveryFee}
+                value={quote.data ? formatUsdExact(quote.data.deliveryFeeCents) : '—'}
+              />
+              {quote.data && quote.data.discountCents > 0 && (
+                <Line
+                  label={t.checkout.discount}
+                  value={`-${formatUsdExact(quote.data.discountCents)}`}
+                />
+              )}
               <div className="flex items-baseline justify-between pt-2">
                 <dt className="text-base font-bold">{t.checkout.total}</dt>
-                <dd className={`font-display text-2xl font-bold tabular-nums ${quote.isFetching ? 'opacity-60' : ''}`}>{quote.data ? formatUsd(quote.data.totalCents) : '—'}</dd>
+                <dd
+                  className={`font-display text-2xl font-bold tabular-nums ${quote.isFetching ? 'opacity-60' : ''}`}
+                >
+                  {quote.data ? formatUsdExact(quote.data.totalCents) : '—'}
+                </dd>
               </div>
             </dl>
 
             <div className="mt-4 space-y-3">
-              <FormError>{error ?? (quote.error && !isApiError(quote.error, 'PROMO_INVALID') ? (quote.error as Error).message : undefined)}</FormError>
+              <FormError>
+                {error ??
+                  (quote.error && !isApiError(quote.error, 'PROMO_INVALID')
+                    ? (quote.error as Error).message
+                    : undefined)}
+              </FormError>
               <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0">
                 <button type="submit" className="btn-primary w-full" disabled={!canSubmit}>
                   {placing ? t.checkout.placing : t.checkout.confirm}
@@ -300,14 +459,25 @@ function usePlaceOrder() {
     setPlacing(true);
     setError(undefined);
     try {
-      const order = await api<Order>('/orders', { method: 'POST', body, headers: { 'Idempotency-Key': key } });
+      const order = await api<Order>('/orders', {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': key },
+      });
       clear();
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['products'] });
-      navigate(order.payment?.method === 'KHQR' ? `/orders/${order.number}/pay` : `/orders/${order.number}/success`, { replace: true });
+      navigate(
+        order.payment?.method === 'KHQR'
+          ? `/orders/${order.number}/pay`
+          : `/orders/${order.number}/success`,
+        { replace: true },
+      );
     } catch (err) {
       if (err instanceof ApiError && err.code === 'OUT_OF_STOCK') {
-        for (const i of (err.details as { items: { productId: string; available: number }[] }).items) setQty(i.productId, i.available);
+        for (const i of (err.details as { items: { productId: string; available: number }[] })
+          .items)
+          setQty(i.productId, i.available);
         setError(t.checkout.outOfStock);
       } else if (err instanceof ApiError && err.code === 'PRODUCT_UNAVAILABLE') {
         removeMany((err.details as { productIds: string[] }).productIds);
@@ -321,14 +491,26 @@ function usePlaceOrder() {
   return { submit, placing, error };
 }
 
-function Section({ title, children, step, done }: { title: string; children: ReactNode; step?: number; done?: boolean }) {
+function Section({
+  title,
+  children,
+  step,
+  done,
+}: {
+  title: string;
+  children: ReactNode;
+  step?: number;
+  done?: boolean;
+}) {
   return (
-    <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-      <h2 className="mb-4 flex items-center gap-3 font-display text-lg font-extrabold tracking-[-0.02em]">
+    <section className="panel p-5">
+      <h2 className="title-section mb-4 flex items-center gap-3">
         {step && (
           <span
             className={`grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold transition-colors ${
-              done ? 'bg-green/15 text-green ring-1 ring-green/40' : 'bg-raised text-muted ring-1 ring-line-strong'
+              done
+                ? 'bg-green/15 text-green ring-1 ring-green/40'
+                : 'bg-raised text-muted ring-1 ring-line-strong'
             }`}
             aria-label={`Step ${step}${done ? ', complete' : ''}`}
           >
@@ -362,14 +544,38 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PaymentOption({ checked, disabled, onSelect, label, hint, badge }: { checked: boolean; disabled?: boolean; onSelect: () => void; label: string; hint?: string; badge?: string }) {
+function PaymentOption({
+  checked,
+  disabled,
+  onSelect,
+  label,
+  hint,
+  badge,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  label: string;
+  hint?: string;
+  badge?: string;
+}) {
   return (
-    <label className={`flex items-start gap-3 rounded-xl border p-3.5 ${checked ? 'border-yellow/60 bg-yellow/5' : 'border-line bg-bg'} ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
-      <input type="radio" name="payment" className="mt-0.5 size-4 accent-[#ffb703]" checked={checked} disabled={disabled} onChange={onSelect} aria-label={label} />
+    <label
+      className={`flex items-start gap-3 rounded-xl border p-3.5 ${checked ? 'border-yellow/60 bg-yellow/5' : 'border-line bg-bg'} ${disabled ? 'opacity-60' : 'cursor-pointer'}`}
+    >
+      <input
+        type="radio"
+        name="payment"
+        className="mt-0.5 size-4 accent-[#ffb703]"
+        checked={checked}
+        disabled={disabled}
+        onChange={onSelect}
+        aria-label={label}
+      />
       <span className="flex-1">
         <span className="flex items-center gap-2 font-semibold">
           {label}
-          {badge && <span className="rounded-full bg-raised px-2 py-0.5 text-[11px] font-bold text-muted">{badge}</span>}
+          {badge && <span className="badge bg-raised text-muted">{badge}</span>}
         </span>
         {hint && <span className="mt-0.5 block text-sm text-muted">{hint}</span>}
       </span>

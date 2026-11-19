@@ -43,6 +43,22 @@ describe('phone + password auth', () => {
     expect((await request(ctx.app).get('/api/v1/auth/me')).status).toBe(401);
   });
 
+  it('answers "who am I" with 200 even when signed out, so guests do not see an error', async () => {
+    const guest = await request(ctx.app).get('/api/v1/auth/session');
+    expect(guest.status).toBe(200);
+    expect(guest.body).toEqual({ user: null });
+
+    const u = await createUser(ctx.prisma);
+    const agent = await loginAs(ctx.app, u.phone);
+    const signedIn = await agent.get('/api/v1/auth/session');
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.body.user).toMatchObject({ id: u.id, phone: u.phone });
+    expect(signedIn.body.user.passwordHash).toBeUndefined();
+
+    await agent.post('/api/v1/auth/logout').set('Origin', WEB_ORIGIN);
+    expect((await agent.get('/api/v1/auth/session')).body).toEqual({ user: null });
+  });
+
   it('logs out', async () => {
     const u = await createUser(ctx.prisma);
     const agent = await loginAs(ctx.app, u.phone);

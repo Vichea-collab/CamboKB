@@ -1,10 +1,11 @@
 import { formatUsd } from '@cambo/shared';
-import { ChevronRight, QrCode, ShieldCheck, Truck, Wallet } from 'lucide-react';
+import { ChevronRight, PackageSearch, QrCode, ShieldCheck, Truck, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { isApiError } from '../../shared/lib/api';
-import { t } from '../../shared/lib/strings';
+import { categoryName, t } from '../../shared/lib/strings';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
+import { Badge, EmptyState, LoadingState } from '../../shared/ui/Page';
 import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
 import { MAX_QTY } from '../cart/cart-store';
@@ -26,14 +27,19 @@ export default function ProductDetail() {
   useDocumentTitle(product.data?.name);
   const related = useProducts({ category: product.data?.category.slug });
 
-  if (product.isPending) return <p className="py-16 text-center text-muted">{t.common.loading}</p>;
+  if (product.isPending) return <LoadingState />;
   if (product.isError) {
     return (
-      <div className="panel mx-auto max-w-md p-8 text-center">
-        <p className="text-muted">{isApiError(product.error, 'NOT_FOUND') ? t.product.notFound : t.common.error}</p>
-        <Link to="/" className="btn-primary mt-5">
-          {t.product.backToShop}
-        </Link>
+      <div className="mx-auto max-w-md py-6">
+        <EmptyState
+          icon={PackageSearch}
+          title={isApiError(product.error, 'NOT_FOUND') ? t.product.notFound : t.common.error}
+          action={
+            <Link to="/" className="btn-primary">
+              {t.product.backToShop}
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -47,13 +53,19 @@ export default function ProductDetail() {
 
   return (
     <div className="pb-24 md:pb-0">
-      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1 text-sm text-muted">
-        <Link to="/" className="inline-flex min-h-8 items-center rounded px-1 hover:text-ink">
-          Shop
+      <nav
+        aria-label={t.product.breadcrumb}
+        className="mb-3 flex items-center gap-1 text-sm font-semibold text-muted"
+      >
+        <Link to="/" className="inline-flex min-h-10 items-center rounded-lg px-1 hover:text-ink">
+          {t.product.shop}
         </Link>
         <ChevronRight className="size-3.5" aria-hidden />
-        <Link to={`/?category=${p.category.slug}`} className="inline-flex min-h-8 items-center rounded px-1 hover:text-ink">
-          {p.category.name}
+        <Link
+          to={`/?category=${p.category.slug}`}
+          className="inline-flex min-h-10 items-center rounded-lg px-1 hover:text-ink"
+        >
+          {categoryName(p.category.slug, p.category.name)}
         </Link>
         <ChevronRight className="size-3.5 shrink-0" aria-hidden />
         <span className="truncate text-ink/80" aria-current="page">
@@ -67,56 +79,83 @@ export default function ProductDetail() {
         </div>
 
         <div>
-          <h1 className="font-display text-[1.9rem] font-extrabold leading-[1.1] tracking-[-0.03em] md:text-[2.4rem]">{p.name}</h1>
+          <h1 className="title-page md:text-[2.4rem]">{p.name}</h1>
           {p.specsLine && <p className="mt-2 text-muted">{p.specsLine}</p>}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Price cents={p.priceCents} compareAt={p.compareAtCents} className="text-[2.2rem]" />
-            <span className={`rounded-full px-3 py-1 text-xs font-bold ${p.isSoldOut ? 'bg-danger/15 text-danger' : lowStock ? 'bg-yellow/15 text-yellow' : 'bg-green/15 text-green'}`}>
+            <Badge tone={p.isSoldOut ? 'danger' : lowStock ? 'yellow' : 'green'}>
               {p.isSoldOut ? t.product.soldOut : t.product.inStock(p.stock)}
-            </span>
+            </Badge>
           </div>
 
           <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-            {!p.isSoldOut && <QtyStepper value={qty} onChange={(n) => setQty(Math.max(1, Math.min(max, n)))} max={max} label={p.name} />}
-            <button className="btn-primary flex-1 py-3.5 text-base md:flex-none md:px-10" disabled={p.isSoldOut} onClick={() => addToCart(p, qty)}>
-              {p.isSoldOut ? t.product.soldOut : `${t.product.addToCart} · ${formatUsd(p.priceCents * qty)}`}
+            {!p.isSoldOut && (
+              <QtyStepper
+                value={qty}
+                onChange={(n) => setQty(Math.max(1, Math.min(max, n)))}
+                max={max}
+                label={p.name}
+              />
+            )}
+            <button
+              className="btn-primary min-h-12 flex-1 text-base md:flex-none md:px-10"
+              disabled={p.isSoldOut}
+              onClick={() => addToCart(p, qty)}
+            >
+              {p.isSoldOut
+                ? t.product.soldOut
+                : `${t.product.addToCart} · ${formatUsd(p.priceCents * qty)}`}
             </button>
           </div>
 
           <ul className="mt-6 divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-            <Perk icon={Truck} title="Delivery across Cambodia">
-              {d ? `Phnom Penh from ${formatUsd(Math.min(d.phnomPenhStandardFeeCents, ...d.grabTiers.map((x) => x.feeCents)))}, provinces ${formatUsd(d.provinceFeeCents)}.` : 'Fees are shown before you pay.'}{' '}
-              <Link to="/delivery" className="font-semibold text-yellow hover:underline">
-                Details
+            <Perk icon={Truck} title={t.product.deliveryTitle}>
+              {d
+                ? t.product.deliveryFrom(
+                    formatUsd(
+                      Math.min(d.phnomPenhStandardFeeCents, ...d.grabTiers.map((x) => x.feeCents)),
+                    ),
+                    formatUsd(d.provinceFeeCents),
+                  )
+                : t.product.feesShown}{' '}
+              <Link to="/delivery" className="link">
+                {t.product.details}
               </Link>
             </Perk>
-            <Perk icon={store.data?.payments.khqr ? QrCode : Wallet} title="Pay your way">
-              {store.data?.payments.khqr ? 'KHQR with any bank app, or cash on delivery in Phnom Penh.' : 'Cash on delivery in Phnom Penh.'}
+            <Perk icon={store.data?.payments.khqr ? QrCode : Wallet} title={t.product.payTitle}>
+              {store.data?.payments.khqr ? t.product.payKhqr : t.product.payCod}
             </Perk>
-            <Perk icon={ShieldCheck} title="Warranty & returns">
-              Something wrong? We'll make it right.{' '}
-              <Link to="/warranty" className="font-semibold text-yellow hover:underline">
-                Read more
+            <Perk icon={ShieldCheck} title={t.product.warrantyTitle}>
+              {t.product.warrantyBlurb}{' '}
+              <Link to="/warranty" className="link">
+                {t.product.readMore}
               </Link>
             </Perk>
           </ul>
 
           <section className="mt-8">
-            <h2 className="font-display text-xl font-extrabold tracking-[-0.02em]">{t.product.specs}</h2>
+            <h2 className="title-section">{t.product.specs}</h2>
             {p.specs.length ? (
               <>
                 <dl className="mt-3 divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
                   {specs.map((s, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-4 py-3 text-sm">
+                    <div
+                      key={i}
+                      className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-4 py-3 text-sm"
+                    >
                       <dt className="font-semibold capitalize text-muted">{s.label}</dt>
                       <dd className="text-ink">{s.value}</dd>
                     </div>
                   ))}
                 </dl>
                 {p.specs.length > SPECS_PREVIEW && (
-                  <button className="mt-3 text-sm font-semibold text-yellow hover:underline" onClick={() => setAllSpecs((v) => !v)} aria-expanded={allSpecs}>
-                    {allSpecs ? 'Show fewer' : `Show all ${p.specs.length} specifications`}
+                  <button
+                    className="link mt-2 inline-flex min-h-10 items-center text-sm"
+                    onClick={() => setAllSpecs((v) => !v)}
+                    aria-expanded={allSpecs}
+                  >
+                    {allSpecs ? t.product.showFewer : t.product.showAllSpecs(p.specs.length)}
                   </button>
                 )}
               </>
@@ -124,18 +163,23 @@ export default function ProductDetail() {
               <p className="mt-2 text-sm text-muted">{t.product.noSpecs}</p>
             )}
           </section>
-          {p.description && <p className="mt-6 whitespace-pre-line leading-relaxed text-ink/90">{p.description}</p>}
+          {p.description && (
+            <p className="mt-6 whitespace-pre-line leading-relaxed text-ink/90">{p.description}</p>
+          )}
         </div>
       </div>
 
       {more.length > 0 && (
         <section className="mt-14" aria-labelledby="more-heading">
-          <h2 id="more-heading" className="mb-4 font-display text-xl font-extrabold tracking-[-0.02em]">
-            More in {p.category.name}
+          <h2 id="more-heading" className="title-section mb-4">
+            {t.product.moreIn(categoryName(p.category.slug, p.category.name))}
           </h2>
           <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
             {more.map((x) => (
-              <div key={x.id} className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-auto sm:max-w-none">
+              <div
+                key={x.id}
+                className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-auto sm:max-w-none"
+              >
                 <ProductCard product={x} onAdd={addToCart} />
               </div>
             ))}
@@ -146,7 +190,15 @@ export default function ProductDetail() {
   );
 }
 
-function Perk({ icon: Icon, title, children }: { icon: typeof Truck; title: string; children: React.ReactNode }) {
+function Perk({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: typeof Truck;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <li className="flex gap-3.5 p-4">
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-raised text-yellow">

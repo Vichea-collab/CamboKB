@@ -5,16 +5,29 @@ import { useMe } from '../features/auth/auth';
 import { useCart } from '../features/cart/cart-store';
 import { t } from '../shared/lib/strings';
 import { useUi } from '../shared/lib/ui-store';
+import { LanguageToggle } from './LanguageToggle';
 
 export function BrandMark({ tagline = true }: { tagline?: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2.5 rounded-xl" aria-label={`${t.brand.name} home`}>
-      <img src="/logo.svg" alt="" className="size-10 rounded-xl border border-line shadow-pop sm:size-11" />
+    <Link
+      to="/"
+      className="flex items-center gap-2.5 rounded-xl"
+      aria-label={t.nav.homeLabel(t.brand.name)}
+    >
+      <img
+        src="/logo.png"
+        alt=""
+        className="size-10 rounded-xl border border-line shadow-pop sm:size-11"
+      />
       <span className="flex flex-col">
         <span className="font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.03em] sm:text-[1.5rem]">
           Cambo<span className="text-yellow">Supply</span>
         </span>
-        {tagline && <span className="mt-1 hidden text-[0.72rem] font-semibold text-muted sm:block">{t.brand.tagline}</span>}
+        {tagline && (
+          <span className="mt-1 hidden text-[0.72rem] font-semibold text-muted sm:block">
+            {t.brand.tagline}
+          </span>
+        )}
       </span>
     </Link>
   );
@@ -63,13 +76,14 @@ export function Header() {
         <BrandMark />
         <nav className="flex items-center gap-2">
           {me.data?.role === 'ADMIN' && (
-            <Link to="/admin" className="hidden rounded-full border border-yellow/40 px-3.5 py-2 text-sm font-semibold text-yellow hover:bg-yellow/10 sm:block">
+            <Link to="/admin" className="chip hidden sm:inline-flex">
               {t.nav.admin}
             </Link>
           )}
+          <LanguageToggle />
           <Link
             to={me.data ? '/account' : '/login'}
-            className="grid size-10 place-items-center rounded-full border border-line bg-surface text-muted transition-colors hover:text-ink"
+            className="btn-icon"
             aria-label={me.data ? t.nav.account : t.nav.login}
           >
             <UserRound className="size-[18px]" strokeWidth={2.2} aria-hidden />
@@ -77,11 +91,14 @@ export function Header() {
           <button
             onClick={openCart}
             className="relative grid size-10 place-items-center rounded-full border border-yellow/40 bg-yellow/10 text-yellow transition-colors hover:bg-yellow/20"
-            aria-label={`${t.nav.cart}, ${count} items`}
+            aria-label={t.nav.cartLabel(count)}
           >
             <ShoppingBag className="size-[18px]" strokeWidth={2.2} aria-hidden />
             {count > 0 && (
-              <span key={count} className="bump absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-yellow px-1 text-[11px] font-extrabold leading-5 text-yellow-ink tabular-nums">
+              <span
+                key={count}
+                className="bump absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-yellow px-1 text-[11px] font-extrabold leading-5 text-yellow-ink tabular-nums"
+              >
                 {count}
               </span>
             )}

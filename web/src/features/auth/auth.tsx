@@ -2,7 +2,7 @@ import type { PublicUser } from '@cambo/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
-import { api, ApiError } from '../../shared/lib/api';
+import { api } from '../../shared/lib/api';
 import { t } from '../../shared/lib/strings';
 
 export const ME_KEY = ['me'] as const;
@@ -11,12 +11,8 @@ export function useMe() {
   return useQuery({
     queryKey: ME_KEY,
     queryFn: async (): Promise<PublicUser | null> => {
-      try {
-        return (await api<{ user: PublicUser }>('/auth/me')).user;
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return null;
-        throw err;
-      }
+      // /auth/session answers 200 with user: null for a guest, so no 401 shows up in the console.
+      return (await api<{ user: PublicUser | null }>('/auth/session')).user;
     },
     staleTime: 5 * 60_000,
   });

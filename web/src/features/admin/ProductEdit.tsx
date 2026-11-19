@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { ExternalLink } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router';
+import { Section } from '../../shared/ui/Page';
 import { useUi } from '../../shared/lib/ui-store';
 import { FormError } from '../../shared/ui/FormCard';
 import { api } from '../../shared/lib/api';
@@ -11,8 +13,30 @@ import { SaveBar, useUnsavedGuard } from './components/SaveBar';
 import { SpecEditor } from './components/SpecEditor';
 import type { AdminProduct } from './types';
 
-type Form = { name: string; categoryId: string; specsLine: string; description: string; price: string; compareAt: string; stock: string; isSoldOut: boolean; isActive: boolean; specs: { label: string; value: string }[] };
-const blank: Form = { name: '', categoryId: '', specsLine: '', description: '', price: '', compareAt: '', stock: '0', isSoldOut: false, isActive: true, specs: [] };
+type Form = {
+  name: string;
+  categoryId: string;
+  specsLine: string;
+  description: string;
+  price: string;
+  compareAt: string;
+  stock: string;
+  isSoldOut: boolean;
+  isActive: boolean;
+  specs: { label: string; value: string }[];
+};
+const blank: Form = {
+  name: '',
+  categoryId: '',
+  specsLine: '',
+  description: '',
+  price: '',
+  compareAt: '',
+  stock: '0',
+  isSoldOut: false,
+  isActive: true,
+  specs: [],
+};
 
 export default function ProductEdit() {
   const { id } = useParams();
@@ -20,7 +44,11 @@ export default function ProductEdit() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const categories = useCategories();
-  const product = useQuery({ queryKey: ['admin', 'product', id], queryFn: () => api<AdminProduct>(`/admin/products/${id}`), enabled: !isNew });
+  const product = useQuery({
+    queryKey: ['admin', 'product', id],
+    queryFn: () => api<AdminProduct>(`/admin/products/${id}`),
+    enabled: !isNew,
+  });
   const [form, setForm] = useState<Form>(blank);
   const showToast = useUi((s) => s.showToast);
   const [dirty, setDirty] = useState(false);
@@ -67,9 +95,13 @@ export default function ProductEdit() {
         stock: Math.max(0, Math.floor(Number(form.stock || 0))),
         isSoldOut: form.isSoldOut,
         isActive: form.isActive,
-        specs: form.specs.filter((s) => s.label.trim()).map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
+        specs: form.specs
+          .filter((s) => s.label.trim())
+          .map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
       };
-      return isNew ? api<AdminProduct>('/admin/products', { method: 'POST', body }) : api<AdminProduct>(`/admin/products/${id}`, { method: 'PATCH', body });
+      return isNew
+        ? api<AdminProduct>('/admin/products', { method: 'POST', body })
+        : api<AdminProduct>(`/admin/products/${id}`, { method: 'PATCH', body });
     },
     onSuccess: (p) => {
       refresh(p);
@@ -84,10 +116,18 @@ export default function ProductEdit() {
     files.forEach((f) => fd.append('files', f));
     refresh(await api<AdminProduct>(`/admin/products/${id}/images`, { method: 'POST', body: fd }));
   };
-  const reorderImages = async (ids: string[]) => refresh(await api<AdminProduct>(`/admin/products/${id}/images/order`, { method: 'PATCH', body: { ids } }));
+  const reorderImages = async (ids: string[]) =>
+    refresh(
+      await api<AdminProduct>(`/admin/products/${id}/images/order`, {
+        method: 'PATCH',
+        body: { ids },
+      }),
+    );
   const deleteImage = async (imageId: string) => {
     if (!confirm('Delete this photo?')) return;
-    refresh(await api<AdminProduct>(`/admin/products/${id}/images/${imageId}`, { method: 'DELETE' }));
+    refresh(
+      await api<AdminProduct>(`/admin/products/${id}/images/${imageId}`, { method: 'DELETE' }),
+    );
   };
 
   if (!isNew && !product.data) return <Loading />;
@@ -100,93 +140,186 @@ export default function ProductEdit() {
     <form onSubmit={onSubmit}>
       <PageHeader
         title={isNew ? 'New product' : form.name || 'Product'}
-        back={
-          <Link to="/admin/products" className="-ml-1 mb-1 inline-flex min-h-10 items-center rounded-lg px-1 text-sm font-semibold text-muted hover:text-ink">
-            ← Products
-          </Link>
-        }
+        back={{ to: '/admin/products', label: 'Products' }}
         actions={
-          <>
-            {!isNew && product.data?.isActive && (
-              <a href={`/products/${product.data.slug}`} target="_blank" rel="noopener" className="btn-ghost px-3 py-2 text-sm">
-                View in shop
-              </a>
-            )}
-          </>
+          !isNew &&
+          product.data?.isActive && (
+            <a
+              href={`/products/${product.data.slug}`}
+              target="_blank"
+              rel="noopener"
+              className="btn-ghost btn-sm"
+            >
+              <ExternalLink className="size-4" aria-hidden /> View in shop
+            </a>
+          )
         }
       />
       <FormError>{save.error ? (save.error as Error).message : undefined}</FormError>
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">
-          <section className="panel space-y-4 p-5">
-            <div>
-              <label className="label" htmlFor="p-name">Name</label>
-              <input id="p-name" className="field" value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={120} required />
+          <Section title="Details">
+            <div className="space-y-4">
+              <div>
+                <label className="label" htmlFor="p-name">
+                  Name
+                </label>
+                <input
+                  id="p-name"
+                  className="field"
+                  value={form.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="p-specs">
+                  Short specs (shown on the card)
+                </label>
+                <input
+                  id="p-specs"
+                  className="field"
+                  value={form.specsLine}
+                  onChange={(e) => set('specsLine', e.target.value)}
+                  placeholder="75% Layout • Hot-Swap • Multi-Mode"
+                  maxLength={200}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="p-desc">
+                  Description
+                </label>
+                <textarea
+                  id="p-desc"
+                  rows={4}
+                  className="field"
+                  value={form.description}
+                  onChange={(e) => set('description', e.target.value)}
+                  maxLength={5000}
+                />
+              </div>
             </div>
-            <div>
-              <label className="label" htmlFor="p-specs">Short specs (shown on the card)</label>
-              <input id="p-specs" className="field" value={form.specsLine} onChange={(e) => set('specsLine', e.target.value)} placeholder="75% Layout • Hot-Swap • Multi-Mode" maxLength={200} />
-            </div>
-            <div>
-              <label className="label" htmlFor="p-desc">Description</label>
-              <textarea id="p-desc" rows={4} className="field" value={form.description} onChange={(e) => set('description', e.target.value)} maxLength={5000} />
-            </div>
-          </section>
-          <section className="panel p-5">
-            <h2 className="mb-3 font-display text-lg font-bold">Photos</h2>
-            {isNew ? <p className="text-sm text-muted">Create the product first, then add photos.</p> : <ImageUploader images={product.data!.images} onUpload={upload} onReorder={reorderImages} onDelete={deleteImage} />}
-          </section>
-          <section className="panel p-5">
-            <h2 className="mb-3 font-display text-lg font-bold">Specifications</h2>
+          </Section>
+          <Section title="Photos">
+            {isNew ? (
+              <p className="text-sm text-muted">Create the product first, then add photos.</p>
+            ) : (
+              <ImageUploader
+                images={product.data!.images}
+                onUpload={upload}
+                onReorder={reorderImages}
+                onDelete={deleteImage}
+              />
+            )}
+          </Section>
+          <Section title="Specifications" description="Shown as a table on the product page.">
             <SpecEditor value={form.specs} onChange={(specs) => set('specs', specs)} />
-          </section>
+          </Section>
         </div>
         <aside className="space-y-5">
-          <section className="panel space-y-4 p-5">
-            <div>
-              <label className="label" htmlFor="p-cat">Category</label>
-              <select id="p-cat" className="field" value={form.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
-                {categories.data?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+          <Section title="Price and stock">
+            <div className="space-y-4">
               <div>
-                <label className="label" htmlFor="p-price">Price ($)</label>
-                <input id="p-price" className="field tabular-nums" inputMode="decimal" value={form.price} onChange={(e) => set('price', e.target.value.replace(/[^\d.]/g, ''))} required />
+                <label className="label" htmlFor="p-cat">
+                  Category
+                </label>
+                <select
+                  id="p-cat"
+                  className="field"
+                  value={form.categoryId}
+                  onChange={(e) => set('categoryId', e.target.value)}
+                >
+                  {categories.data?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="p-price">
+                    Price ($)
+                  </label>
+                  <input
+                    id="p-price"
+                    className="field tabular-nums"
+                    inputMode="decimal"
+                    value={form.price}
+                    onChange={(e) => set('price', e.target.value.replace(/[^\d.]/g, ''))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="p-compare">
+                    Was ($)
+                  </label>
+                  <input
+                    id="p-compare"
+                    className="field tabular-nums"
+                    inputMode="decimal"
+                    value={form.compareAt}
+                    onChange={(e) => set('compareAt', e.target.value.replace(/[^\d.]/g, ''))}
+                    placeholder="optional"
+                  />
+                </div>
               </div>
               <div>
-                <label className="label" htmlFor="p-compare">Was ($)</label>
-                <input id="p-compare" className="field tabular-nums" inputMode="decimal" value={form.compareAt} onChange={(e) => set('compareAt', e.target.value.replace(/[^\d.]/g, ''))} placeholder="optional" />
+                <label className="label" htmlFor="p-stock">
+                  Stock
+                </label>
+                <input
+                  id="p-stock"
+                  className="field tabular-nums"
+                  inputMode="numeric"
+                  value={form.stock}
+                  onChange={(e) => set('stock', e.target.value.replace(/\D/g, ''))}
+                />
               </div>
             </div>
-            <div>
-              <label className="label" htmlFor="p-stock">Stock</label>
-              <input id="p-stock" className="field tabular-nums" inputMode="numeric" value={form.stock} onChange={(e) => set('stock', e.target.value.replace(/\D/g, ''))} />
+          </Section>
+          <Section title="Visibility">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="block font-semibold">Show in shop</span>
+                  <span className="text-xs text-muted">Off = archived (kept for past orders)</span>
+                </span>
+                <Toggle
+                  checked={form.isActive}
+                  onChange={(v) => set('isActive', v)}
+                  label="Show in shop"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="block font-semibold">Sold out</span>
+                  <span className="text-xs text-muted">Also automatic when stock is 0</span>
+                </span>
+                <Toggle
+                  checked={form.isSoldOut}
+                  onChange={(v) => set('isSoldOut', v)}
+                  label="Sold out"
+                />
+              </div>
             </div>
-          </section>
-          <section className="panel space-y-4 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <span>
-                <span className="block font-semibold">Show in shop</span>
-                <span className="text-xs text-muted">Off = archived (kept for past orders)</span>
-              </span>
-              <Toggle checked={form.isActive} onChange={(v) => set('isActive', v)} label="Show in shop" />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>
-                <span className="block font-semibold">Sold out</span>
-                <span className="text-xs text-muted">Also automatic when stock is 0</span>
-              </span>
-              <Toggle checked={form.isSoldOut} onChange={(v) => set('isSoldOut', v)} label="Sold out" />
-            </div>
-          </section>
+          </Section>
         </aside>
       </div>
-      <SaveBar dirty={dirty || isNew} saving={save.isPending} label={isNew ? 'Create product' : 'Save changes'} disabled={!form.name.trim() || !form.price} />
+      <SaveBar
+        dirty={dirty || isNew}
+        saving={save.isPending}
+        label={isNew ? 'Create product' : 'Save changes'}
+        disabled={!form.name.trim() || !form.price}
+        message={
+          isNew && !dirty
+            ? 'Add a name and price to create the product'
+            : isNew && (!form.name.trim() || !form.price)
+              ? 'Name and price are needed to create the product'
+              : undefined
+        }
+      />
     </form>
   );
 }

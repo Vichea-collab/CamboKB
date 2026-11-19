@@ -19,7 +19,7 @@ let orderCalls: { headers?: Record<string, string>; body?: unknown }[] = [];
 function mockServer(opts: { promoValid?: boolean; khqr?: boolean } = {}) {
   orderCalls = [];
   vi.mocked(api).mockImplementation(async (path: string, init?: { body?: unknown; headers?: Record<string, string> }) => {
-    if (path === '/auth/me') return { user: { id: 'u1', name: 'Dara', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: null } };
+    if (path === '/auth/session') return { user: { id: 'u1', name: 'Dara', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: null } };
     if (path === '/me') return { user: { id: 'u1', name: 'Dara', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: null }, defaultAddress: null };
     if (path.startsWith('/products/by-ids')) return { items: [product] };
     if (path === '/store') {
@@ -72,7 +72,7 @@ describe('Checkout', () => {
     expect(screen.getByRole('radio', { name: /Cash on delivery/ })).toBeDisabled();
     expect(screen.getByText('Cash on delivery is only available in Phnom Penh.')).toBeInTheDocument();
     // The total appears in the phone summary bar and in the order summary panel.
-    expect((await screen.findAllByText('$23')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('$23.00')).length).toBeGreaterThan(0);
   });
 
   it('explains an invalid promo code', async () => {

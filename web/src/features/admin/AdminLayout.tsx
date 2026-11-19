@@ -19,6 +19,7 @@ import { api } from '../../shared/lib/api';
 import { Drawer } from '../../shared/ui/Drawer';
 import { Toast } from '../../shared/ui/Toast';
 import { useMe } from '../auth/auth';
+import { useAdminLive } from './useAdminLive';
 
 type Item = { to: string; label: string; icon: LucideIcon };
 
@@ -43,21 +44,31 @@ const href = (to: string) => `/admin${to ? `/${to}` : ''}`;
 
 /** Orders waiting for you: shown as a badge so you notice without opening the page. */
 function usePendingCount() {
-  const counts = useQuery({ queryKey: ['admin', 'orders', 'counts'], queryFn: () => api<Record<string, number>>('/admin/orders/counts'), refetchInterval: 30_000 });
+  const counts = useQuery({
+    queryKey: ['admin', 'orders', 'counts'],
+    queryFn: () => api<Record<string, number>>('/admin/orders/counts'),
+    refetchInterval: 30_000,
+  });
   return counts.data?.PENDING ?? 0;
 }
 
 function Badge({ n }: { n: number }) {
   if (!n) return null;
-  return <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-yellow px-1.5 text-[11px] font-extrabold leading-5 text-yellow-ink tabular-nums">{n > 99 ? '99+' : n}</span>;
+  return (
+    <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-yellow px-1.5 text-[11px] font-extrabold leading-5 text-yellow-ink tabular-nums">
+      {n > 99 ? '99+' : n}
+    </span>
+  );
 }
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const me = useMe();
   const [more, setMore] = useState(false);
   const pending = usePendingCount();
+  const live = useAdminLive();
   const { pathname } = useLocation();
-  const moreActive = SETUP.some((i) => pathname.startsWith(href(i.to))) || pathname.startsWith(href('reports'));
+  const moreActive =
+    SETUP.some((i) => pathname.startsWith(href(i.to))) || pathname.startsWith(href('reports'));
 
   const link = (i: Item, onNavigate?: () => void) => (
     <NavLink
@@ -76,7 +87,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
+    <div lang="en" className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
       {/* Desktop sidebar */}
       <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface/60 px-3 py-5 lg:flex">
         <Brand />
@@ -86,35 +97,71 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           {SETUP.map((i) => link(i))}
         </nav>
         <div className="mt-auto space-y-3">
-          <Link to="/" className="flex items-center gap-2.5 rounded-xl bg-raised px-3 py-2.5 text-sm font-semibold text-ink ring-1 ring-line-strong transition hover:ring-yellow/50">
+          <Link to="/" className="btn-ghost w-full justify-start gap-2.5 px-3 text-sm">
             <ShoppingBag className="size-[18px] text-yellow" aria-hidden /> Go to shop
           </Link>
-          <p className="truncate px-3 text-xs text-muted">Signed in as {me.data?.name}</p>
+          <p
+            className="flex items-center gap-2 truncate px-3 text-xs text-muted"
+            title={
+              live
+                ? 'New orders appear here as they happen'
+                : 'Reconnecting… the page still refreshes every 30 seconds'
+            }
+          >
+            <span
+              className={`size-2 shrink-0 rounded-full ${live ? 'bg-green' : 'bg-muted'}`}
+              aria-hidden
+            />
+            <span className="sr-only">
+              {live ? 'Live updates on' : 'Live updates reconnecting'}.{' '}
+            </span>
+            <span className="truncate">Signed in as {me.data?.name}</span>
+          </p>
         </div>
       </aside>
 
       {/* Phone top bar */}
       <header className="no-print sticky top-0 z-30 flex items-center justify-between border-b border-line bg-bg/90 px-4 py-2.5 backdrop-blur lg:hidden">
         <Brand />
-        <Link to="/" className="btn-ghost min-h-10 gap-2 px-3 py-2 text-sm">
+        <Link to="/" className="btn-ghost btn-sm">
           <ShoppingBag className="size-4 text-yellow" aria-hidden /> Shop
         </Link>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10">
+        {children}
+      </main>
 
       {/* Phone tab bar */}
-      <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Admin">
+      <nav
+        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        aria-label="Admin"
+      >
         {TABS.map((i) => (
-          <NavLink key={i.to} to={href(i.to)} end={i.to === ''} className={({ isActive }) => `relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive ? 'text-yellow' : 'text-muted'}`}>
+          <NavLink
+            key={i.to}
+            to={href(i.to)}
+            end={i.to === ''}
+            className={({ isActive }) =>
+              `relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive ? 'text-yellow' : 'text-muted'}`
+            }
+          >
             <span className="relative">
               <i.icon className="size-5" aria-hidden />
-              {i.to === 'orders' && pending > 0 && <span className="absolute -right-2.5 -top-1.5 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums">{pending > 99 ? '99+' : pending}</span>}
+              {i.to === 'orders' && pending > 0 && (
+                <span className="absolute -right-2.5 -top-1.5 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums">
+                  {pending > 99 ? '99+' : pending}
+                </span>
+              )}
             </span>
             {i.label}
           </NavLink>
         ))}
-        <button onClick={() => setMore(true)} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${moreActive ? 'text-yellow' : 'text-muted'}`} aria-haspopup="dialog">
+        <button
+          onClick={() => setMore(true)}
+          className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${moreActive ? 'text-yellow' : 'text-muted'}`}
+          aria-haspopup="dialog"
+        >
           <Ellipsis className="size-5" aria-hidden />
           More
         </button>
@@ -133,7 +180,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 function Brand() {
   return (
     <Link to="/admin" className="flex items-center gap-2.5 px-1">
-      <img src="/logo.svg" alt="" className="size-9 rounded-xl" />
+      <img src="/logo.png" alt="" className="size-9 rounded-xl border border-line" />
       <span className="font-display text-lg font-extrabold leading-none tracking-[-0.02em]">
         Cambo<span className="text-yellow">Supply</span>
         <span className="mt-0.5 block text-xs font-semibold tracking-normal text-muted">Admin</span>

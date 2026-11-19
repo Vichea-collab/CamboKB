@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Banner } from '../../shared/lib/types';
+import { t } from '../../shared/lib/strings';
 
 /** Auto-advancing banners (5 s), swipeable, pauses on hover/focus and for reduced motion. */
 export function BannerCarousel({ banners }: { banners: Banner[] }) {
@@ -9,7 +10,8 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
   const count = banners.length;
 
   useEffect(() => {
-    if (count < 2 || paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (count < 2 || paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      return;
     const id = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
     return () => clearInterval(id);
   }, [count, paused]);
@@ -21,8 +23,8 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
   return (
     <section
       aria-roledescription="carousel"
-      aria-label="Promotions"
-      className="relative overflow-hidden rounded-[20px] border border-line bg-surface shadow-[0_4px_18px_rgb(0_0_0/0.35)]"
+      aria-label={t.home.promotions}
+      className="relative overflow-hidden rounded-2xl border border-line bg-surface shadow-lift"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -31,11 +33,18 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
       onTouchEnd={(e) => {
         const start = touchX.current;
         const end = e.changedTouches[0]?.clientX;
-        if (start !== null && end !== undefined && Math.abs(end - start) > 40) go(index + (end < start ? 1 : -1));
+        if (start !== null && end !== undefined && Math.abs(end - start) > 40)
+          go(index + (end < start ? 1 : -1));
         touchX.current = null;
       }}
     >
-      <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${index * 100}%)`, aspectRatio: `${first.width} / ${first.height}` }}>
+      <div
+        className="flex transition-transform duration-500 ease-out"
+        style={{
+          transform: `translateX(-${index * 100}%)`,
+          aspectRatio: `${first.width} / ${first.height}`,
+        }}
+      >
         {banners.map((b, i) => {
           const img = (
             <img
@@ -49,7 +58,12 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
             />
           );
           return (
-            <div key={b.id} className="h-full w-full shrink-0" aria-hidden={i !== index} aria-roledescription="slide">
+            <div
+              key={b.id}
+              className="h-full w-full shrink-0"
+              aria-hidden={i !== index}
+              aria-roledescription="slide"
+            >
               {b.linkUrl ? (
                 <a href={b.linkUrl} tabIndex={i === index ? 0 : -1} className="block size-full">
                   {img}
@@ -62,10 +76,18 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
         })}
       </div>
       {count > 1 && (
-        <div className="absolute inset-x-0 bottom-0.5 flex justify-center">
+        <div className="absolute inset-x-0 -bottom-1.5 flex justify-center">
           {banners.map((b, i) => (
-            <button key={b.id} onClick={() => go(i)} aria-label={`Show banner ${i + 1} of ${count}`} aria-current={i === index} className="group grid size-6 place-items-center">
-              <span className={`block h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-yellow' : 'w-1.5 bg-white/45 group-hover:bg-white/70'}`} />
+            <button
+              key={b.id}
+              onClick={() => go(i)}
+              aria-label={t.home.showBanner(i + 1, count)}
+              aria-current={i === index}
+              className="group grid h-11 min-w-8 place-items-center"
+            >
+              <span
+                className={`block h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-yellow' : 'w-1.5 bg-white/45 group-hover:bg-white/70'}`}
+              />
             </button>
           ))}
         </div>

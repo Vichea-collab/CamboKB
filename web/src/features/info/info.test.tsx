@@ -57,7 +57,7 @@ describe('info pages', () => {
     expect(screen.getByText(/Up to 5 km/)).toBeInTheDocument();
     expect(screen.getAllByText('$1.50').length).toBeGreaterThan(0);
     expect(screen.getByText('$2.50')).toBeInTheDocument();
-    expect(screen.getAllByText('$2').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$2.00').length).toBeGreaterThan(0);
   });
 
   it("Warranty shows the owner's text, or a safe default that promises nothing specific", async () => {

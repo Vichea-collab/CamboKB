@@ -74,6 +74,14 @@ export function authRouter(deps: AppDeps): Router {
     res.json({ user: toPublicUser(req.user!) });
   });
 
+  /**
+   * The web app's "who is signed in?" probe. Unlike /me it answers 200 with `user: null` for a guest,
+   * so every first page load doesn't log a red 401 in the browser console.
+   */
+  r.get('/session', (req, res) => {
+    res.json({ user: req.user ? toPublicUser(req.user) : null });
+  });
+
   r.post('/change-password', requireAuth, validate({ body: changePasswordSchema }), async (req, res) => {
     const { currentPassword, newPassword } = req.valid.body as ChangePasswordInput;
     const user = req.user!;

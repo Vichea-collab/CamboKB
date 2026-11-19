@@ -1,11 +1,13 @@
-import { formatPhone, formatUsd } from '@cambo/shared';
+import { formatPhone, formatUsdExact } from '@cambo/shared';
+import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t } from '../../shared/lib/strings';
 import type { Order } from '../../shared/lib/types';
+import { formatDateTime as when } from '../../shared/lib/format';
+import { Section } from '../../shared/ui/Page';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 
 const STEPS = ['PENDING', 'CONFIRMED', 'PACKED', 'SHIPPING', 'DELIVERED'] as const;
-const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh', dateStyle: 'medium', timeStyle: 'short' });
 
 /** Progress through the fixed order flow; a cancelled order shows where it stopped. */
 export function OrderTimeline({ order }: { order: Order }) {
@@ -18,9 +20,16 @@ export function OrderTimeline({ order }: { order: Order }) {
         const done = Boolean(ev);
         return (
           <li key={s} className="relative flex gap-3 pb-4 last:pb-0">
-            {i < STEPS.length - 1 && <span className={`absolute left-[9px] top-5 h-full w-0.5 ${done && reached.get(STEPS[i + 1]!) ? 'bg-yellow' : 'bg-raised'}`} aria-hidden />}
-            <span className={`relative z-10 mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-black ${done ? 'bg-yellow text-bg' : 'border-2 border-raised bg-surface'}`}>
-              {done ? '✓' : ''}
+            {i < STEPS.length - 1 && (
+              <span
+                className={`absolute left-[9px] top-5 h-full w-0.5 ${done && reached.get(STEPS[i + 1]!) ? 'bg-yellow' : 'bg-raised'}`}
+                aria-hidden
+              />
+            )}
+            <span
+              className={`relative z-10 mt-0.5 grid size-5 shrink-0 place-items-center rounded-full ${done ? 'bg-yellow text-yellow-ink' : 'border-2 border-raised bg-surface'}`}
+            >
+              {done && <Check className="size-3" strokeWidth={3.5} aria-hidden />}
             </span>
             <div className={done ? '' : 'text-muted'}>
               <p className="text-sm font-semibold">{t.status[s]}</p>
@@ -43,62 +52,79 @@ export function OrderSummary({ order, actions }: { order: Order; actions?: React
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <div className="space-y-4">
-        <section className="panel p-5">
+        <Section title={t.orderView.items}>
           <ul className="divide-y divide-line">
             {order.items.map((i) => (
               <li key={i.productId} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="size-14 shrink-0 overflow-hidden rounded-xl bg-[#090c10]">{i.image && <img src={i.image} alt="" className="size-full object-cover" />}</div>
+                <div className="media size-14 shrink-0 rounded-xl">
+                  {i.image && <img src={i.image} alt="" className="size-full object-cover" />}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold leading-snug">{i.name}</p>
                   <p className="text-xs text-muted tabular-nums">
-                    {i.quantity} × {formatUsd(i.priceCents)}
+                    {i.quantity} × {formatUsdExact(i.priceCents)}
                   </p>
                 </div>
-                <span className="font-display font-bold tabular-nums">{formatUsd(i.lineTotalCents)}</span>
+                <span className="font-display font-bold tabular-nums">
+                  {formatUsdExact(i.lineTotalCents)}
+                </span>
               </li>
             ))}
           </ul>
           <dl className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm">
-            <Row label={t.checkout.subtotal} value={formatUsd(order.subtotalCents)} />
-            <Row label={t.checkout.deliveryFee} value={formatUsd(order.deliveryFeeCents)} />
-            {order.discountCents > 0 && <Row label={`${t.checkout.discount}${order.promoCode ? ` (${order.promoCode})` : ''}`} value={`-${formatUsd(order.discountCents)}`} />}
+            <Row label={t.checkout.subtotal} value={formatUsdExact(order.subtotalCents)} />
+            <Row label={t.checkout.deliveryFee} value={formatUsdExact(order.deliveryFeeCents)} />
+            {order.discountCents > 0 && (
+              <Row
+                label={`${t.checkout.discount}${order.promoCode ? ` (${order.promoCode})` : ''}`}
+                value={`-${formatUsdExact(order.discountCents)}`}
+              />
+            )}
             <div className="flex justify-between pt-2 text-base font-bold">
               <dt>{t.checkout.total}</dt>
-              <dd className="font-display text-xl tabular-nums">{formatUsd(order.totalCents)}</dd>
+              <dd className="font-display text-xl tabular-nums">{formatUsdExact(order.totalCents)}</dd>
             </div>
           </dl>
-        </section>
-        <section className="panel grid gap-4 p-5 text-sm sm:grid-cols-2">
-          <div>
-            <h3 className="mb-1 font-semibold text-muted">{t.checkout.contact}</h3>
-            <p className="font-semibold">{order.contactName}</p>
-            <p className="tabular-nums">{formatPhone(order.contactPhone)}</p>
-          </div>
-          <div>
-            <h3 className="mb-1 font-semibold text-muted">{t.checkout.delivery}</h3>
-            <p>
-              {t.region[order.region]} · {t.service[order.deliveryService]}
-            </p>
-            <p className="text-ink/85">{order.addressLine}</p>
-            {order.lat !== null && order.lng !== null && (
-              <a className="-my-1 mt-0 inline-block py-2 font-semibold text-yellow hover:underline" href={`https://maps.google.com/?q=${order.lat},${order.lng}`} target="_blank" rel="noopener noreferrer">
-                Open map pin
-              </a>
+        </Section>
+        <Section title={t.orderView.details}>
+          <div className="grid gap-5 text-sm sm:grid-cols-2">
+            <div>
+              <h3 className="mb-1 text-xs font-semibold text-muted">{t.checkout.contact}</h3>
+              <p className="font-semibold">{order.contactName}</p>
+              <p className="tabular-nums">{formatPhone(order.contactPhone)}</p>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-semibold text-muted">{t.checkout.delivery}</h3>
+              <p>
+                {t.region[order.region]} · {t.service[order.deliveryService]}
+              </p>
+              <p className="text-ink/85">{order.addressLine}</p>
+              {order.lat !== null && order.lng !== null && (
+                <a
+                  className="link inline-flex min-h-10 items-center"
+                  href={`https://maps.google.com/?q=${order.lat},${order.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t.orderView.mapPin}
+                </a>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-semibold text-muted">{t.checkout.payment}</h3>
+              <p>
+                {order.payment ? t.payment[order.payment.method] : '—'} ·{' '}
+                {order.payment ? t.paymentStatus[order.payment.status] : ''}
+              </p>
+            </div>
+            {order.note && (
+              <div>
+                <h3 className="mb-1 text-xs font-semibold text-muted">{t.checkout.note}</h3>
+                <p className="whitespace-pre-line">{order.note}</p>
+              </div>
             )}
           </div>
-          <div>
-            <h3 className="mb-1 font-semibold text-muted">{t.checkout.payment}</h3>
-            <p>
-              {order.payment ? t.payment[order.payment.method] : '—'} · {order.payment ? t.paymentStatus[order.payment.status] : ''}
-            </p>
-          </div>
-          {order.note && (
-            <div>
-              <h3 className="mb-1 font-semibold text-muted">{t.checkout.note}</h3>
-              <p className="whitespace-pre-line">{order.note}</p>
-            </div>
-          )}
-        </section>
+        </Section>
       </div>
       <aside className="space-y-4">
         <section className="panel p-5">

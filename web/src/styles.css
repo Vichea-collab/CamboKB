@@ -16,9 +16,12 @@
   --color-yellow-ink: #1c1500;
   --color-green: #10b981;
   --color-danger: #f87171;
+  /* Behind product photos: darker than the page so white-background photos don't glow. */
+  --color-well: #0b0e12;
 
   --font-sans: 'Plus Jakarta Sans', 'Noto Sans Khmer', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', 'Noto Sans Khmer', ui-sans-serif, sans-serif;
+  --font-display:
+    'Bricolage Grotesque', 'Plus Jakarta Sans', 'Noto Sans Khmer', ui-sans-serif, sans-serif;
 
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
   --shadow-glow: 0 6px 20px rgb(255 183 3 / 0.28);
@@ -46,9 +49,20 @@ body {
   min-height: 100dvh;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-yellow);
-  outline-offset: 2px;
+/* Khmer stacks vowels and subscripts above and below the line: tight Latin leading would clip them. */
+html:lang(km) body {
+  line-height: 1.65;
+}
+html:lang(km) :is(h1, h2, h3, h4, p, a, button, label, li, dt, dd, td, th, legend, option, figcaption) {
+  line-height: 1.6;
+}
+
+/* In the base layer so a component (a form field) can replace the outline with its own focus style. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-yellow);
+    outline-offset: 2px;
+  }
 }
 
 input,
@@ -58,21 +72,122 @@ textarea {
 }
 
 @utility field {
-  @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[15px] text-ink transition-colors placeholder:text-muted/70;
-  &:focus {
-    @apply border-yellow/70 outline-none;
+  @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[15px] text-ink transition-[border-color,box-shadow] placeholder:text-muted/70 hover:border-line-strong;
+  /* One clean focus ring (the page-wide outline would draw a second one around it). */
+  &:focus,
+  &:focus-visible {
+    border-color: var(--color-yellow);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-yellow) 22%, transparent);
   }
   &[aria-invalid='true'] {
     @apply border-danger/70;
   }
+  /* Dropdowns: our own chevron, a roomy hit area, and the dark list the browser draws when it opens. */
+  &:is(select) {
+    appearance: none;
+    cursor: pointer;
+    color-scheme: dark;
+    padding-right: 2.75rem;
+    text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23919bab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    background-size: 1.15rem;
+  }
+  &:is(select):focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffb703' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  &:is(select):disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+select.field option {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
 }
 
 @utility label {
   @apply mb-1.5 block text-sm font-semibold text-ink/90;
 }
 
+/* ---------------------------------------------------------------------------
+   The system. Every page uses these, so the shop and the admin read as one app.
+
+   Type      title-page (one per page) · title-section (a block inside a page)
+   Corners   rounded-xl (12px) controls: buttons, fields, chips' cousins, thumbnails
+             rounded-2xl (16px) surfaces: panels, cards, photos
+             rounded-3xl (24px) sheets and the sign-in card only
+             rounded-full pills: badges, chips, icon buttons
+   Colour    solid yellow key = do this (one per area) · yellow tint = selected
+   Spacing   panels p-5 · stacks space-y-5 · grids gap-5 · lists of cards gap-3
+   --------------------------------------------------------------------------- */
+
+@utility title-page {
+  @apply font-display text-[1.75rem] leading-[1.15] font-extrabold tracking-[-0.03em] text-balance sm:text-[2rem];
+}
+
+@utility title-section {
+  @apply font-display text-lg leading-tight font-extrabold tracking-[-0.02em];
+}
+
+@utility link {
+  @apply rounded font-semibold text-yellow underline-offset-2 hover:underline;
+}
+
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[15px] font-bold transition-[background-color,transform,opacity,border-color] disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-bold whitespace-nowrap transition-[background-color,transform,opacity,border-color] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Smaller buttons for toolbars and table rows. Combine: `btn-ghost btn-sm`. */
+@utility btn-sm {
+  @apply min-h-9 gap-1.5 px-3 py-1.5 text-sm;
+}
+
+/* Round icon button with a visible edge (header, sort). */
+@utility btn-icon {
+  @apply grid size-10 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-muted transition-colors hover:bg-raised hover:text-ink disabled:opacity-35;
+}
+
+/* Quiet square icon button for row actions (move up/down, delete). */
+@utility icon-btn {
+  @apply inline-grid size-9 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-raised hover:text-ink disabled:pointer-events-none disabled:opacity-30;
+}
+@utility icon-btn-danger {
+  @apply icon-btn hover:bg-danger/10 hover:text-danger;
+}
+
+/* Filters and tabs. Selected = yellow tint, never the solid key (that means "act"). */
+@utility chip {
+  @apply inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-surface px-4 text-sm font-semibold whitespace-nowrap text-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-line-strong;
+  &[aria-selected='true'],
+  &[aria-pressed='true'],
+  &[aria-current='page'],
+  &.active {
+    @apply bg-yellow/12 text-yellow ring-yellow/45;
+  }
+}
+
+/* Two or three options side by side (Day / Month, In shop / Archived). */
+@utility segmented {
+  @apply inline-flex rounded-xl bg-surface p-1 ring-1 ring-line;
+}
+@utility segment {
+  @apply min-h-9 rounded-lg px-3.5 text-sm font-semibold text-muted transition-colors hover:text-ink;
+  &[aria-pressed='true'] {
+    @apply bg-yellow/12 text-yellow ring-1 ring-yellow/45;
+  }
+}
+
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs leading-none font-bold whitespace-nowrap;
+}
+
+/* Product photos sit on a dark well. */
+@utility media {
+  @apply overflow-hidden bg-well;
 }
 
 /* The one memorable thing: primary actions are keycaps. A darker edge shows the key's
@@ -118,6 +233,11 @@ textarea {
   @apply rounded-2xl border border-line bg-surface;
 }
 
+/* A whole panel that is a link. */
+@utility panel-link {
+  @apply panel block transition-colors hover:border-line-strong hover:bg-raised/40;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -140,8 +260,16 @@ textarea {
 
 /* Cart count pops when it changes. */
 @keyframes bump {
-  0% { transform: scale(0.6); }
-  60% { transform: scale(1.25); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
-.bump { animation: bump 260ms var(--ease-key); }
+.bump {
+  animation: bump 260ms var(--ease-key);
+}

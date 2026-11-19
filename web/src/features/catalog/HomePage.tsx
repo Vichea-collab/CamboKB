@@ -1,7 +1,8 @@
-import { Search, X } from 'lucide-react';
+import { Search, SearchX, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { t } from '../../shared/lib/strings';
+import { EmptyState, ErrorState } from '../../shared/ui/Page';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useAddToCart } from '../cart/useAddToCart';
 import { useBanners, useCategories, useProducts } from './api';
@@ -17,7 +18,9 @@ export default function Home() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const category = params.get('category') ?? '';
-  const sort = (SORTS.includes(params.get('sort') as SortKey) ? params.get('sort') : 'featured') as SortKey;
+  const sort = (
+    SORTS.includes(params.get('sort') as SortKey) ? params.get('sort') : 'featured'
+  ) as SortKey;
   const [draft, setDraft] = useState(q);
 
   const update = (key: string, value: string) =>
@@ -53,9 +56,10 @@ export default function Home() {
 
   return (
     <div className="space-y-5">
-      <label className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line transition focus-within:ring-2 focus-within:ring-yellow/70">
+      <h1 className="sr-only">{t.home.heading}</h1>
+      <label className="flex min-h-12 items-center gap-3 rounded-2xl bg-surface px-4 ring-1 ring-line transition focus-within:ring-2 focus-within:ring-yellow/70">
         <Search className="size-5 shrink-0 text-muted" aria-hidden />
-        <span className="sr-only">Search</span>
+        <span className="sr-only">{t.home.searchLabel}</span>
         <input
           type="search"
           value={draft}
@@ -65,8 +69,13 @@ export default function Home() {
           enterKeyHint="search"
         />
         {draft && (
-          <button type="button" onClick={() => setDraft('')} aria-label="Clear search" className="grid size-6 shrink-0 place-items-center rounded-full bg-raised text-muted hover:text-ink">
-            <X className="size-3.5" aria-hidden />
+          <button
+            type="button"
+            onClick={() => setDraft('')}
+            aria-label={t.home.clearSearch}
+            className="icon-btn -mr-2 rounded-full"
+          >
+            <X className="size-4" aria-hidden />
           </button>
         )}
       </label>
@@ -74,18 +83,21 @@ export default function Home() {
       {!q && !category && banners.data && <BannerCarousel banners={banners.data} />}
 
       <div>
-        {categories.data && <FilterBar categories={categories.data} category={category} onCategory={(s) => update('category', s)} sort={sort} onSort={(s) => update('sort', s === 'featured' ? '' : s)} />}
+        {categories.data && (
+          <FilterBar
+            categories={categories.data}
+            category={category}
+            onCategory={(s) => update('category', s)}
+            sort={sort}
+            onSort={(s) => update('sort', s === 'featured' ? '' : s)}
+          />
+        )}
         <p className="mb-3 mt-4 text-sm font-semibold text-muted" aria-live="polite">
           {products.data ? t.home.count(products.data.total) : ' '}
         </p>
 
         {products.isError ? (
-          <div className="panel p-8 text-center">
-            <p className="text-muted">{t.home.error}</p>
-            <button className="btn-ghost mt-4" onClick={() => products.refetch()}>
-              {t.home.retry}
-            </button>
-          </div>
+          <ErrorState message={t.home.error} onRetry={() => products.refetch()} />
         ) : !products.data ? (
           <ProductGrid>
             {Array.from({ length: 10 }, (_, i) => (
@@ -93,20 +105,23 @@ export default function Home() {
             ))}
           </ProductGrid>
         ) : items.length === 0 ? (
-          <div className="panel p-10 text-center">
-            <p className="text-muted">{t.home.empty}</p>
-            {(q || category) && (
-              <button
-                className="btn-ghost mt-4"
-                onClick={() => {
-                  setDraft('');
-                  setParams({});
-                }}
-              >
-                {t.home.clear}
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={SearchX}
+            title={t.home.empty}
+            action={
+              (q || category) && (
+                <button
+                  className="btn-ghost"
+                  onClick={() => {
+                    setDraft('');
+                    setParams({});
+                  }}
+                >
+                  {t.home.clear}
+                </button>
+              )
+            }
+          />
         ) : (
           <ProductGrid>
             {items.map((p) => (
