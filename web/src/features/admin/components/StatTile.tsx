@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Sparkline } from './Sparkline';
 
@@ -15,7 +16,7 @@ export function StatTile({
   icon?: LucideIcon;
   label: string;
   value: string;
-  sub?: string;
+  sub?: ReactNode;
   to?: string;
   highlight?: boolean;
   chart?: number[];
@@ -31,7 +32,7 @@ export function StatTile({
       <p className="mt-2 font-display text-[1.75rem] leading-none font-extrabold tracking-[-0.03em] tabular-nums sm:text-[1.9rem]">
         {value}
       </p>
-      {sub && <p className="mt-1.5 text-xs text-muted">{sub}</p>}
+      {sub && <div className="mt-1.5 text-xs text-muted">{sub}</div>}
       {chart && chart.length > 1 && <Sparkline values={chart} className="mt-3 h-9 w-full" />}
     </div>
   );
