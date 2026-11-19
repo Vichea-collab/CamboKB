@@ -10,6 +10,7 @@ import {
   TEST_PASSWORD,
   WEB_ORIGIN,
 } from '../../../test/helpers';
+import { eventsIdle } from '../events/outbox';
 
 type Ctx = Awaited<ReturnType<typeof createTestApp>>;
 let updateId = 1;
@@ -100,6 +101,15 @@ describe('telegram phone verification', () => {
     });
     const user = await ctx.prisma.user.findUniqueOrThrow({ where: { phone: '+85512345678' } });
     expect(user.telegramUserId).toBe(777n);
+  });
+
+  it('tells the owner about every new customer', async () => {
+    const { agent, requestId, token } = await start(ctx, { purpose: 'SIGNUP' });
+    await sendStart(ctx, 777, token);
+    await sendContact(ctx, 777, '85512345678');
+    await agent.post('/api/v1/auth/signup/complete').set('Origin', WEB_ORIGIN).send({ requestId, name: 'Dara', password: TEST_PASSWORD });
+    await eventsIdle();
+    expect(ctx.events.data('customer.signed_up')).toEqual([{ name: 'Dara', phone: '+85512345678', telegramUsername: 'dara777', adminAlerts: true }]);
   });
 
   it("rejects a contact that isn't the sender's own number", async () => {

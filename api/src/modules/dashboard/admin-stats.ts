@@ -1,3 +1,4 @@
+import { LOW_STOCK_THRESHOLD } from '@cambo/shared';
 import { startOfPhnomPenhDay } from '@cambo/shared';
 import { Router } from 'express';
 import type { AppDeps } from '../../http/app';
@@ -19,7 +20,7 @@ export function adminStatsRouter({ prisma }: AppDeps): Router {
       prisma.order.count({ where: { status: 'PENDING' } }),
       prisma.payment.count({ where: { method: 'KHQR', status: 'PENDING', order: { status: 'PENDING' } } }),
       prisma.product.findMany({
-        where: { isActive: true, stock: { lte: 3 } },
+        where: { isActive: true, stock: { lte: LOW_STOCK_THRESHOLD } },
         select: { id: true, name: true, stock: true },
         orderBy: [{ stock: 'asc' }, { name: 'asc' }],
         take: 20,

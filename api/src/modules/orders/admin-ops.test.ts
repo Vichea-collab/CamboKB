@@ -234,8 +234,10 @@ describe('admin operations', () => {
   it('queues what the report and notification services need, in the same transaction as the order', async () => {
     const o = await placeOrder({ note: '<b>ring twice</b>' });
     const rows = await ctx.prisma.serviceEvent.findMany({ orderBy: { createdAt: 'asc' } });
+    // The product only had 5 in stock, so taking 2 leaves it low: the owner is warned too.
     expect(rows.map((r) => `${r.target}:${r.type}`).sort()).toEqual([
       'notification:order.placed',
+      'notification:product.low_stock',
       'report:order.snapshot',
     ]);
     const placed = rows.find((r) => r.type === 'order.placed')!.payload as {
@@ -247,7 +249,7 @@ describe('admin operations', () => {
     expect(placed.order.note).toBe('<b>ring twice</b>'); // escaping is the notification service's job
     expect(placed.order.items).toMatchObject([{ name: 'Attack Shark X11 White', quantity: 2 }]);
     expect(placed).toMatchObject({ adminAlerts: true, holdMinutes: 10 });
-    await vi.waitFor(() => expect(ctx.events.sent).toHaveLength(2)); // and delivered right away
+    await vi.waitFor(() => expect(ctx.events.sent).toHaveLength(3)); // and delivered right away
   });
 
   it('still places the order, and keeps the events waiting, when the other services are down', async () => {
@@ -258,7 +260,7 @@ describe('admin operations', () => {
         await ctx.prisma.serviceEvent.count({ where: { attempts: { gt: 0 } } }),
       ).toBeGreaterThan(0),
     );
-    expect(await ctx.prisma.serviceEvent.count({ where: { status: 'PENDING' } })).toBe(2);
+    expect(await ctx.prisma.serviceEvent.count({ where: { status: 'PENDING' } })).toBe(3); // snapshot, placed, low stock
     expect(await ctx.prisma.order.count()).toBe(1);
   });
 

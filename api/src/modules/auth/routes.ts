@@ -20,6 +20,8 @@ import { AppError } from '../../http/errors';
 import { requireAuth } from '../../http/middleware/auth';
 import { limiter, loginLimiter } from '../../http/middleware/rate-limit';
 import { validate } from '../../http/middleware/validate';
+import { kickEvents } from '../events/outbox';
+import { announceCustomerSignedUp } from '../events/snapshot';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './password';
 import { clearSessionCookie, randomToken, revokeAllSessions, revokeSession, sha256, startSession, toPublicUser } from './sessions';
 import {
@@ -160,7 +162,7 @@ export function authRouter(deps: AppDeps): Router {
         where: { OR: [{ phone: verified.phone! }, { telegramUserId: verified.telegramUserId! }] },
       });
       if (taken) throw new AppError(409, 'PHONE_TAKEN', 'This phone number already has an account');
-      return tx.user.create({
+      const created = await tx.user.create({
         data: {
           phone: verified.phone!,
           name: typedName ?? verified.firstName ?? 'Customer',
@@ -170,7 +172,10 @@ export function authRouter(deps: AppDeps): Router {
           telegramUsername: verified.telegramUsername,
         },
       });
+      await announceCustomerSignedUp(tx, created);
+      return created;
     });
+    kickEvents(deps);
     res.clearCookie(TG_REQUEST_COOKIE, { path: '/api/v1/auth' });
     await startSession(prisma, config, res, user, { ip: req.ip, userAgent: req.get('user-agent') });
     res.status(201).json({ user: toPublicUser(user) });

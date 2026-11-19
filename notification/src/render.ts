@@ -1,4 +1,4 @@
-import { formatUsd, type OrderSnapshot } from '@cambo/shared';
+import { formatPhone, formatUsd, type OrderSnapshot } from '@cambo/shared';
 
 /** What the messages say. Pure functions of the event data: easy to read, easy to test. */
 
@@ -45,6 +45,15 @@ export function newOrderAlert(o: OrderSnapshot, webOrigin: string): string {
 export const paymentReceivedAlert = (o: OrderSnapshot) =>
   `💰 Payment received: order ${o.number}, ${formatUsd(o.totalCents)} via KHQR. The order is confirmed.`;
 
+/** Stock running low, or gone: the owner can open the product to restock. */
+export function lowStockAlert(p: { productId: string; name: string; stock: number }, webOrigin: string): string {
+  const head = p.stock === 0 ? `🚫 <b>Sold out</b>: ${escapeHtml(p.name)}` : `⚠️ <b>Low stock</b>: ${escapeHtml(p.name)} — only ${p.stock} left.`;
+  return [head, `${webOrigin}/admin/products/${p.productId}`].join('\n');
+}
+
+export const newCustomerAlert = (c: { name: string; phone: string; telegramUsername: string | null }) =>
+  `👋 <b>New customer</b>: ${escapeHtml(c.name)} · ${escapeHtml(formatPhone(c.phone))}${c.telegramUsername ? ` · @${escapeHtml(c.telegramUsername)}` : ''}`;
+
 /** Telegram only opens a Mini App from an https address. On http (local development) the message carries a plain link. */
 export const canOpenInTelegram = (webOrigin: string) => webOrigin.startsWith('https://');
 export const orderUrl = (webOrigin: string, number: string) =>
@@ -75,7 +84,7 @@ export function customerMessage(
     text = '💳 Payment received for order {n} ({total}). Your order is confirmed.';
   else if (kind === 'expired')
     text =
-      "⏰ Order {n} was cancelled because it wasn't paid within {hold} minutes. You can order again any time.";
+      "⏰ Order {n} expired because it wasn't paid within {hold} minutes. You can order again any time.";
   else if (kind === 'tracking')
     text = "📮 Tracking number for order {n}: {tracking} ({carrier}). Use it on the carrier's app or website to follow your parcel.";
   else text = STATUS_MESSAGE[o.status] ?? '📌 Your order {n} is now {status}.';

@@ -160,7 +160,7 @@ describe('events from the api become Telegram messages', () => {
     expect(ctx.telegram.to(CUSTOMER).map((m) => /A1|B2/.exec(m.text)![0])).toEqual(['A1', 'B2']);
   });
 
-  it("tells the customer an unpaid order was cancelled, using the api's hold time", async () => {
+  it("tells the customer an unpaid order expired, using the api's hold time", async () => {
     await send(
       event('payment.expired', {
         order: order({ status: 'CANCELLED' }),
@@ -169,7 +169,10 @@ describe('events from the api become Telegram messages', () => {
       }),
     );
     await flush();
-    expect(ctx.telegram.to(CUSTOMER)[0]!.text).toContain("wasn't paid within 15 minutes");
+    const text = ctx.telegram.to(CUSTOMER)[0]!.text;
+    expect(text).toContain("wasn't paid within 15 minutes");
+    expect(text).toMatch(/expired/);
+    expect(text).not.toMatch(/cancelled/);
   });
 
   it('passes an owner alert through as plain text', async () => {
@@ -211,6 +214,39 @@ describe('events from the api become Telegram messages', () => {
       topicOf('⚠️ Needs attention'),
     );
     expect(ctx.telegram.to(CUSTOMER).every((m) => m.opts?.threadId === undefined)).toBe(true);
+  });
+
+  it('warns the owner when a product is running low, and when it is sold out, in the Stock topic', async () => {
+    const productId = '8d7a0b3e-3c5a-4e0b-8f6a-0d9a8f1e2b34';
+    await send(event('product.low_stock', { productId, name: 'Attack Shark <X11>', stock: 3, adminAlerts: true }));
+    await send(event('product.low_stock', { productId, name: 'Attack Shark <X11>', stock: 0, adminAlerts: true }));
+    await flush();
+    const [low, out] = ctx.telegram.to(ADMIN_CHAT);
+    expect(low!.text).toContain('Low stock');
+    expect(low!.text).toContain('only 3 left');
+    expect(low!.text).toContain('Attack Shark &lt;X11&gt;');
+    expect(low!.text).toContain(`${WEB_ORIGIN}/admin/products/${productId}`);
+    expect(out!.text).toContain('Sold out');
+    const stock = ctx.telegram.topicsCreated.find((t) => t.name === '📦 Stock')!;
+    expect(low!.opts?.threadId).toBe(stock.threadId);
+  });
+
+  it('tells the owner about a new customer, in the Customers topic, escaping what they typed', async () => {
+    await send(event('customer.signed_up', { name: 'Dara <b>', phone: '+85512345678', telegramUsername: 'dara_k', adminAlerts: true }));
+    await flush();
+    const msg = ctx.telegram.to(ADMIN_CHAT)[0]!;
+    expect(msg.text).toContain('New customer');
+    expect(msg.text).toContain('Dara &lt;b&gt;');
+    expect(msg.text).toContain('+855 12 345 678');
+    expect(msg.text).toContain('@dara_k');
+    expect(msg.opts?.threadId).toBe(ctx.telegram.topicsCreated.find((t) => t.name === '👤 Customers')!.threadId);
+  });
+
+  it('stays quiet about stock and new customers when alerts are off', async () => {
+    await send(event('product.low_stock', { productId: '8d7a0b3e-3c5a-4e0b-8f6a-0d9a8f1e2b34', name: 'X', stock: 1, adminAlerts: false }));
+    await send(event('customer.signed_up', { name: 'Dara', phone: '+85512345678', telegramUsername: null, adminAlerts: false }));
+    await flush();
+    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0);
   });
 
   it('skips the owner when alerts are off, customers without a chat, and an owner chat that is not set', async () => {
@@ -314,17 +350,8 @@ describe('events from the api become Telegram messages', () => {
     await flush();
     expect(ctx.telegram.to(ADMIN_CHAT)[0]!.text).toContain('Test message');
     // One test line in every topic, so a new group is set up and the owner can see where each alert will land.
-    expect(ctx.telegram.topicsCreated.map((t) => t.name)).toEqual([
-      '🛒 New orders',
-      '💳 Payments',
-      '⚠️ Needs attention',
-    ]);
-    expect(ctx.telegram.to(ADMIN_CHAT).map((m) => m.opts?.threadId)).toEqual([
-      undefined,
-      100,
-      101,
-      102,
-    ]);
+    expect(ctx.telegram.topicsCreated.map((t) => t.name)).toEqual(['🛒 New orders', '💳 Payments', '⚠️ Needs attention', '📦 Stock', '👤 Customers']);
+    expect(ctx.telegram.to(ADMIN_CHAT).map((m) => m.opts?.threadId)).toEqual([undefined, 100, 101, 102, 103, 104]);
   });
 
   it('explains when there is no owner chat or the bot is off', async () => {

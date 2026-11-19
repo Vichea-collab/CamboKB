@@ -12,6 +12,8 @@ import { NotificationError } from './errors';
 import {
   customerKeyboard,
   customerMessage,
+  lowStockAlert,
+  newCustomerAlert,
   newOrderAlert,
   paymentReceivedAlert,
   type CustomerKind,
@@ -26,6 +28,8 @@ const NOTIFICATION_EVENTS = [
   'order.status_changed',
   'order.tracking_set',
   'payment.confirmed',
+  'product.low_stock',
+  'customer.signed_up',
   'payment.expired',
   'admin.alert',
 ] as const;
@@ -109,6 +113,16 @@ export function messagesFor<T extends NotificationEvent>(
     case 'payment.expired': {
       const d = data as EventData<'payment.expired'>;
       customer(d.customerChatId, d.order, 'expired', d.holdMinutes);
+      break;
+    }
+    case 'product.low_stock': {
+      const d = data as EventData<'product.low_stock'>;
+      admin({ text: lowStockAlert(d, config.webOrigin), parseMode: 'HTML' }, d.adminAlerts, 'stock');
+      break;
+    }
+    case 'customer.signed_up': {
+      const d = data as EventData<'customer.signed_up'>;
+      admin({ text: newCustomerAlert(d), parseMode: 'HTML' }, d.adminAlerts, 'customers');
       break;
     }
     case 'admin.alert': {

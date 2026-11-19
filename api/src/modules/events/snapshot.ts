@@ -124,6 +124,29 @@ export async function announcePaymentExpired(db: Db, orderId: string, holdMinute
   );
 }
 
+/** A product just ran low or sold out: tell the owner. Call inside the transaction that took the stock. */
+export async function announceLowStock(db: Db, product: { id: string; name: string; stock: number }) {
+  await publishEvent(db, 'product.low_stock', {
+    productId: product.id,
+    name: product.name,
+    stock: product.stock,
+    adminAlerts: await adminAlertsOn(db),
+  });
+}
+
+/** Someone just created an account: tell the owner. */
+export async function announceCustomerSignedUp(
+  db: Db,
+  user: { id: string; name: string; phone: string; telegramUsername: string | null },
+) {
+  await publishEvent(
+    db,
+    'customer.signed_up',
+    { name: user.name, phone: user.phone, telegramUsername: user.telegramUsername, adminAlerts: await adminAlertsOn(db) },
+    { dedupeKey: `customer:${user.id}:signed_up` },
+  );
+}
+
 /** A plain message for the shop owner ("Bakong token rejected", "paid but cancelled"...). */
 export async function alertAdmin(db: Db, text: string, dedupeKey?: string) {
   await publishEvent(

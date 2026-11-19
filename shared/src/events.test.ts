@@ -78,4 +78,12 @@ describe('event contracts', () => {
     const data = eventDataSchemas['order.tracking_set'].parse({ order: { ...order, trackingNumber: 'VET1' }, customerChatId: '7001' });
     expect(data.order.trackingNumber).toBe('VET1');
   });
+
+  it('describes the stock and new-customer alerts for the owner', () => {
+    expect(EVENT_TARGETS['product.low_stock']).toBe('notification');
+    expect(EVENT_TARGETS['customer.signed_up']).toBe('notification');
+    expect(eventDataSchemas['product.low_stock'].parse({ productId: '8d7a0b3e-3c5a-4e0b-8f6a-0d9a8f1e2b34', name: 'X11', stock: 0, adminAlerts: true }).stock).toBe(0);
+    expect(eventDataSchemas['customer.signed_up'].parse({ name: 'Dara', phone: '+85512345678', telegramUsername: null, adminAlerts: true }).name).toBe('Dara');
+    expect(() => eventDataSchemas['product.low_stock'].parse({ productId: 'nope', name: 'X', stock: -1, adminAlerts: true })).toThrow();
+  });
 });

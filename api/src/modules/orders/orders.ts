@@ -6,13 +6,13 @@ import {
   type Payment,
   type PromoCode,
 } from '@prisma/client';
-import type { CreateOrderInput } from '@cambo/shared';
+import { LOW_STOCK_THRESHOLD, type CreateOrderInput } from '@cambo/shared';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import type { FileClient } from '../../integrations/files/client';
 import { appMetrics } from '../../lib/app-metrics';
 import { kickEvents } from '../events/outbox';
-import { announceOrderPlaced } from '../events/snapshot';
+import { announceLowStock, announceOrderPlaced } from '../events/snapshot';
 import { publishAdminEvent } from '../../lib/events';
 import { getPaymentProvider } from '../payments/providers';
 import { buildQuote } from './quote';
@@ -112,10 +112,14 @@ export async function createOrder(
       async (tx) => {
         const q = await buildQuote(tx, input, userId, { lock: true });
         for (const item of q.items) {
-          await tx.product.update({
+          const left = await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
+            select: { id: true, name: true, stock: true },
           });
+          // Warn the owner when stock falls to the low-stock line, and when it runs out: not on every order below it.
+          const before = left.stock + item.quantity;
+          if ((left.stock <= LOW_STOCK_THRESHOLD && before > LOW_STOCK_THRESHOLD) || (left.stock === 0 && before > 0)) await announceLowStock(tx, left);
         }
         if (q.promo)
           await tx.promoCode.update({

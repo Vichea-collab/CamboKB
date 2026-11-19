@@ -73,6 +73,19 @@ export const eventDataSchemas = {
     customerChatId: chat,
     holdMinutes: z.number().int().positive(),
   }),
+  'product.low_stock': z.object({
+    productId: z.uuid(),
+    name: z.string().min(1).max(200),
+    /** What is left: 0 means sold out. */
+    stock: z.number().int().min(0),
+    adminAlerts: z.boolean(),
+  }),
+  'customer.signed_up': z.object({
+    name: z.string().min(1).max(100),
+    phone: z.string(),
+    telegramUsername: z.string().nullable(),
+    adminAlerts: z.boolean(),
+  }),
   'admin.alert': z.object({
     text: z.string().min(1).max(3500),
     adminAlerts: z.boolean().default(true),
@@ -90,6 +103,8 @@ export const EVENT_TARGETS = {
   'order.tracking_set': 'notification',
   'payment.confirmed': 'notification',
   'payment.expired': 'notification',
+  'product.low_stock': 'notification',
+  'customer.signed_up': 'notification',
   'admin.alert': 'notification',
 } as const satisfies Record<EventType, 'report' | 'notification'>;
 export type EventTarget = (typeof EVENT_TARGETS)[EventType];
