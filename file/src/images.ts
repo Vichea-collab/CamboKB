@@ -16,7 +16,7 @@ export async function processImage(
   storage: StorageAdapter,
   input: Buffer,
   prefix: ImagePrefix,
-): Promise<{ storageKey: string; width: number; height: number }> {
+): Promise<{ storageKey: string; width: number; height: number; bytes: number }> {
   let meta: Metadata;
   try {
     meta = await sharp(input).metadata();
@@ -32,7 +32,7 @@ export async function processImage(
 
   const storageKey = `${prefix}/${randomUUID()}`;
   const targets = IMAGE_WIDTHS.filter((w, i) => i === 0 || w <= width);
-  await Promise.all(
+  const sizes = await Promise.all(
     targets.map(async (w) => {
       const body = await sharp(input)
         .rotate()
@@ -40,9 +40,10 @@ export async function processImage(
         .webp({ quality: 82 })
         .toBuffer();
       await storage.put(`${storageKey}-${w}.webp`, body, 'image/webp');
+      return body.length;
     }),
   );
-  return { storageKey, width, height };
+  return { storageKey, width, height, bytes: sizes.reduce((a, b) => a + b, 0) };
 }
 
 export async function deleteImage(storage: StorageAdapter, storageKey: string) {
@@ -54,8 +55,14 @@ export async function deleteImage(storage: StorageAdapter, storageKey: string) {
  * portrait), centred on a darkened, blurred copy of itself.
  */
 export async function shareImage(source: Buffer): Promise<Buffer> {
-  const background = await sharp(source).resize(1200, 630, { fit: 'cover' }).blur(28).modulate({ brightness: 0.45 }).toBuffer();
-  const product = await sharp(source).resize(1200, 630, { fit: 'inside', withoutEnlargement: false }).toBuffer();
+  const background = await sharp(source)
+    .resize(1200, 630, { fit: 'cover' })
+    .blur(28)
+    .modulate({ brightness: 0.45 })
+    .toBuffer();
+  const product = await sharp(source)
+    .resize(1200, 630, { fit: 'inside', withoutEnlargement: false })
+    .toBuffer();
   return sharp(background)
     .composite([{ input: product, gravity: 'centre' }])
     .flatten({ background: '#14171c' })
