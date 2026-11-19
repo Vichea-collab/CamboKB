@@ -29,7 +29,7 @@ export function FilterBar({
   const [sheet, setSheet] = useState(false);
   const chips = [{ slug: '', name: t.home.all }, ...categories];
   return (
-    <div className="sticky top-[var(--hdr,64px)] z-30 -mx-4 border-b border-line/60 bg-bg/90 px-4 py-2.5 backdrop-blur-md transition-[top] duration-200 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 motion-reduce:transition-none">
+    <div className="sticky top-[var(--hdr,var(--hdr-h,56px))] z-30 -mx-4 border-b border-line/60 bg-bg/90 px-4 py-2.5 backdrop-blur-md transition-[top] duration-200 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 motion-reduce:transition-none">
       <div className="flex items-center gap-3">
         <div
           className="-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto px-1 py-0.5 pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] [scrollbar-width:none]"

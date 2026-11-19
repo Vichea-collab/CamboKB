@@ -32,6 +32,13 @@
 
 :root {
   color-scheme: dark;
+  /* The shop's top bar: as tall as the phone's bottom bar (56px) so the two frame the page evenly. */
+  --hdr-h: 56px;
+}
+@media (min-width: 640px) {
+  :root {
+    --hdr-h: 64px;
+  }
 }
 
 html {

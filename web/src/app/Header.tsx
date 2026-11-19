@@ -59,7 +59,7 @@ function useHideOnScroll() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   useEffect(() => {
-    document.documentElement.style.setProperty('--hdr', hidden ? '0px' : '64px');
+    document.documentElement.style.setProperty('--hdr', hidden ? '0px' : 'var(--hdr-h)');
   }, [hidden]);
   return hidden;
 }
@@ -75,7 +75,7 @@ export function Header() {
     <header
       className={`sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none ${hidden ? '-translate-y-full' : ''}`}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between gap-3 px-3 min-[360px]:px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 w-full max-w-[1240px] items-center justify-between gap-3 px-3 min-[360px]:px-4 sm:h-16 sm:px-6 lg:px-8">
         <BrandMark />
         <nav className="flex items-center gap-1 min-[360px]:gap-2">
           {me.data?.role === 'ADMIN' && (
