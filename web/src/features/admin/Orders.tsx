@@ -153,7 +153,7 @@ export default function Orders() {
                     <span className="font-display text-lg font-extrabold tabular-nums">
                       {o.number}
                     </span>
-                    <StatusBadge status={o.status} />
+                    <StatusBadge status={o.status} payment={o.payment?.status} />
                   </div>
                   <div className="mt-2 flex items-end justify-between gap-3">
                     <div className="min-w-0">
@@ -214,7 +214,7 @@ export default function Orders() {
                     </td>
                     <td className={td}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={o.status} />
+                        <StatusBadge status={o.status} payment={o.payment?.status} />
                         <Waiting o={o} />
                       </div>
                     </td>

@@ -46,7 +46,7 @@ export default function OrdersPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display font-extrabold tabular-nums">{o.number}</span>
-                    <StatusBadge status={o.status} />
+                    <StatusBadge status={o.status} payment={o.payment?.status} />
                   </div>
                   <p className="mt-1 truncate text-sm text-muted">
                     {o.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')}

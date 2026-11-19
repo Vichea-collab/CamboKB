@@ -243,7 +243,7 @@ const en = {
     renew: 'Get a new QR',
     waiting: 'Waiting for your payment…',
     expired:
-      "This order wasn't paid in time, so it was cancelled. You can place it again any time.",
+      "This order wasn't paid in time, so it expired. You can place it again any time.",
     backToShop: 'Back to the shop',
     viewOrder: 'View order',
     payNow: 'Pay now with KHQR',
@@ -266,6 +266,8 @@ const en = {
     SHIPPING: 'On the way',
     DELIVERED: 'Delivered',
     CANCELLED: 'Cancelled',
+    // An order that was never paid: its KHQR payment ran out, so it was closed (the stock goes back).
+    PAYMENT_EXPIRED: 'Expired',
   } as Record<string, string>,
   payment: { COD: 'Cash on delivery', KHQR: 'KHQR' } as Record<string, string>,
   paymentStatus: {
@@ -629,6 +631,7 @@ const km: Strings = {
     SHIPPING: 'កំពុងដឹកជញ្ជូន',
     DELIVERED: 'បានដឹកដល់',
     CANCELLED: 'បានបោះបង់',
+    PAYMENT_EXPIRED: 'ផុតកំណត់',
   },
   payment: { COD: 'បង់ប្រាក់ពេលទទួលទំនិញ', KHQR: 'KHQR' },
   paymentStatus: {

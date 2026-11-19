@@ -118,7 +118,7 @@ export default function Dashboard() {
                     {formatUsdExact(o.totalCents)}
                   </span>
                   <span className="col-span-2">
-                    <StatusBadge status={o.status} />
+                    <StatusBadge status={o.status} payment={o.payment?.status} />
                   </span>
                 </Link>
               </li>

@@ -8,8 +8,26 @@ const TONE: Record<string, Tone> = {
   SHIPPING: 'indigo',
   DELIVERED: 'green',
   CANCELLED: 'danger',
+  PAYMENT_EXPIRED: 'neutral',
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  return <Badge tone={TONE[status] ?? 'neutral'}>{t.status[status] ?? status}</Badge>;
+/**
+ * An order closed because its payment ran out was not cancelled by anyone: "Payment: Expired" already says
+ * why, so it reads "Expired" (grey, like something that never happened) instead of a red "Cancelled".
+ * Pass the order's payment status when the screen has it.
+ */
+export function displayStatus(status: string, paymentStatus?: string | null): string {
+  return status === 'CANCELLED' && paymentStatus === 'EXPIRED' ? 'PAYMENT_EXPIRED' : status;
+}
+
+export function StatusBadge({
+  status,
+  payment,
+}: {
+  status: string;
+  /** The order's payment status, if known. */
+  payment?: string | null;
+}) {
+  const shown = displayStatus(status, payment);
+  return <Badge tone={TONE[shown] ?? 'neutral'}>{t.status[shown] ?? shown}</Badge>;
 }

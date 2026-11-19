@@ -133,7 +133,7 @@ export function OrderSummary({ order, actions }: { order: Order; actions?: React
       <aside className="space-y-4">
         <section className="panel p-5">
           <div className="mb-4 flex items-center justify-between">
-            <StatusBadge status={order.status} />
+            <StatusBadge status={order.status} payment={order.payment?.status} />
             <span className="text-xs text-muted">{when(order.createdAt)}</span>
           </div>
           <OrderTimeline order={order} />

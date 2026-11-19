@@ -64,7 +64,7 @@ export default function CustomerDetail() {
                   {o.number}
                 </span>
                 <span className="min-w-0 flex-1 text-sm text-muted">{fmtDate(o.createdAt)}</span>
-                <StatusBadge status={o.status} />
+                <StatusBadge status={o.status} payment={o.payment?.status} />
                 <span className="w-20 text-right font-bold tabular-nums">
                   {formatUsdExact(o.totalCents)}
                 </span>
