@@ -54,6 +54,7 @@ export async function seedOrder(opts: {
     discountCents: discount,
     totalCents: subtotal + fee - discount,
     promoCode: null,
+    trackingNumber: null,
     payment: { method: opts.method ?? 'COD', status: 'UNPAID' },
     items: opts.items.map((i) => ({ ...i, lineTotalCents: i.priceCents * i.quantity })),
   };
