@@ -1,0 +1,96 @@
+name: Deploy
+
+# NOT run automatically. Start it by hand (Actions -> Deploy -> Run workflow) when a server is ready.
+#
+# What it needs, once:
+#   - a server with Docker + the Compose plugin, and a folder (DEPLOY_PATH) containing a filled-in
+#     `.env.production` (see .env.production.example). Secrets stay on the server, never in GitHub.
+#   - repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key; add its public key on the server)
+#   - repository variables: DEPLOY_PATH (e.g. /opt/cambo-supply), PUBLIC_HOST (e.g. shop.example.com),
+#     and optionally COMPOSE_PROFILES (`tunnel` when Cloudflare reaches the shop through a Tunnel)
+#   - the images published by CI (push to main or a v* tag), readable from the server (public package,
+#     or `docker login ghcr.io` once on the server with a read:packages token).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to run (latest, sha-1a2b3c4, 1.0.0)'
+        required: true
+        default: latest
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      PUBLIC_HOST: ${{ vars.PUBLIC_HOST }}
+      TAG: ${{ inputs.tag }}
+      # e.g. `tunnel` to also run the Cloudflare Tunnel container
+      PROFILES: ${{ vars.COMPOSE_PROFILES }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the inputs
+        run: |
+          case "$TAG" in *[!A-Za-z0-9._-]*|'') echo "Bad tag"; exit 1;; esac
+          case "$PROFILES" in *[!A-Za-z0-9,_-]*) echo "Bad COMPOSE_PROFILES"; exit 1;; esac
+          for v in HOST DEPLOY_USER DEPLOY_PATH PUBLIC_HOST; do
+            [ -n "${!v}" ] || { echo "Missing $v: see the comments at the top of this workflow"; exit 1; }
+          done
+      - name: SSH setup
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+      - name: Upload the Compose file and the monitoring configuration
+        run: |
+          rsync -az --delete docker-compose.prod.yml observability "$DEPLOY_USER@$HOST:$DEPLOY_PATH/"
+      - name: Pull the images and restart
+        run: |
+          ssh "$DEPLOY_USER@$HOST" "cd '$DEPLOY_PATH' \
+            && export IMAGE_TAG='$TAG' COMPOSE_PROFILES='$PROFILES' \
+            && docker compose -f docker-compose.prod.yml --env-file .env.production pull \
+            && docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans \
+            && docker image prune -f"
+      - name: Check the site answers
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS "https://$PUBLIC_HOST/healthz" && curl -fsS "https://$PUBLIC_HOST/api/v1/products?pageSize=1" >/dev/null && exit 0
+            sleep 5
+          done
+          echo "The site did not come up in time"; exit 1
+
+  notify:
+    name: Telegram notice
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: ${{ always() }}
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/pipeline-notify.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/pipeline-notify.mjs run
+        env:
+          RUN_TITLE: Deploy
+          RUN_RESULTS: ${{ toJSON(needs) }}
+          RUN_NOTE: Image tag ${{ inputs.tag }} on ${{ vars.PUBLIC_HOST }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PIPELINE_THREAD_ID: ${{ vars.TELEGRAM_PIPELINE_THREAD_ID }}

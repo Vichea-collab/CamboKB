@@ -1,0 +1,40 @@
+name: Pipeline notices
+
+# Posts to the "Pipeline" topic of the Telegram group when someone pushes, or opens, merges or closes a
+# pull request. The result of each CI and Deploy run is posted by those workflows themselves.
+#
+# Needs (Settings -> Secrets and variables -> Actions):
+#   secrets    TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+#   variable   TELEGRAM_PIPELINE_THREAD_ID   (the topic's id; see docs/deployment.md)
+# Without the secrets the job still passes and says it sent nothing (forks never get secrets).
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  telegram:
+    name: Telegram notice
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      # Only the script, not the whole repository.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/pipeline-notify.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tell the group
+        run: node scripts/pipeline-notify.mjs event
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_PIPELINE_THREAD_ID: ${{ vars.TELEGRAM_PIPELINE_THREAD_ID }}
