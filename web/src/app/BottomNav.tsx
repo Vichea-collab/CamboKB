@@ -24,13 +24,11 @@ function useSearchLink() {
 
 const cell = 'group relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold outline-none';
 
-/** The icon sits on a pill that fills in yellow for the page you are on, like the system bars of the phone. */
+/** The current page is yellow and a touch bolder; the icon shrinks a little under the finger. */
 function Glyph({ icon: Icon, active }: { icon: LucideIcon; active: boolean }) {
   return (
-    <span
-      className={`grid h-8 w-14 place-items-center rounded-full transition-[background-color,transform] duration-200 group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-yellow ${active ? 'bg-yellow/15' : ''}`}
-    >
-      <Icon className="size-[22px]" strokeWidth={active ? 2.6 : 2.1} aria-hidden />
+    <span className="grid h-8 w-10 place-items-center rounded-xl transition-transform duration-150 group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-yellow">
+      <Icon className="size-6" strokeWidth={active ? 2.4 : 1.9} aria-hidden />
     </span>
   );
 }

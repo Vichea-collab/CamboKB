@@ -41,9 +41,9 @@ const SETUP: Item[] = [
 const TABS = MAIN.slice(0, 4);
 
 const tabCell = 'group relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold outline-none min-[340px]:text-[11px]';
-/** The icon sits on a pill that fills in yellow for the page you are on (same look as the shop's bar). */
-const pill = (active: boolean) =>
-  `relative grid h-8 w-14 place-items-center rounded-full transition-[background-color,transform] duration-200 group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-yellow ${active ? 'bg-yellow/15' : ''}`;
+/** The icon's box: the current page is yellow (set by the tab) and bolder; it shrinks a little under the finger. */
+const pill = () =>
+  'relative grid h-8 w-10 place-items-center rounded-xl transition-transform duration-150 group-active:scale-90 group-focus-visible:ring-2 group-focus-visible:ring-yellow';
 
 const href = (to: string) => `/admin${to ? `/${to}` : ''}`;
 
@@ -151,10 +151,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           >
             {({ isActive }) => (
               <>
-                <span className={pill(isActive)}>
-                  <i.icon className="size-[22px]" strokeWidth={isActive ? 2.6 : 2.1} aria-hidden />
+                <span className={pill()}>
+                  <i.icon className="size-6" strokeWidth={isActive ? 2.4 : 1.9} aria-hidden />
                   {i.to === 'orders' && pending > 0 && (
-                    <span className="absolute right-2 top-0 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums ring-2 ring-surface">
+                    <span className="absolute -right-1 -top-0.5 grid min-w-4 place-items-center rounded-full bg-yellow px-1 text-[10px] font-extrabold leading-4 text-yellow-ink tabular-nums ring-2 ring-surface">
                       {pending > 99 ? '99+' : pending}
                     </span>
                   )}
@@ -165,8 +165,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
         <button onClick={() => setMore(true)} className={`${tabCell} ${moreActive ? 'text-yellow' : 'text-muted'}`} aria-haspopup="dialog">
-          <span className={pill(moreActive)}>
-            <Ellipsis className="size-[22px]" strokeWidth={moreActive ? 2.6 : 2.1} aria-hidden />
+          <span className={pill()}>
+            <Ellipsis className="size-6" strokeWidth={moreActive ? 2.4 : 1.9} aria-hidden />
           </span>
           <span className="max-w-full truncate px-0.5 leading-none">More</span>
         </button>
