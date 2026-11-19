@@ -86,4 +86,11 @@ describe('event contracts', () => {
     expect(eventDataSchemas['customer.signed_up'].parse({ name: 'Dara', phone: '+85512345678', telegramUsername: null, adminAlerts: true }).name).toBe('Dara');
     expect(() => eventDataSchemas['product.low_stock'].parse({ productId: 'nope', name: 'X', stock: -1, adminAlerts: true })).toThrow();
   });
+
+  it('reminds a customer to pay before an unpaid KHQR order is cancelled', () => {
+    expect(EVENT_TARGETS['payment.reminder']).toBe('notification');
+    const data = eventDataSchemas['payment.reminder'].parse({ order, customerChatId: '7001', minutesLeft: 3 });
+    expect(data.minutesLeft).toBe(3);
+    expect(() => eventDataSchemas['payment.reminder'].parse({ order, customerChatId: '7001', minutesLeft: 0 })).toThrow();
+  });
 });

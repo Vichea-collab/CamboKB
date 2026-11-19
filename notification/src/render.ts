@@ -59,7 +59,10 @@ export const canOpenInTelegram = (webOrigin: string) => webOrigin.startsWith('ht
 export const orderUrl = (webOrigin: string, number: string) =>
   `${webOrigin}/account/orders/${encodeURIComponent(number)}`;
 
-export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired' | 'tracking';
+export const payUrl = (webOrigin: string, number: string) =>
+  `${webOrigin}/orders/${encodeURIComponent(number)}/pay`;
+
+export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired' | 'tracking' | 'reminder';
 
 const STATUS_MESSAGE: Record<string, string> = {
   CONFIRMED: '👍 Your order {n} is confirmed.',
@@ -73,7 +76,7 @@ const STATUS_MESSAGE: Record<string, string> = {
 export function customerMessage(
   kind: CustomerKind,
   o: OrderSnapshot,
-  ctx: { webOrigin: string; holdMinutes?: number },
+  ctx: { webOrigin: string; holdMinutes?: number; minutesLeft?: number },
 ): string {
   let text: string;
   if (kind === 'placed') {
@@ -85,6 +88,8 @@ export function customerMessage(
   else if (kind === 'expired')
     text =
       "⏰ Order {n} expired because it wasn't paid within {hold} minutes. You can order again any time.";
+  else if (kind === 'reminder')
+    text = '⏳ Order {n} is still waiting for payment. Pay {total} with KHQR within {mins}, or the order will be cancelled.';
   else if (kind === 'tracking')
     text = "📮 Tracking number for order {n}: {tracking} ({carrier}). Use it on the carrier's app or website to follow your parcel.";
   else text = STATUS_MESSAGE[o.status] ?? '📌 Your order {n} is now {status}.';
@@ -93,12 +98,13 @@ export function customerMessage(
     .replace('{total}', formatUsd(o.totalCents))
     .replace('{hold}', String(ctx.holdMinutes ?? 10))
     .replace('{status}', o.status.toLowerCase())
+    .replace('{mins}', `${ctx.minutesLeft ?? 1} ${ctx.minutesLeft === 1 || ctx.minutesLeft === undefined ? 'minute' : 'minutes'}`)
     .replace('{tracking}', o.trackingNumber ?? '')
     .replace('{carrier}', SERVICE[o.deliveryService]);
   // With the button (https) the link would only repeat it.
   return canOpenInTelegram(ctx.webOrigin)
     ? body
-    : [body, '', orderUrl(ctx.webOrigin, o.number)].join('\n');
+    : [body, '', kind === 'reminder' ? payUrl(ctx.webOrigin, o.number) : orderUrl(ctx.webOrigin, o.number)].join('\n');
 }
 
 /** The button under a customer's message: opens their order (or the shop, after an expired order) as a Mini App. */
@@ -107,6 +113,8 @@ export function customerKeyboard(kind: CustomerKind, o: OrderSnapshot, webOrigin
   const button =
     kind === 'expired'
       ? { text: '🛒 Order again', web_app: { url: webOrigin } }
-      : { text: '📦 View my order', web_app: { url: orderUrl(webOrigin, o.number) } };
+      : kind === 'reminder'
+        ? { text: '💳 Pay now', web_app: { url: payUrl(webOrigin, o.number) } }
+        : { text: '📦 View my order', web_app: { url: orderUrl(webOrigin, o.number) } };
   return { inline_keyboard: [[button]] };
 }

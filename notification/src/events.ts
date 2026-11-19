@@ -28,6 +28,7 @@ const NOTIFICATION_EVENTS = [
   'order.status_changed',
   'order.tracking_set',
   'payment.confirmed',
+  'payment.reminder',
   'product.low_stock',
   'customer.signed_up',
   'payment.expired',
@@ -51,11 +52,12 @@ export function messagesFor<T extends NotificationEvent>(
     o: OrderSnapshot,
     kind: CustomerKind,
     holdMinutes?: number,
+    minutesLeft?: number,
   ) => {
     if (chatId)
       out.push({
         chatId,
-        text: customerMessage(kind, o, { webOrigin: config.webOrigin, holdMinutes }),
+        text: customerMessage(kind, o, { webOrigin: config.webOrigin, holdMinutes, minutesLeft }),
         replyMarkup: customerKeyboard(kind, o, config.webOrigin),
         dedupeKey: `order:${o.id}:customer:${kind === 'status' ? o.status : kind === 'tracking' ? `tracking:${o.trackingNumber}` : kind}`,
       });
@@ -108,6 +110,11 @@ export function messagesFor<T extends NotificationEvent>(
         d.adminAlerts,
         'payments',
       );
+      break;
+    }
+    case 'payment.reminder': {
+      const d = data as EventData<'payment.reminder'>;
+      customer(d.customerChatId, d.order, 'reminder', undefined, d.minutesLeft);
       break;
     }
     case 'payment.expired': {

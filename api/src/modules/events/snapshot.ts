@@ -113,6 +113,18 @@ export async function announcePaymentConfirmed(db: Db, orderId: string) {
   );
 }
 
+/** The payment window is closing: remind the customer (only when they have Telegram). */
+export async function announcePaymentReminder(db: Db, orderId: string, minutesLeft: number) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  if (!customerChatId) return;
+  await publishEvent(
+    db,
+    'payment.reminder',
+    { order, customerChatId, minutesLeft },
+    { dedupeKey: `order:${orderId}:reminder` },
+  );
+}
+
 export async function announcePaymentExpired(db: Db, orderId: string, holdMinutes: number) {
   const { order, customerChatId } = await loadSnapshot(db, orderId);
   await publishEvent(db, 'order.snapshot', order);

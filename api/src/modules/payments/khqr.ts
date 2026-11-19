@@ -10,6 +10,7 @@ import {
   alertAdmin,
   announcePaymentConfirmed,
   announcePaymentExpired,
+  announcePaymentReminder,
   announceSnapshot,
 } from '../events/snapshot';
 import { publishOrderUpdate } from '../orders/status';
@@ -288,7 +289,9 @@ async function expirePayment(deps: AppDeps, paymentId: string): Promise<boolean>
  * cancel those whose window closed (after one last check with Bakong). An order is
  * never cancelled while Bakong can't be reached: it might have been paid.
  */
-export async function sweepKhqrPayments(deps: AppDeps): Promise<{ paid: number; expired: number }> {
+export async function sweepKhqrPayments(
+  deps: AppDeps,
+): Promise<{ paid: number; expired: number; reminded: number }> {
   const now = Date.now();
   const open = await deps.prisma.payment.findMany({
     where: { method: 'KHQR', status: 'PENDING' },
@@ -304,7 +307,46 @@ export async function sweepKhqrPayments(deps: AppDeps): Promise<{ paid: number; 
     if (outcome === 'paid') paid++;
     else if (windowClosed && outcome === 'unpaid' && (await expirePayment(deps, p.id))) expired++;
   }
-  return { paid, expired };
+  return { paid, expired, reminded: await remindClosingPayments(deps) };
+}
+
+/** Tell the customer when this little time is left to pay. */
+const REMINDER_BEFORE_MS = 3 * 60_000;
+
+/**
+ * Once per payment, when about 3 minutes are left, message the customer so a forgotten order
+ * isn't cancelled by surprise. Skipped when the whole window is too short for it to be useful.
+ */
+async function remindClosingPayments(deps: AppDeps): Promise<number> {
+  const { prisma, config } = deps;
+  if (config.bakong.holdMinutes * 60_000 <= 2 * REMINDER_BEFORE_MS) return 0;
+  const now = Date.now();
+  const due = await prisma.payment.findMany({
+    where: {
+      method: 'KHQR',
+      status: 'PENDING',
+      reminderSentAt: null,
+      expiresAt: { gt: new Date(now), lte: new Date(now + REMINDER_BEFORE_MS) },
+      order: { status: 'PENDING' },
+    },
+    select: { id: true, orderId: true, expiresAt: true },
+  });
+  let reminded = 0;
+  for (const p of due) {
+    const minutesLeft = Math.max(1, Math.ceil((p.expiresAt!.getTime() - now) / 60_000));
+    const claimed = await prisma.$transaction(async (db) => {
+      const c = await db.payment.updateMany({
+        where: { id: p.id, status: 'PENDING', reminderSentAt: null },
+        data: { reminderSentAt: new Date() },
+      });
+      if (c.count === 0) return false;
+      await announcePaymentReminder(db, p.orderId, minutesLeft);
+      return true;
+    });
+    if (claimed) reminded++;
+  }
+  if (reminded) kickEvents(deps);
+  return reminded;
 }
 
 /** Run the sweep every `intervalMs`. Returns a stop function. */

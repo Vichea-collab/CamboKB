@@ -68,6 +68,12 @@ export const eventDataSchemas = {
     customerChatId: chat,
     adminAlerts: z.boolean(),
   }),
+  'payment.reminder': z.object({
+    order: orderSnapshotSchema,
+    customerChatId: chat,
+    /** Whole minutes left to pay, at least 1. */
+    minutesLeft: z.number().int().min(1).max(60),
+  }),
   'payment.expired': z.object({
     order: orderSnapshotSchema,
     customerChatId: chat,
@@ -103,6 +109,7 @@ export const EVENT_TARGETS = {
   'order.tracking_set': 'notification',
   'payment.confirmed': 'notification',
   'payment.expired': 'notification',
+  'payment.reminder': 'notification',
   'product.low_stock': 'notification',
   'customer.signed_up': 'notification',
   'admin.alert': 'notification',

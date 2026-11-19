@@ -242,6 +242,45 @@ describe('KHQR payments with Bakong', () => {
     expect((await payment(o.number)).body).toMatchObject({ status: 'EXPIRED', khqr: null });
   });
 
+  describe('reminder before the window closes', () => {
+    const setWindow = (orderId: string, msFromNow: number) =>
+      ctx.prisma.payment.updateMany({ where: { orderId }, data: { expiresAt: new Date(Date.now() + msFromNow) } });
+
+    it('messages the customer once, when about 3 minutes are left', async () => {
+      const o = await placeKhqr();
+      await setWindow(o.id, 8 * MIN);
+      expect((await sweepKhqrPayments(ctx.deps)).reminded).toBe(0); // plenty of time yet
+      await setWindow(o.id, 2.5 * MIN);
+      expect((await sweepKhqrPayments(ctx.deps)).reminded).toBe(1);
+      expect((await sweepKhqrPayments(ctx.deps)).reminded).toBe(0); // once only
+      const reminders = await queued<{ order: { number: string }; customerChatId: string; minutesLeft: number }>('payment.reminder');
+      expect(reminders).toHaveLength(1);
+      expect(reminders[0]).toMatchObject({ order: { number: o.number }, customerChatId: String(TG), minutesLeft: 3 });
+    });
+
+    it('does not remind about an order that is paid, or already past its window', async () => {
+      const paid = await placeKhqr();
+      const [code] = await codes(paid.id);
+      ctx.bakong.pay(code!.md5, { amount: 44 });
+      await setWindow(paid.id, 2 * MIN);
+      const late = await placeKhqr();
+      await setWindow(late.id, -3 * MIN);
+      const result = await sweepKhqrPayments(ctx.deps);
+      expect(result.reminded).toBe(0);
+      expect(await queued('payment.reminder')).toHaveLength(0);
+    });
+
+    it('still marks the reminder done for a customer without Telegram, so it is not retried every 20 seconds', async () => {
+      const { agent: other } = await signedInAgent(ctx.app, ctx.prisma, { name: 'Sok' });
+      const res = await order({}, other);
+      await setWindow(res.body.id, 2 * MIN);
+      await sweepKhqrPayments(ctx.deps);
+      const reminded = await ctx.prisma.payment.findFirstOrThrow({ where: { orderId: res.body.id } });
+      expect(reminded.reminderSentAt).not.toBeNull();
+      expect(await sweepKhqrPayments(ctx.deps)).toMatchObject({ reminded: 0 });
+    });
+  });
+
   it('checks one last time before cancelling, and keeps a paid order', async () => {
     const o = await placeKhqr();
     const [code] = await codes(o.id);

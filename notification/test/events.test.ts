@@ -175,6 +175,33 @@ describe('events from the api become Telegram messages', () => {
     expect(text).not.toMatch(/cancelled/);
   });
 
+  it('reminds the customer to pay, with the time left and a link to pay, and tells nobody else', async () => {
+    const o = order({ payment: { method: 'KHQR', status: 'PENDING' }, totalCents: 4350 });
+    await send(event('payment.reminder', { order: o, customerChatId: String(CUSTOMER), minutesLeft: 3 }));
+    await flush();
+    const msg = ctx.telegram.to(CUSTOMER)[0]!;
+    expect(msg.text).toContain(o.number);
+    expect(msg.text).toContain('$43.50');
+    expect(msg.text).toContain('3 minutes');
+    expect(msg.text).toContain(`${WEB_ORIGIN}/orders/${o.number}/pay`); // plain link on http: Telegram only opens https buttons
+    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0);
+  });
+
+  it('says "1 minute" in the singular', async () => {
+    const o = order({ payment: { method: 'KHQR', status: 'PENDING' } });
+    await send(event('payment.reminder', { order: o, customerChatId: String(CUSTOMER), minutesLeft: 1 }));
+    await flush();
+    expect(ctx.telegram.to(CUSTOMER)[0]!.text).toMatch(/within 1 minute,/);
+  });
+
+  it('on an https shop the reminder has a Pay now button that opens the payment page in Telegram', () => {
+    const o = order({ payment: { method: 'KHQR', status: 'PENDING' } });
+    const msg = messagesFor('payment.reminder', { order: o, customerChatId: String(CUSTOMER), minutesLeft: 3 } as never, { webOrigin: 'https://shop.test' })[0]!;
+    expect(keyboardTexts(msg as { replyMarkup?: unknown })).toEqual(['💳 Pay now']);
+    expect(JSON.stringify(msg.replyMarkup)).toContain(`"url":"https://shop.test/orders/${o.number}/pay"`);
+    expect(msg.text).not.toContain('https://shop.test/orders'); // the button carries the link
+  });
+
   it('passes an owner alert through as plain text', async () => {
     await send(event('admin.alert', { text: '⚠️ Bakong token was rejected', adminAlerts: true }));
     await flush();

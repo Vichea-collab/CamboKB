@@ -323,6 +323,8 @@ model Payment {
   rawPayload    Json?
   /// Last time we asked the payment provider (throttles polling).
   lastCheckedAt DateTime?
+  /// When the customer was reminded that the payment window is closing (once per payment).
+  reminderSentAt DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
