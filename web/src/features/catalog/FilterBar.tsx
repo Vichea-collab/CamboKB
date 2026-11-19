@@ -42,7 +42,7 @@ export function FilterBar({
             );
           })}
         </div>
-        <label className="relative shrink-0">
+        <label className="relative shrink-0 rounded-full has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-yellow sm:has-[:focus-visible]:ring-0">
           <span className="sr-only">{t.home.sort}</span>
           {/* Phones: just an icon (the real select sits invisibly on top). From tablet up: a labelled select. */}
           <span className="btn-icon relative text-ink sm:hidden" aria-hidden>
@@ -58,7 +58,7 @@ export function FilterBar({
           <select
             value={sort}
             onChange={(e) => onSort(e.target.value as SortKey)}
-            className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full text-ink opacity-0 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-yellow sm:static sm:h-10 sm:w-auto sm:bg-surface sm:pl-9 sm:pr-4 sm:text-sm sm:font-semibold sm:opacity-100 sm:ring-1 sm:ring-line sm:hover:ring-line-strong"
+            className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full text-ink opacity-0 sm:static sm:h-10 sm:w-auto sm:bg-surface sm:pl-9 sm:pr-4 sm:text-sm sm:font-semibold sm:opacity-100 sm:ring-1 sm:ring-line sm:hover:ring-line-strong"
           >
             <option value="featured">{t.home.sortFeatured}</option>
             <option value="price-asc">{t.home.sortPriceAsc}</option>

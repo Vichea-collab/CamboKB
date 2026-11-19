@@ -11,6 +11,9 @@ const en = {
   lang: { switchLabel: 'Switch language to Khmer', button: 'ខ្មែរ' },
   nav: {
     cart: 'Cart',
+    main: 'Main',
+    home: 'Home',
+    ordersTab: 'Orders',
     cartLabel: (n: number) => `Cart, ${n} ${n === 1 ? 'item' : 'items'}`,
     homeLabel: (name: string) => `${name} home`,
     account: 'Account',
@@ -364,6 +367,9 @@ const km: Strings = {
   lang: { switchLabel: 'ប្តូរភាសាទៅជាអង់គ្លេស', button: 'EN' },
   nav: {
     cart: 'កន្ត្រក',
+    main: 'ម៉ឺនុយមេ',
+    home: 'ទំព័រដើម',
+    ordersTab: 'ការបញ្ជាទិញ',
     cartLabel: (n) => `កន្ត្រក ${n} ទំនិញ`,
     homeLabel: (name) => `${name} ទំព័រដើម`,
     account: 'គណនី',

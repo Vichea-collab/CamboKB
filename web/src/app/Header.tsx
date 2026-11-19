@@ -5,6 +5,7 @@ import { useMe } from '../features/auth/auth';
 import { useCart } from '../features/cart/cart-store';
 import { t } from '../shared/lib/strings';
 import { useUi } from '../shared/lib/ui-store';
+import { useBottomNavVisible } from './BottomNav';
 import { LanguageToggle } from './LanguageToggle';
 
 export function BrandMark({ tagline = true }: { tagline?: boolean }) {
@@ -68,6 +69,8 @@ export function Header() {
   const openCart = useUi((s) => s.openCart);
   const me = useMe();
   const hidden = useHideOnScroll();
+  // On phones the bottom bar carries account and cart, so the header drops them there (not where the bar is hidden).
+  const phoneBar = useBottomNavVisible() ? 'max-md:hidden' : '';
   return (
     <header
       className={`sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md transition-transform duration-200 motion-reduce:transition-none ${hidden ? '-translate-y-full' : ''}`}
@@ -83,14 +86,14 @@ export function Header() {
           <LanguageToggle />
           <Link
             to={me.data ? '/account' : '/login'}
-            className="btn-icon"
+            className={`btn-icon ${phoneBar}`}
             aria-label={me.data ? t.nav.account : t.nav.login}
           >
             <UserRound className="size-[18px]" strokeWidth={2.2} aria-hidden />
           </Link>
           <button
             onClick={openCart}
-            className="relative grid size-10 place-items-center rounded-full border border-yellow/40 bg-yellow/10 text-yellow transition-colors hover:bg-yellow/20"
+            className={`relative grid size-10 place-items-center rounded-full border border-yellow/40 bg-yellow/10 text-yellow transition-colors hover:bg-yellow/20 ${phoneBar}`}
             aria-label={t.nav.cartLabel(count)}
           >
             <ShoppingBag className="size-[18px]" strokeWidth={2.2} aria-hidden />

@@ -1,4 +1,5 @@
 import { Outlet, ScrollRestoration } from 'react-router';
+import { BottomNav } from './BottomNav';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { t } from '../shared/lib/strings';
@@ -21,6 +22,7 @@ export function StoreLayout() {
         </main>
         <Footer />
       </div>
+      <BottomNav />
       <CartDrawer />
       <Toast />
       <ScrollRestoration />
