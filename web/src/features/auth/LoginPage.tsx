@@ -42,7 +42,10 @@ export default function Login() {
       footer={
         <>
           {t.auth.noAccount}{' '}
-          <Link to={`/signup${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="inline-block py-2 font-semibold text-yellow hover:underline">
+          <Link
+            to={`/signup${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="link inline-flex min-h-10 items-center"
+          >
             {t.auth.signupLink}
           </Link>
         </>
@@ -54,7 +57,14 @@ export default function Login() {
           <label htmlFor="phone" className="label">
             {t.auth.phone}
           </label>
-          <PhoneInput id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} invalid={!!phoneError} aria-describedby="phone-error" required />
+          <PhoneInput
+            id="phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            invalid={!!phoneError}
+            aria-describedby="phone-error"
+            required
+          />
           <FieldError id="phone-error">{phoneError}</FieldError>
         </div>
         <div>
@@ -62,13 +72,28 @@ export default function Login() {
             <label htmlFor="password" className="label">
               {t.auth.password}
             </label>
-            <Link to="/forgot-password" className="inline-block py-2 text-sm font-semibold text-muted hover:text-ink">
+            <Link
+              to="/forgot-password"
+              className="inline-flex min-h-10 items-center rounded text-sm font-semibold text-muted hover:text-ink"
+            >
               {t.auth.forgot}
             </Link>
           </div>
-          <input id="password" type="password" autoComplete="current-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            className="field"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={login.isPending || !phone || !password}>
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={login.isPending || !phone || !password}
+        >
           {t.auth.loginButton}
         </button>
       </form>

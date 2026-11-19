@@ -1,31 +1,32 @@
 import type { ReactNode } from 'react';
+import { EmptyState, LoadingState } from '../../../shared/ui/Page';
+export { formatDateTime as fmtDate } from '../../../shared/lib/format';
 
-export function PageHeader({ title, actions, back }: { title: string; actions?: ReactNode; back?: ReactNode }) {
-  return (
-    <div className="mb-5">
-      {back}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">{title}</h1>
-        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-      </div>
-    </div>
-  );
-}
+export { PageHeader } from '../../../shared/ui/Page';
 
+/** Admin shorthand: an empty list's message. */
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="panel p-8 text-center text-muted">{children}</div>;
+  return <EmptyState title={children} />;
 }
 
 export function Loading() {
-  return <p className="py-10 text-center text-muted">Loading…</p>;
+  return <LoadingState />;
 }
 
 /** `compact` tables are narrow enough for a phone (few short columns); others scroll sideways inside their box. */
-export function Table({ head, children, compact }: { head: ReactNode; children: ReactNode; compact?: boolean }) {
+export function Table({
+  head,
+  children,
+  compact,
+}: {
+  head: ReactNode;
+  children: ReactNode;
+  compact?: boolean;
+}) {
   return (
     <div className="panel overflow-x-auto">
       <table className={`w-full text-left text-sm ${compact ? '' : 'min-w-[640px]'}`}>
-        <thead className="border-b border-line text-xs text-muted">
+        <thead className="border-b border-line text-xs font-semibold text-muted">
           <tr>{head}</tr>
         </thead>
         <tbody className="divide-y divide-line">{children}</tbody>
@@ -37,7 +38,15 @@ export function Table({ head, children, compact }: { head: ReactNode; children: 
 export const th = 'px-4 py-3 font-semibold';
 export const td = 'px-4 py-3 align-middle';
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
   return (
     <button
       type="button"
@@ -47,11 +56,12 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-green' : 'bg-raised'}`}
     >
-      <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+      <span
+        className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${checked ? 'left-[22px]' : 'left-0.5'}`}
+      />
     </button>
   );
 }
 
 export const dollars = (cents: number) => (cents / 100).toFixed(2);
 export const toCents = (v: string) => Math.round(Number(v || 0) * 100);
-export const fmtDate = (iso: string) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh', dateStyle: 'medium', timeStyle: 'short' });

@@ -40,6 +40,21 @@ export async function api<T = unknown>(path: string, init: Init = {}): Promise<T
   return data as T;
 }
 
+/** GET that returns the response body as text (the invoice page). Non-2xx throws ApiError like `api`. */
+export async function apiText(path: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { credentials: 'include' });
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', "Can't reach the store right now. Check your connection and try again.");
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: { code: string; message: string } } | null;
+    throw new ApiError(res.status, data?.error?.code ?? 'HTTP_ERROR', data?.error?.message ?? `Request failed (${res.status})`);
+  }
+  return res.text();
+}
+
 /** URL for links the browser opens directly (PDFs, CSV downloads). */
 export const apiUrl = (path: string) => `${BASE}${path}`;
 

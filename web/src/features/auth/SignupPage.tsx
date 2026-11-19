@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { PublicUser } from '@cambo/shared';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -38,18 +39,33 @@ export default function Signup() {
   return (
     <AuthCard
       title={t.auth.signupTitle}
-      intro={tg.status === 'verified' ? (tg.firstName ? t.auth.choosePasswordIntro : undefined) : t.auth.signupIntro}
+      intro={
+        tg.status === 'verified'
+          ? tg.firstName
+            ? t.auth.choosePasswordIntro
+            : undefined
+          : t.auth.signupIntro
+      }
       footer={
         <>
           {t.auth.haveAccount}{' '}
-          <Link to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} className="inline-block py-2 font-semibold text-yellow hover:underline">
+          <Link
+            to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="link inline-flex min-h-10 items-center"
+          >
             {t.auth.loginButton}
           </Link>
         </>
       }
     >
       {tg.status === 'verified' && tg.requestId ? (
-        <SetPasswordForm requestId={tg.requestId} firstName={tg.firstName} maskedPhone={tg.maskedPhone} next={next} onRestart={tg.reset} />
+        <SetPasswordForm
+          requestId={tg.requestId}
+          firstName={tg.firstName}
+          maskedPhone={tg.maskedPhone}
+          next={next}
+          onRestart={tg.reset}
+        />
       ) : (
         <TelegramStep tg={tg} startLabel={t.auth.signupButton} />
       )}
@@ -57,7 +73,19 @@ export default function Signup() {
   );
 }
 
-function SetPasswordForm({ requestId, firstName, maskedPhone, next, onRestart }: { requestId: string; firstName?: string; maskedPhone?: string; next: string; onRestart: () => void }) {
+function SetPasswordForm({
+  requestId,
+  firstName,
+  maskedPhone,
+  next,
+  onRestart,
+}: {
+  requestId: string;
+  firstName?: string;
+  maskedPhone?: string;
+  next: string;
+  onRestart: () => void;
+}) {
   const navigate = useNavigate();
   const setMe = useSetMe();
   // The name comes from the customer's Telegram profile; only ask when Telegram gave none.
@@ -72,13 +100,19 @@ function SetPasswordForm({ requestId, firstName, maskedPhone, next, onRestart }:
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const pw = passwordProblem(password);
-    const errs = { password: pw ?? undefined, confirm: password !== confirm ? t.auth.passwordsDiffer : undefined };
+    const errs = {
+      password: pw ?? undefined,
+      confirm: password !== confirm ? t.auth.passwordsDiffer : undefined,
+    };
     setFieldError(errs);
     if (errs.password || errs.confirm) return;
     setBusy(true);
     setError(undefined);
     try {
-      const { user } = await api<{ user: PublicUser }>('/auth/signup/complete', { method: 'POST', body: { requestId, password, ...(askName ? { name: name.trim() } : {}) } });
+      const { user } = await api<{ user: PublicUser }>('/auth/signup/complete', {
+        method: 'POST',
+        body: { requestId, password, ...(askName ? { name: name.trim() } : {}) },
+      });
       setMe(user);
       navigate(next, { replace: true });
     } catch (err) {
@@ -93,32 +127,67 @@ function SetPasswordForm({ requestId, firstName, maskedPhone, next, onRestart }:
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      {maskedPhone && <p className="rounded-xl bg-green/10 px-3.5 py-2.5 text-sm font-semibold text-green">✓ {t.auth.verifiedAs(maskedPhone)}</p>}
+      {maskedPhone && (
+        <p className="flex items-center gap-2 rounded-xl bg-green/10 px-3.5 py-2.5 text-sm font-semibold text-green">
+          <Check className="size-4" strokeWidth={3} aria-hidden />
+          {t.auth.verifiedAs(maskedPhone)}
+        </p>
+      )}
       <FormError>{error}</FormError>
-      {firstName && <p className="font-display text-2xl font-extrabold leading-tight">{t.auth.hiName(firstName)}</p>}
+      {firstName && <p className="title-section text-2xl">{t.auth.hiName(firstName)}</p>}
       {askName && (
         <div>
           <label htmlFor="name" className="label">
             {t.auth.name}
           </label>
-          <input id="name" className="field" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
+          <input
+            id="name"
+            className="field"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={60}
+            required
+          />
         </div>
       )}
       <div>
         <label htmlFor="new-password" className="label">
           {t.auth.newPassword}
         </label>
-        <input id="new-password" type="password" autoComplete="new-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={!!fieldError.password || undefined} aria-describedby="pw-error" />
+        <input
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          className="field"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          aria-invalid={!!fieldError.password || undefined}
+          aria-describedby="pw-error"
+        />
         <FieldError id="pw-error">{fieldError.password}</FieldError>
       </div>
       <div>
         <label htmlFor="confirm-password" className="label">
           {t.auth.confirmPassword}
         </label>
-        <input id="confirm-password" type="password" autoComplete="new-password" className="field" value={confirm} onChange={(e) => setConfirm(e.target.value)} aria-invalid={!!fieldError.confirm || undefined} aria-describedby="confirm-error" />
+        <input
+          id="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          className="field"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          aria-invalid={!!fieldError.confirm || undefined}
+          aria-describedby="confirm-error"
+        />
         <FieldError id="confirm-error">{fieldError.confirm}</FieldError>
       </div>
-      <button type="submit" className="btn-primary w-full" disabled={busy || (askName && !name.trim())}>
+      <button
+        type="submit"
+        className="btn-primary w-full"
+        disabled={busy || (askName && !name.trim())}
+      >
         {t.auth.createAccount}
       </button>
     </form>

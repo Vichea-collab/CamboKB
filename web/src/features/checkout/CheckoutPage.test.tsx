@@ -15,9 +15,11 @@ const product = { id: PID, slug: 'x11', name: 'Attack Shark X11 White', specsLin
 const quote = (over: object = {}) => ({ items: [{ productId: PID, name: product.name, priceCents: 2100, quantity: 1, lineTotalCents: 2100, image: null }], subtotalCents: 2100, deliveryFeeCents: 150, distanceKm: null, discountCents: 0, totalCents: 2250, promo: null, ...over });
 
 let orderCalls: { headers?: Record<string, string>; body?: unknown }[] = [];
+let quoteCalls: { pin?: { lat: number; lng: number } | null }[] = [];
 
-function mockServer(opts: { promoValid?: boolean; khqr?: boolean } = {}) {
+function mockServer(opts: { promoValid?: boolean; khqr?: boolean; shared?: 'location' | 'expired' } = {}) {
   orderCalls = [];
+  quoteCalls = [];
   vi.mocked(api).mockImplementation(async (path: string, init?: { body?: unknown; headers?: Record<string, string> }) => {
     if (path === '/auth/session') return { user: { id: 'u1', name: 'Dara', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: null } };
     if (path === '/me') return { user: { id: 'u1', name: 'Dara', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: null }, defaultAddress: null };
@@ -31,7 +33,8 @@ function mockServer(opts: { promoValid?: boolean; khqr?: boolean } = {}) {
       };
     }
     if (path === '/checkout/quote') {
-      const body = init?.body as { promoCode?: string; region: string };
+      const body = init?.body as { promoCode?: string; region: string; pin?: { lat: number; lng: number } | null };
+      quoteCalls.push(body);
       if (body.promoCode && !opts.promoValid) throw new ApiError(422, 'PROMO_INVALID', 'invalid', { reason: 'EXPIRED' });
       return quote(body.region === 'PROVINCE' ? { deliveryFeeCents: 200, totalCents: 2300 } : {});
     }
@@ -40,6 +43,11 @@ function mockServer(opts: { promoValid?: boolean; khqr?: boolean } = {}) {
       await new Promise((r) => setTimeout(r, 50));
       return { id: 'o1', number: 'CS-250001', payment: { method: (init?.body as { paymentMethod: string }).paymentMethod } };
     }
+    // Sharing the delivery location through the Telegram bot.
+    if (path === '/auth/telegram/current') return { request: null };
+    if (path === '/auth/telegram/start') return { requestId: 'r1', deepLink: 'https://t.me/shop_bot?start=abc' };
+    if (path === '/auth/telegram/r1/status')
+      return opts.shared === 'expired' ? { status: 'EXPIRED' } : { status: 'VERIFIED', lat: 11.5651, lng: 104.9123 };
     throw new Error(`unexpected ${path}`);
   });
 }
@@ -75,6 +83,45 @@ describe('Checkout', () => {
     expect((await screen.findAllByText('$23.00')).length).toBeGreaterThan(0);
   });
 
+  it('moves the pin to the location the customer shared in Telegram, and prices the delivery from it', async () => {
+    mockServer({ shared: 'location' });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: /Share location in Telegram/ }));
+    expect(open).toHaveBeenCalledWith('https://t.me/shop_bot?start=abc', '_blank', 'noopener');
+    expect(await screen.findByText(/Location received from Telegram/, {}, { timeout: 5000 })).toBeInTheDocument();
+    await waitFor(() => expect(quoteCalls.at(-1)?.pin).toEqual({ lat: 11.5651, lng: 104.9123 }));
+    open.mockRestore();
+  });
+
+  it('tells the customer when the Telegram location request ran out', async () => {
+    mockServer({ shared: 'expired' });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: /Share location in Telegram/ }));
+    expect(await screen.findByRole('alert', {}, { timeout: 5000 })).toHaveTextContent(/took too long/);
+    open.mockRestore();
+  });
+
+  it('will not place a Grab order until a map pin is set, then sends the pin with the order', async () => {
+    mockServer({ shared: 'location' });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderCheckout();
+    await userEvent.type(await screen.findByLabelText('Address / note for the driver'), 'St. 315');
+    const place = await screen.findByRole('button', { name: 'Place order' });
+    expect(place).toBeDisabled();
+    expect(screen.getByText(/Set your delivery pin first/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Share location in Telegram/ }));
+    await waitFor(() => expect(place).toBeEnabled(), { timeout: 5000 });
+    expect(screen.queryByText(/Set your delivery pin first/)).not.toBeInTheDocument();
+
+    await userEvent.click(place);
+    expect(await screen.findByText('success page')).toBeInTheDocument();
+    expect((orderCalls[0]!.body as { pin?: unknown }).pin).toEqual({ lat: 11.5651, lng: 104.9123 });
+    open.mockRestore();
+  });
+
   it('explains an invalid promo code', async () => {
     mockServer({ promoValid: false });
     renderCheckout();
@@ -86,6 +133,7 @@ describe('Checkout', () => {
   it('sends one order with an idempotency key when Place order is double-clicked', async () => {
     mockServer();
     renderCheckout();
+    await userEvent.selectOptions(await screen.findByLabelText('Delivery service'), 'VET'); // Grab would need a map pin
     await userEvent.type(await screen.findByLabelText('Address / note for the driver'), 'St. 315');
     const button = await screen.findByRole('button', { name: 'Place order' });
     await waitFor(() => expect(button).toBeEnabled());

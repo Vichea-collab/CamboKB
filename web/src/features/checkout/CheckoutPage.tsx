@@ -18,6 +18,7 @@ import { PhoneInput } from '../../shared/ui/PhoneInput';
 import { useQuote, type QuoteInput } from './useQuote';
 import { api, ApiError, isApiError } from '../../shared/lib/api';
 import { useMe } from '../auth/auth';
+import { useTelegramVerification } from '../auth/useTelegramVerification';
 import { useCartProducts } from '../catalog/api';
 import { t } from '../../shared/lib/strings';
 import type { Order } from '../../shared/lib/types';
@@ -143,11 +144,21 @@ export default function Checkout() {
   };
   const onPin = useCallback((p: { lat: number; lng: number }) => setPin(p), []);
 
+  // Or share it from the phone's Telegram: the bot sends the location back and the pin follows it.
+  const tgLocation = useTelegramVerification('SHARE_LOCATION');
+  const sharedLocation = tgLocation.status === 'verified' ? tgLocation.location : undefined;
+  useEffect(() => {
+    if (sharedLocation) setPin(sharedLocation);
+  }, [sharedLocation]);
+
   const { submit, placing, error } = usePlaceOrder();
 
   if (cartItems.length === 0 && !placing) return <Navigate to="/" replace />;
 
+  // Grab is priced by distance and the driver needs a point on the map: a typed address alone is not enough.
+  const pinMissing = region === 'PHNOM_PENH' && service === 'GRAB' && !pin;
   const canSubmit =
+    !pinMissing &&
     Boolean(quote.data) &&
     !quote.isFetching &&
     name.trim() &&
@@ -262,16 +273,51 @@ export default function Checkout() {
               <div className="mt-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-muted">{t.checkout.pinHelp}</p>
-                  <button
-                    type="button"
-                    onClick={locate}
-                    disabled={locating}
-                    className="btn-ghost btn-sm"
-                  >
-                    📍 {locating ? t.checkout.locating : t.checkout.useLocation}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={locate}
+                      disabled={locating}
+                      className="btn-ghost btn-sm"
+                    >
+                      📍 {locating ? t.checkout.locating : t.checkout.useLocation}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void tgLocation.start()}
+                      disabled={tgLocation.status === 'starting' || tgLocation.status === 'waiting'}
+                      className="btn-ghost btn-sm"
+                    >
+                      ✈️ {tgLocation.status === 'waiting' ? t.checkout.shareWaiting : t.checkout.shareTelegram}
+                    </button>
+                  </div>
                 </div>
+                {tgLocation.status === 'waiting' && (
+                  <p className="text-sm text-muted" aria-live="polite">
+                    {t.checkout.shareHelp}{' '}
+                    {tgLocation.deepLink && (
+                      <a className="link" href={tgLocation.deepLink} target="_blank" rel="noopener noreferrer">
+                        {t.checkout.shareOpen}
+                      </a>
+                    )}
+                  </p>
+                )}
+                {tgLocation.status === 'verified' && sharedLocation && (
+                  <p className="text-sm text-green" role="status">
+                    ✓ {t.checkout.shareReceived}
+                  </p>
+                )}
+                {(tgLocation.status === 'expired' || tgLocation.status === 'error') && (
+                  <p className="text-sm text-danger" role="alert">
+                    {tgLocation.status === 'expired' ? t.checkout.shareExpired : t.checkout.shareError}
+                  </p>
+                )}
                 {locError && <p className="text-sm text-danger">{locError}</p>}
+                {pinMissing && (
+                  <p className="text-sm font-semibold text-yellow" role="status">
+                    {t.checkout.pinRequired}
+                  </p>
+                )}
                 <Suspense
                   fallback={<div className="h-56 animate-pulse rounded-xl bg-raised/50 sm:h-64" />}
                 >

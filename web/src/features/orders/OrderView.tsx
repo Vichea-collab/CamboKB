@@ -109,6 +109,9 @@ export function OrderSummary({ order, actions }: { order: Order; actions?: React
                   {t.orderView.mapPin}
                 </a>
               )}
+              {order.deliveryService === 'GRAB' && (order.lat === null || order.lng === null) && (
+                <p className="mt-1 text-sm font-semibold text-yellow">{t.orderView.noPin}</p>
+              )}
             </div>
             <div>
               <h3 className="mb-1 text-xs font-semibold text-muted">{t.checkout.payment}</h3>

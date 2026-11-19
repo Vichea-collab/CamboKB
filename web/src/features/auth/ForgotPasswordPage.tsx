@@ -22,7 +22,7 @@ export default function ForgotPassword() {
       title={t.auth.resetTitle}
       intro={tg.status === 'verified' ? t.auth.verifiedReset : t.auth.resetIntro}
       footer={
-        <Link to="/login" className="inline-block py-2 font-semibold text-yellow hover:underline">
+        <Link to="/login" className="link inline-flex min-h-10 items-center">
           {t.auth.loginButton}
         </Link>
       }
@@ -36,8 +36,16 @@ export default function ForgotPassword() {
               <label htmlFor="phone" className="label">
                 {t.auth.phone}
               </label>
-              <PhoneInput id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} invalid={phone.length > 5 && !valid} aria-describedby="phone-error" />
-              <FieldError id="phone-error">{phone.length > 5 && !valid ? t.auth.invalidPhone : undefined}</FieldError>
+              <PhoneInput
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                invalid={phone.length > 5 && !valid}
+                aria-describedby="phone-error"
+              />
+              <FieldError id="phone-error">
+                {phone.length > 5 && !valid ? t.auth.invalidPhone : undefined}
+              </FieldError>
             </div>
           )}
           <TelegramStep tg={tg} startLabel={t.auth.resetStart} disabled={!valid} />
@@ -57,11 +65,15 @@ function NewPasswordForm({ requestId, onRestart }: { requestId: string; onRestar
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const problem = passwordProblem(password) ?? (password !== confirm ? t.auth.passwordsDiffer : null);
+    const problem =
+      passwordProblem(password) ?? (password !== confirm ? t.auth.passwordsDiffer : null);
     if (problem) return setError(problem);
     setBusy(true);
     try {
-      const { user } = await api<{ user: PublicUser }>('/auth/reset/complete', { method: 'POST', body: { requestId, password } });
+      const { user } = await api<{ user: PublicUser }>('/auth/reset/complete', {
+        method: 'POST',
+        body: { requestId, password },
+      });
       setMe(user);
       navigate('/account', { replace: true });
     } catch (err) {
@@ -79,13 +91,27 @@ function NewPasswordForm({ requestId, onRestart }: { requestId: string; onRestar
         <label htmlFor="new-password" className="label">
           {t.auth.newPassword}
         </label>
-        <input id="new-password" type="password" autoComplete="new-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          className="field"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
       </div>
       <div>
         <label htmlFor="confirm-password" className="label">
           {t.auth.confirmPassword}
         </label>
-        <input id="confirm-password" type="password" autoComplete="new-password" className="field" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <input
+          id="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          className="field"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+        />
       </div>
       <button type="submit" className="btn-primary w-full" disabled={busy}>
         {t.auth.resetSave}

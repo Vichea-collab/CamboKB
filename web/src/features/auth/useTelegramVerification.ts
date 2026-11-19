@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../shared/lib/api';
 
-export type TgPurpose = 'SIGNUP' | 'RESET' | 'CHANGE_PHONE';
+export type TgPurpose = 'SIGNUP' | 'RESET' | 'CHANGE_PHONE' | 'SHARE_LOCATION';
 type Status = 'idle' | 'starting' | 'waiting' | 'verified' | 'expired' | 'error';
-type StatusResponse = { status: 'PENDING' | 'VERIFIED' | 'COMPLETED' | 'EXPIRED'; phone?: string; firstName?: string };
+type StatusResponse = {
+  status: 'PENDING' | 'VERIFIED' | 'COMPLETED' | 'EXPIRED';
+  phone?: string;
+  firstName?: string;
+  /** SHARE_LOCATION: what the customer shared in the bot. */
+  lat?: number;
+  lng?: number;
+};
+export type SharedLocation = { lat: number; lng: number };
+const locationOf = (st: StatusResponse): SharedLocation | undefined =>
+  st.lat !== undefined && st.lng !== undefined ? { lat: st.lat, lng: st.lng } : undefined;
 
 const POLL_MS = 2000;
 const GIVE_UP_MS = 10 * 60 * 1000;
@@ -16,7 +26,7 @@ const telegramApp = () => (window as { Telegram?: { WebApp?: TelegramWebApp } })
  * customer has shared their number (or the link expires).
  */
 export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
-  const [state, setState] = useState<{ status: Status; deepLink?: string; requestId?: string; firstName?: string; maskedPhone?: string; error?: unknown }>({
+  const [state, setState] = useState<{ status: Status; deepLink?: string; requestId?: string; firstName?: string; maskedPhone?: string; location?: SharedLocation; error?: unknown }>({
     status: 'idle',
   });
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -42,7 +52,7 @@ export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
           const st = await api<StatusResponse>(`/auth/telegram/${requestId}/status`);
           if (st.status === 'VERIFIED') {
             stop();
-            setState((s) => ({ ...s, status: 'verified', maskedPhone: st.phone, firstName: st.firstName }));
+            setState((s) => ({ ...s, status: 'verified', maskedPhone: st.phone, firstName: st.firstName, location: locationOf(st) }));
           } else if (st.status === 'EXPIRED' || st.status === 'COMPLETED') {
             stop();
             setState((s) => ({ ...s, status: 'expired' }));
@@ -63,7 +73,7 @@ export function useTelegramVerification(purpose: TgPurpose, phone?: string) {
       .then(({ request }) => {
         if (!live || !request) return;
         if (request.status === 'VERIFIED') {
-          setState({ status: 'verified', requestId: request.requestId, maskedPhone: request.phone, firstName: request.firstName });
+          setState({ status: 'verified', requestId: request.requestId, maskedPhone: request.phone, firstName: request.firstName, location: locationOf(request) });
         } else if (request.status === 'PENDING') {
           setState({ status: 'waiting', requestId: request.requestId });
           poll(request.requestId);

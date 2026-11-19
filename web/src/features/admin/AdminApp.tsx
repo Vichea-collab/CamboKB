@@ -6,6 +6,7 @@ import CustomerDetail from './CustomerDetail';
 import Customers from './Customers';
 import Dashboard from './Dashboard';
 import OrderDetail from './OrderDetail';
+import AdminInvoice from './InvoicePage';
 import Orders from './Orders';
 import ProductEdit from './ProductEdit';
 import Products from './Products';
@@ -21,6 +22,7 @@ export default function AdminApp() {
         <Route index element={<Dashboard />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
+        <Route path="orders/:id/invoice" element={<AdminInvoice />} />
         <Route path="products" element={<Products />} />
         <Route path="products/new" element={<ProductEdit />} />
         <Route path="products/:id" element={<ProductEdit />} />

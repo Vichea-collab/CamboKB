@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { useEffect } from 'react';
 import { useUi } from '../lib/ui-store';
 
@@ -10,10 +11,18 @@ export function Toast() {
     return () => clearTimeout(id);
   }, [toast, clear]);
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 md:bottom-8">
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 md:bottom-8"
+    >
       {toast && (
-        <div key={toast.id} className="flex items-center gap-2.5 rounded-full border border-line-strong bg-raised px-4 py-2.5 text-sm font-semibold shadow-pop motion-safe:animate-[toast_.2s_ease-out]">
-          <span className="grid size-5 place-items-center rounded-full bg-green text-[11px] text-bg">✓</span>
+        <div
+          key={toast.id}
+          className="flex items-center gap-2.5 rounded-full border border-line-strong bg-raised px-4 py-2.5 text-sm font-semibold shadow-pop motion-safe:animate-[toast_.2s_ease-out]"
+        >
+          <span className="grid size-5 place-items-center rounded-full bg-green text-bg">
+            <Check className="size-3" strokeWidth={3.5} aria-hidden />
+          </span>
           {toast.text}
           <style>{`@keyframes toast{from{opacity:0;transform:translateY(8px)}}`}</style>
         </div>
