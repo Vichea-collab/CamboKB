@@ -148,10 +148,7 @@ describe('Telegram Mini App colours follow the phone', () => {
     themeParams: { bg_color },
     onEvent: vi.fn(),
   });
-  afterEach(() => {
-    document.documentElement.style.removeProperty('--color-bg');
-    document.documentElement.removeAttribute('data-scheme');
-  });
+  afterEach(() => document.documentElement.style.removeProperty('--color-bg'));
 
   it("on a dark phone uses the phone's own background for Telegram's header, the page and the bottom bar", () => {
     const app = themed('dark', '#000000');
@@ -160,22 +157,12 @@ describe('Telegram Mini App colours follow the phone', () => {
     expect(app.setBackgroundColor).toHaveBeenCalledWith('#000000');
     expect(app.setBottomBarColor).toHaveBeenCalledWith('#000000');
     expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('#000000');
-    expect(document.documentElement.dataset.scheme).toBe('dark');
   });
 
-  it("on a light phone the shop goes light too, with the phone's own background", () => {
+  it('keeps the shop colour on a light phone, because the shop is dark only and its text is light', () => {
     const app = themed('light', '#ffffff');
     configureTelegramApp(app, '#12151a');
-    expect(app.setHeaderColor).toHaveBeenCalledWith('#ffffff');
-    expect(app.setBackgroundColor).toHaveBeenCalledWith('#ffffff');
-    expect(app.setBottomBarColor).toHaveBeenCalledWith('#ffffff');
-    expect(document.documentElement.dataset.scheme).toBe('light');
-  });
-
-  it('uses white on a light phone that reports no usable background', () => {
-    const app = themed('light', 'not-a-colour');
-    configureTelegramApp(app, '#12151a');
-    expect(app.setHeaderColor).toHaveBeenCalledWith('#ffffff');
+    expect(app.setHeaderColor).toHaveBeenCalledWith('#12151a');
     expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('');
   });
 
@@ -194,12 +181,7 @@ describe('Telegram Mini App colours follow the phone', () => {
     app.colorScheme = 'light';
     app.themeParams.bg_color = '#ffffff';
     repaint();
-    expect(app.setHeaderColor).toHaveBeenLastCalledWith('#ffffff');
-    expect(document.documentElement.dataset.scheme).toBe('light');
-    app.colorScheme = 'dark';
-    app.themeParams.bg_color = '#000000';
-    repaint();
-    expect(app.setHeaderColor).toHaveBeenLastCalledWith('#000000');
-    expect(document.documentElement.dataset.scheme).toBe('dark');
+    expect(app.setHeaderColor).toHaveBeenLastCalledWith('#12151a');
+    expect(document.documentElement.style.getPropertyValue('--color-bg')).toBe('');
   });
 });

@@ -62,41 +62,30 @@ export type TelegramWebApp = {
   BackButton?: TelegramBackButton;
 };
 
-/** The phone's own background colour, when Telegram gives a usable one. */
+/** The phone's own background, but only on a dark theme: the shop is dark only, so on a light phone it keeps its own. */
 function phoneBackground(app: TelegramWebApp): string | undefined {
   const bg = app.themeParams?.bg_color;
-  return bg && /^#[0-9a-f]{6}$/i.test(bg) ? bg : undefined;
+  return app.colorScheme === 'dark' && bg && /^#[0-9a-f]{6}$/i.test(bg) ? bg : undefined;
 }
-
-/** The shop's background on a light phone that did not report one. */
-const LIGHT_BACKGROUND = '#ffffff';
 
 /**
  * Make the store feel like part of Telegram: full height, and no accidental close or collapse when a swipe
- * down at the top of a long list is meant as scrolling. The shop follows the phone's own light or dark
- * theme: the header, the page and the bottom bar all use the phone's background, so the store blends into
- * Telegram instead of showing a different shade (and it follows the phone if the theme changes).
- * `color` is the shop's own dark colour, used on a dark phone that did not report a background.
+ * down at the top of a long list is meant as scrolling. On a dark phone the header, page and bottom bar all
+ * use the phone's own background, so the store blends into Telegram instead of showing a different shade
+ * (and it follows the phone if the theme changes). `color` is the shop's own colour, used otherwise.
  */
 export function configureTelegramApp(app: TelegramWebApp | undefined, color: string): void {
   if (!app) return;
   app.ready();
   app.expand();
-  const root = document.documentElement;
   const paint = () => {
-    const light = app.colorScheme === 'light';
     const phone = phoneBackground(app);
-    const bg = phone ?? (light ? LIGHT_BACKGROUND : color);
+    const bg = phone ?? color;
     app.setHeaderColor?.(bg);
     app.setBackgroundColor?.(bg);
     app.setBottomBarColor?.(bg);
-    root.dataset.scheme = light ? 'light' : 'dark';
-    document
-      .querySelector('meta[name="color-scheme"]')
-      ?.setAttribute('content', light ? 'light' : 'dark');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
-    if (phone) root.style.setProperty('--color-bg', phone);
-    else root.style.removeProperty('--color-bg');
+    if (phone) document.documentElement.style.setProperty('--color-bg', phone);
+    else document.documentElement.style.removeProperty('--color-bg');
   };
   paint();
   app.onEvent?.('themeChanged', paint);
