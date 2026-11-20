@@ -65,6 +65,12 @@ const renderCheckout = () =>
     </QueryClientProvider>,
   );
 
+/** The dropdowns are bottom sheets: open one by its label, then pick an option from the list. */
+async function choose(label: string, option: string | RegExp) {
+  await userEvent.click(await screen.findByLabelText(label));
+  await userEvent.click(await screen.findByRole('radio', { name: option }));
+}
+
 describe('Checkout', () => {
   beforeEach(() => {
     useCart.setState({ items: [{ productId: PID, quantity: 1 }] });
@@ -94,10 +100,14 @@ describe('Checkout', () => {
   it('hides Grab and disables cash on delivery for provinces', async () => {
     mockServer();
     renderCheckout();
-    const region = await screen.findByLabelText('Delivery location');
-    expect(screen.getByRole('option', { name: /Grab/ })).toBeInTheDocument();
-    await userEvent.selectOptions(region, 'PROVINCE');
-    expect(screen.queryByRole('option', { name: /Grab/ })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByLabelText('Delivery service'));
+    expect(await screen.findByRole('radio', { name: /Grab/ })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await choose('Delivery location', 'Province (តាមខេត្ត)');
+    await userEvent.click(await screen.findByLabelText('Delivery service'));
+    expect(await screen.findByRole('radio', { name: /VET/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Grab/ })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
     expect(screen.getByRole('radio', { name: /Cash on delivery/ })).toBeDisabled();
     expect(screen.getByText('Cash on delivery is only available in Phnom Penh.')).toBeInTheDocument();
     // The total appears in the phone summary bar and in the order summary panel.
@@ -154,7 +164,7 @@ describe('Checkout', () => {
   it('sends one order with an idempotency key when Place order is double-clicked', async () => {
     mockServer();
     renderCheckout();
-    await userEvent.selectOptions(await screen.findByLabelText('Delivery service'), 'VET'); // Grab would need a map pin
+    await choose('Delivery service', /VET/); // Grab would need a map pin
     await userEvent.type(await screen.findByLabelText('Address / note for the driver'), 'St. 315');
     const button = await screen.findByRole('button', { name: 'Place order' });
     await waitFor(() => expect(button).toBeEnabled());
@@ -168,7 +178,7 @@ describe('Checkout', () => {
   it('switches province orders to KHQR and sends the customer to the payment page', async () => {
     mockServer({ khqr: true });
     renderCheckout();
-    await userEvent.selectOptions(await screen.findByLabelText('Delivery location'), 'PROVINCE');
+    await choose('Delivery location', 'Province (តាមខេត្ត)');
     await waitFor(() => expect(screen.getByRole('radio', { name: /KHQR/ })).toBeChecked());
     await userEvent.type(screen.getByLabelText('Address / note for the driver'), 'Siem Reap');
     const button = screen.getByRole('button', { name: 'Place order' });

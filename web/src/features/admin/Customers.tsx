@@ -13,6 +13,7 @@ import { useUi } from '../../shared/lib/ui-store';
 import { Loading, PageHeader, Table, td, th } from './components/ui';
 import { Pager } from './Orders';
 import type { Customer } from './types';
+import { Select } from '../../shared/ui/Select';
 
 export default function Customers() {
   const [q, setQ] = useState('');
@@ -188,15 +189,16 @@ function NewCustomerDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           <label htmlFor="new-cust-role" className="label">
             Role
           </label>
-          <select
+          <Select
             id="new-cust-role"
-            className="field"
+            title="Role"
             value={role}
-            onChange={(e) => setRole(e.target.value as 'CUSTOMER' | 'ADMIN')}
-          >
-            <option value="CUSTOMER">Customer</option>
-            <option value="ADMIN">Admin</option>
-          </select>
+            onChange={(v) => setRole(v as 'CUSTOMER' | 'ADMIN')}
+            options={[
+              { value: 'CUSTOMER', label: 'Customer' },
+              { value: 'ADMIN', label: 'Admin' },
+            ]}
+          />
         </div>
         <div className="flex justify-end gap-3 pt-3">
           <button type="button" className="btn-ghost" onClick={onClose}>

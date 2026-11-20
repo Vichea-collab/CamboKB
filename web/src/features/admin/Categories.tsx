@@ -46,7 +46,7 @@ export default function Categories() {
   };
   const error = create.error ?? rename.error ?? remove.error;
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="space-y-5">
       <PageHeader
         title="Categories"
         description="The filters shoppers see on the home page, in this order. Rename a category by editing its name."

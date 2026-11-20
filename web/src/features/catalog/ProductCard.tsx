@@ -26,7 +26,7 @@ export function ProductCard({
             <img
               src={p.image.md}
               srcSet={`${p.image.sm} 400w, ${p.image.md} 800w`}
-              sizes="(min-width: 1280px) 240px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+              sizes="(min-width: 1280px) 290px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               alt=""
               loading="lazy"
               decoding="async"

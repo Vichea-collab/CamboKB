@@ -17,7 +17,7 @@ export default function OrdersPage() {
     queryFn: () => api<Paged<Order>>('/orders?pageSize=50'),
   });
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <PageHeader title={t.account.orders} back={{ to: '/', label: t.product.backToShop }} />
       {orders.isError ? (
         <ErrorState onRetry={() => orders.refetch()} />

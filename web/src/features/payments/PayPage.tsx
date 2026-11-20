@@ -122,9 +122,8 @@ export default function PayPage() {
         )}
       </div>
 
-      <div className="mt-6 space-y-3 text-sm text-ink/90">
+      <div className="mt-6 space-y-3 text-center text-sm text-ink/90">
         <p>{t.pay.howTo}</p>
-        <p className="text-muted">{t.pay.onThisPhone}</p>
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">

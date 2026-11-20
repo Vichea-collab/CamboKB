@@ -59,6 +59,12 @@ function renderOrders(url = '/admin/orders') {
   );
 }
 
+/** The dropdowns are bottom sheets: open one by its label, then pick an option from the list. */
+async function choose(label: string, option: string | RegExp) {
+  await userEvent.click(await screen.findByLabelText(label));
+  await userEvent.click(await screen.findByRole('radio', { name: option }));
+}
+
 describe('Admin orders: payment', () => {
   beforeEach(() => {
     vi.mocked(api).mockReset();
@@ -76,17 +82,17 @@ describe('Admin orders: payment', () => {
   it('asks the api for only the orders that match the payment and method filters', async () => {
     renderOrders();
     await screen.findAllByText('CS-250001');
-    await userEvent.selectOptions(screen.getByLabelText('Payment'), 'UNPAID');
-    await userEvent.selectOptions(screen.getByLabelText('Payment method'), 'COD');
+    await choose('Payment', 'Not paid yet');
+    await choose('Payment method', 'Cash on delivery');
     await waitFor(() => expect(lastListCall()).toMatch(/payment=UNPAID/));
     expect(lastListCall()).toMatch(/method=COD/);
   });
 
   it('clears a filter when "All payments" is chosen again', async () => {
     renderOrders('/admin/orders?payment=PAID');
-    expect(await screen.findByLabelText('Payment')).toHaveValue('PAID');
+    expect(await screen.findByLabelText('Payment')).toHaveTextContent('Paid');
     expect(lastListCall()).toMatch(/payment=PAID/);
-    await userEvent.selectOptions(screen.getByLabelText('Payment'), '');
+    await choose('Payment', 'All payments');
     await waitFor(() => expect(lastListCall()).not.toMatch(/payment=/));
   });
 });

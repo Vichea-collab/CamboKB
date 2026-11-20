@@ -55,7 +55,7 @@ export default function Banners() {
   };
   const error = upload.error ?? patch.error ?? remove.error;
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="space-y-5">
       <PageHeader
         title="Banners"
         description="The slides at the top of the shop's home page, in this order."

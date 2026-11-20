@@ -30,6 +30,28 @@
   --ease-key: cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 
+/* Inside Telegram on a light phone (see shared/lib/telegram.ts): the same tokens, light values. The accent is
+   a deeper amber so yellow text and links still read on white. */
+:root[data-scheme='light'] {
+  color-scheme: light;
+  --color-bg: #ffffff;
+  --color-surface: #f3f4f7;
+  --color-card: #f6f7f9;
+  --color-raised: #e7eaef;
+  --color-line: rgb(0 0 0 / 0.08);
+  --color-line-strong: rgb(0 0 0 / 0.14);
+  --color-ink: #14171c;
+  --color-muted: #5d6878;
+  --color-yellow: #b97500;
+  --color-yellow-hover: #a06500;
+  --color-yellow-edge: #7a4d00;
+  --color-green: #047857;
+  --color-danger: #dc2626;
+  --color-well: #e8ebf0;
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.16);
+  --shadow-lift: 0 1px 0 rgb(255 255 255 / 0.7) inset, 0 8px 24px rgb(0 0 0 / 0.08);
+}
+
 :root {
   color-scheme: dark;
   /* The shop's top bar: as tall as the phone's bottom bar (56px) so the two frame the page evenly. */

@@ -34,11 +34,14 @@ export default function ProfilePage() {
   if (profile.isError) return <ErrorState onRetry={() => profile.refetch()} />;
   if (!profile.data) return <LoadingState />;
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <PageHeader title={t.account.profile} back={{ to: '/', label: t.product.backToShop }} />
-      <div className="space-y-5">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         {me.data?.role === 'ADMIN' && (
-          <Link to="/admin" className="panel-link flex items-center gap-3 border-yellow/35 p-4">
+          <Link
+            to="/admin"
+            className="panel-link flex items-center gap-3 border-yellow/35 p-4 lg:col-span-2"
+          >
             <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-yellow/12 text-yellow">
               <LayoutDashboard className="size-[18px]" aria-hidden />
             </span>

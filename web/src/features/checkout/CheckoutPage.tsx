@@ -27,6 +27,7 @@ import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useCart } from '../cart/cart-store';
 import { ShopPerks } from '../info/ShopPerks';
 import { useStore } from '../info/store-api';
+import { Select } from '../../shared/ui/Select';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
 
@@ -249,27 +250,31 @@ export default function Checkout() {
           <Section step={2} title={t.checkout.delivery} done={Boolean(address.trim())}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="region" label={t.checkout.region}>
-                <select
+                <Select
                   id="region"
-                  className="field"
+                  title={t.checkout.region}
                   value={region}
-                  onChange={(e) => chooseRegion(e.target.value as Region)}
-                >
-                  <option value="PHNOM_PENH">{t.checkout.phnomPenh}</option>
-                  <option value="PROVINCE">{t.checkout.province}</option>
-                </select>
+                  onChange={(v) => chooseRegion(v as Region)}
+                  options={[
+                    { value: 'PHNOM_PENH', label: t.checkout.phnomPenh },
+                    { value: 'PROVINCE', label: t.checkout.province },
+                  ]}
+                />
               </Field>
               <Field id="service" label={t.checkout.service}>
-                <select
+                <Select
                   id="service"
-                  className="field"
+                  title={t.checkout.service}
                   value={service}
-                  onChange={(e) => setService(e.target.value as Service)}
-                >
-                  {region === 'PHNOM_PENH' && <option value="GRAB">🚀 {t.checkout.grab}</option>}
-                  <option value="VET">📦 {t.checkout.vet}</option>
-                  <option value="JNT">🚚 {t.checkout.jnt}</option>
-                </select>
+                  onChange={(v) => setService(v as Service)}
+                  options={[
+                    ...(region === 'PHNOM_PENH'
+                      ? [{ value: 'GRAB', label: `🚀 ${t.checkout.grab}` }]
+                      : []),
+                    { value: 'VET', label: `📦 ${t.checkout.vet}` },
+                    { value: 'JNT', label: `🚚 ${t.checkout.jnt}` },
+                  ]}
+                />
               </Field>
             </div>
             {region === 'PHNOM_PENH' && (

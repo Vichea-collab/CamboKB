@@ -1,6 +1,6 @@
-import { Home, Package, Search, ShoppingBag, UserRound, type LucideIcon } from 'lucide-react';
+import { Headset, Home, Package, ShoppingBag, UserRound, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link, NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation } from 'react-router';
 import { useMe } from '../features/auth/auth';
 import { useCart } from '../features/cart/cart-store';
 import { t } from '../shared/lib/strings';
@@ -13,14 +13,6 @@ import { useUi } from '../shared/lib/ui-store';
 const NO_NAV = /^\/(products\/|checkout|orders\/|login|signup|forgot-password)/;
 
 export const useBottomNavVisible = () => !NO_NAV.test(useLocation().pathname);
-
-/** On the shop page, Search keeps the category and sort already chosen; from anywhere else it starts clean. */
-function useSearchLink() {
-  const { pathname, search } = useLocation();
-  const params = new URLSearchParams(pathname === '/' ? search : '');
-  params.set('focus', 'search');
-  return `/?${params}`;
-}
 
 const cell = 'group relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold outline-none';
 
@@ -49,7 +41,7 @@ function Tab({ to, end, icon, label }: { to: string; end?: boolean; icon: Lucide
 }
 
 /**
- * The shop's app-style navigation on phones (and in the Telegram Mini App): home, search, orders and account,
+ * The shop's app-style navigation on phones (and in the Telegram Mini App): home, contact, orders and account,
  * with the cart as a raised yellow key in the middle. Tablets and desktops use the header.
  */
 export function BottomNav() {
@@ -57,7 +49,6 @@ export function BottomNav() {
   const me = useMe();
   const count = useCart((s) => s.count());
   const openCart = useUi((s) => s.openCart);
-  const searchTo = useSearchLink();
   if (!visible) return null;
   return (
     <nav
@@ -65,11 +56,7 @@ export function BottomNav() {
       className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       <Tab to="/" end icon={Home} label={t.nav.home} />
-      {/* Never "current": it only takes you to the search box. */}
-      <Link to={searchTo} className={`${cell} text-muted`}>
-        <Glyph icon={Search} active={false} />
-        <Label>{t.nav.search}</Label>
-      </Link>
+      <Tab to="/contact" icon={Headset} label={t.nav.contact} />
       <button type="button" onClick={openCart} aria-label={t.nav.cartLabel(count)} className={`${cell} text-yellow`}>
         <span className="relative -mt-6 grid size-14 place-items-center rounded-full bg-yellow text-yellow-ink shadow-[0_4px_0_0_var(--color-yellow-edge),0_8px_18px_-4px_rgb(0_0_0/0.55)] ring-4 ring-surface transition-transform duration-100 group-active:translate-y-1 group-active:shadow-[0_0_0_0_var(--color-yellow-edge)] group-focus-visible:ring-yellow">
           <ShoppingBag className="size-6" strokeWidth={2.4} aria-hidden />

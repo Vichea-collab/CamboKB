@@ -1,6 +1,7 @@
 import { ArrowUpDown, Check } from 'lucide-react';
 import { useState } from 'react';
 import { Drawer } from '../../shared/ui/Drawer';
+import { Select } from '../../shared/ui/Select';
 import type { Category } from '../../shared/lib/types';
 import { categoryName, t } from '../../shared/lib/strings';
 
@@ -65,18 +66,13 @@ export function FilterBar({
         {/* Tablets and desktops: a labelled dropdown. */}
         <div className="relative hidden shrink-0 sm:block">
           <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-          <select
+          <Select
             aria-label={t.home.sort}
             value={sort}
-            onChange={(e) => onSort(e.target.value as SortKey)}
-            className="h-10 cursor-pointer appearance-none rounded-full bg-surface pl-9 pr-4 text-sm font-semibold text-ink ring-1 ring-line hover:ring-line-strong"
-          >
-            {OPTIONS.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label()}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onSort(v as SortKey)}
+            options={OPTIONS.map((o) => ({ value: o.key, label: o.label() }))}
+            className="h-10 cursor-pointer rounded-full bg-surface pl-9 pr-3 text-sm font-semibold text-ink ring-1 ring-line hover:ring-line-strong"
+          />
         </div>
       </div>
       <Drawer open={sheet} onClose={() => setSheet(false)} title={t.home.sort}>

@@ -18,7 +18,7 @@ export default function OrderDetailPage() {
   const back = { to: '/account/orders', label: t.account.orders };
   if (order.isError)
     return (
-      <div className="mx-auto max-w-2xl">
+      <div>
         <PageHeader title={number} back={back} />
         <ErrorState message={(order.error as Error).message} onRetry={() => order.refetch()} />
       </div>

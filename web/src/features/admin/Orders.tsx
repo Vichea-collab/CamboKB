@@ -10,6 +10,8 @@ import { PaymentBadge, StatusBadge } from '../../shared/ui/StatusBadge';
 import { EmptyState } from '../../shared/ui/Page';
 import { fmtDate, Loading, PageHeader, td, th } from './components/ui';
 import type { AdminOrder } from './types';
+import { Select } from '../../shared/ui/Select';
+import { DatePicker } from '../../shared/ui/DatePicker';
 
 export default function Orders() {
   const [params, setParams] = useSearchParams();
@@ -108,47 +110,51 @@ export default function Orders() {
             aria-label="Search orders"
           />
         </form>
-        <select
+        <Select
           className="field w-auto min-w-[9.5rem] flex-1 sm:flex-none"
           value={payment}
-          onChange={(e) => set('payment', e.target.value)}
+          onChange={(v) => set('payment', v)}
           aria-label="Payment"
-        >
-          <option value="">All payments</option>
-          <option value="PAID">Paid</option>
-          <option value="UNPAID">Not paid yet</option>
-          <option value="FAILED">Failed</option>
-          <option value="REFUNDED">Refunded</option>
-        </select>
-        <select
+          options={[
+            { value: '', label: 'All payments' },
+            { value: 'PAID', label: 'Paid' },
+            { value: 'UNPAID', label: 'Not paid yet' },
+            { value: 'FAILED', label: 'Failed' },
+            { value: 'REFUNDED', label: 'Refunded' },
+          ]}
+        />
+        <Select
           className="field w-auto min-w-[9.5rem] flex-1 sm:flex-none"
           value={method}
-          onChange={(e) => set('method', e.target.value)}
+          onChange={(v) => set('method', v)}
           aria-label="Payment method"
-        >
-          <option value="">Any method</option>
-          <option value="KHQR">KHQR</option>
-          <option value="COD">Cash on delivery</option>
-        </select>
+          options={[
+            { value: '', label: 'Any method' },
+            { value: 'KHQR', label: 'KHQR' },
+            { value: 'COD', label: 'Cash on delivery' },
+          ]}
+        />
         <details className="group relative w-full sm:w-auto" open={Boolean(from || to)}>
           <summary className="btn-ghost w-full cursor-pointer list-none justify-start px-3.5 sm:w-auto [&::-webkit-details-marker]:hidden">
             <CalendarDays className="size-4 text-muted" aria-hidden />
             {from || to ? `${from || '…'} → ${to || '…'}` : 'Dates'}
           </summary>
           <div className="mt-2 flex flex-wrap gap-2 rounded-2xl bg-surface p-3 ring-1 ring-line-strong sm:absolute sm:right-0 sm:z-20 sm:mt-2 sm:w-[22rem] sm:shadow-pop">
-            <input
-              type="date"
+            <DatePicker
               className="field min-w-0 flex-1"
               value={from}
-              onChange={(e) => set('from', e.target.value)}
+              max={to || undefined}
+              onChange={(v) => set('from', v)}
               aria-label="From date"
+              placeholder="From"
             />
-            <input
-              type="date"
+            <DatePicker
               className="field min-w-0 flex-1"
               value={to}
-              onChange={(e) => set('to', e.target.value)}
+              min={from || undefined}
+              onChange={(v) => set('to', v)}
               aria-label="To date"
+              placeholder="To"
             />
             {(from || to) && (
               <button

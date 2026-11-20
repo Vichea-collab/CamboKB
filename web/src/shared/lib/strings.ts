@@ -14,6 +14,7 @@ const en = {
     main: 'Main',
     search: 'Search',
     home: 'Home',
+    contact: 'Contact',
     ordersTab: 'Orders',
     cartLabel: (n: number) => `Cart, ${n} ${n === 1 ? 'item' : 'items'}`,
     homeLabel: (name: string) => `${name} home`,
@@ -236,8 +237,6 @@ const en = {
     payBefore: (time: string) => `Pay before ${time} or the order is cancelled.`,
     howTo:
       'Open your bank app (ABA, ACLEDA, Wing, Bakong…), tap Scan, and scan this code. The amount is filled in for you.',
-    onThisPhone:
-      'Paying on this phone? Save the QR image, then in your bank app tap Scan and choose it from your photos.',
     save: 'Save QR image',
     expiresIn: (mmss: string) => `QR expires in ${mmss}`,
     qrExpired: 'This QR has expired.',
@@ -379,6 +378,7 @@ const km: Strings = {
     main: 'ម៉ឺនុយមេ',
     search: 'ស្វែងរក',
     home: 'ទំព័រដើម',
+    contact: 'ទំនាក់ទំនង',
     ordersTab: 'ការបញ្ជាទិញ',
     cartLabel: (n) => `កន្ត្រក ${n} ទំនិញ`,
     homeLabel: (name) => `${name} ទំព័រដើម`,
@@ -604,8 +604,6 @@ const km: Strings = {
     payBefore: (time) => `សូមបង់ប្រាក់មុន ${time} បើមិនដូច្នោះទេការបញ្ជាទិញនឹងត្រូវបោះបង់។`,
     howTo:
       'បើកកម្មវិធីធនាគាររបស់អ្នក (ABA, ACLEDA, Wing, Bakong…) ចុច Scan ហើយស្កេនកូដនេះ។ ចំនួនទឹកប្រាក់ត្រូវបានបំពេញឱ្យរួចហើយ។',
-    onThisPhone:
-      'កំពុងបង់ប្រាក់លើទូរស័ព្ទនេះមែនទេ? សូមរក្សាទុករូបភាព QR បន្ទាប់មកក្នុងកម្មវិធីធនាគារ ចុច Scan ហើយជ្រើសរើសវាពីរូបថតរបស់អ្នក។',
     save: 'រក្សាទុករូបភាព QR',
     expiresIn: (mmss) => `QR ផុតកំណត់ក្នុង ${mmss}`,
     qrExpired: 'QR នេះផុតកំណត់ហើយ។',

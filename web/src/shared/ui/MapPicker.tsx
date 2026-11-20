@@ -39,7 +39,9 @@ export default function MapPicker({ value, fallback, onChange }: { value: LatLng
     [onChange],
   );
   return (
-    <div className="h-56 overflow-hidden rounded-xl border border-line sm:h-64">
+    // `isolate`: Leaflet's panes and zoom buttons use z-index up to 1000, which would otherwise float above
+    // the sticky save bar, the bottom navigation and the drawers. Isolated, they stay inside this box.
+    <div className="isolate h-56 overflow-hidden rounded-xl border border-line sm:h-64">
       <MapContainer center={center} zoom={value ? 15 : 13} scrollWheelZoom={false} className="size-full" attributionControl>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' />
         <Marker position={center} draggable icon={pin} eventHandlers={handlers} />

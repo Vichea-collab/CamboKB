@@ -12,6 +12,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { SaveBar, useUnsavedGuard } from './components/SaveBar';
 import { SpecEditor } from './components/SpecEditor';
 import type { AdminProduct } from './types';
+import { Select } from '../../shared/ui/Select';
 
 type Form = {
   name: string;
@@ -256,18 +257,13 @@ export default function ProductEdit() {
                 <label className="label" htmlFor="p-cat">
                   Category
                 </label>
-                <select
+                <Select
                   id="p-cat"
-                  className="field"
+                  title="Category"
                   value={form.categoryId}
-                  onChange={(e) => set('categoryId', e.target.value)}
-                >
-                  {categories.data?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => set('categoryId', v)}
+                  options={(categories.data ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

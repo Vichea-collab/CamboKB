@@ -14,6 +14,7 @@ import { StatusActions } from './components/StatusActions';
 import { RefundNotice } from './components/RefundNotice';
 import { TrackingCard } from './components/TrackingCard';
 import type { AdminOrder } from './types';
+import { Select } from '../../shared/ui/Select';
 
 export default function OrderDetail() {
   const { id = '' } = useParams();
@@ -125,19 +126,14 @@ export default function OrderDetail() {
               <label htmlFor="pay" className="label">
                 Payment status
               </label>
-              <select
+              <Select
                 id="pay"
-                className="field"
+                title="Payment status"
                 value={o.payment?.status ?? ''}
-                onChange={(e) => payment.mutate(e.target.value)}
+                onChange={(v) => payment.mutate(v)}
                 disabled={payment.isPending}
-              >
-                {PAYMENT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {t.paymentStatus[s]}
-                  </option>
-                ))}
-              </select>
+                options={PAYMENT_STATUSES.map((s) => ({ value: s, label: t.paymentStatus[s] }))}
+              />
             </Section>
             <Section title="Customer">
               <p className="text-sm">

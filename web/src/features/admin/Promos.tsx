@@ -7,6 +7,8 @@ import { Ticket } from 'lucide-react';
 import { EmptyState } from '../../shared/ui/Page';
 import { dollars, Loading, PageHeader, Table, td, th, toCents, Toggle } from './components/ui';
 import type { Promo } from './types';
+import { Select } from '../../shared/ui/Select';
+import { DatePicker } from '../../shared/ui/DatePicker';
 
 type Draft = {
   code: string;
@@ -108,14 +110,15 @@ export default function Promos() {
           />
         </L>
         <L label="Type">
-          <select
-            className="field"
+          <Select
+            title="Type"
             value={d.type}
-            onChange={(e) => set('type', e.target.value as Draft['type'])}
-          >
-            <option value="FIXED">Amount off ($)</option>
-            <option value="PERCENT">Percent off (%)</option>
-          </select>
+            onChange={(v) => set('type', v as Draft['type'])}
+            options={[
+              { value: 'FIXED', label: 'Amount off ($)' },
+              { value: 'PERCENT', label: 'Percent off (%)' },
+            ]}
+          />
         </L>
         <L label={d.type === 'FIXED' ? 'Amount ($)' : 'Percent (1–100)'}>
           <input
@@ -136,19 +139,21 @@ export default function Promos() {
           />
         </L>
         <L label="Starts">
-          <input
-            type="date"
-            className="field"
+          <DatePicker
+            title="Starts"
+            placeholder="No start date"
             value={d.startsAt}
-            onChange={(e) => set('startsAt', e.target.value)}
+            max={d.endsAt || undefined}
+            onChange={(v) => set('startsAt', v)}
           />
         </L>
         <L label="Ends">
-          <input
-            type="date"
-            className="field"
+          <DatePicker
+            title="Ends"
+            placeholder="No end date"
             value={d.endsAt}
-            onChange={(e) => set('endsAt', e.target.value)}
+            min={d.startsAt || undefined}
+            onChange={(v) => set('endsAt', v)}
           />
         </L>
         <L label="Total uses">

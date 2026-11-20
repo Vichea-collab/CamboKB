@@ -4,7 +4,7 @@ import { t } from '../lib/strings';
 
 /** − 1 + control. `compact` is the pill used on product cards. */
 export function QtyStepper({ value, onChange, max = MAX_QTY, label, compact }: { value: number; onChange: (n: number) => void; max?: number; label: string; compact?: boolean }) {
-  const btn = `grid place-items-center text-ink transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-35 ${compact ? 'size-9' : 'size-10'}`;
+  const btn = `grid place-items-center text-ink transition-colors hover:bg-ink/10 active:bg-ink/15 disabled:opacity-35 ${compact ? 'size-9' : 'size-10'}`;
   return (
     <div
       className={`inline-flex items-center overflow-hidden rounded-xl ${compact ? 'bg-yellow/10 ring-1 ring-yellow/50' : 'bg-surface ring-1 ring-line-strong'}`}

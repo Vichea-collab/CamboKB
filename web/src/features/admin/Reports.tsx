@@ -17,6 +17,7 @@ import { EmptyState, ErrorState, Section } from '../../shared/ui/Page';
 import { RevenueChart } from './components/RevenueChart';
 import { StatTile } from './components/StatTile';
 import { Loading, PageHeader } from './components/ui';
+import { DatePicker } from '../../shared/ui/DatePicker';
 
 type Totals = { orders: number; units: number; revenueCents: number; averageOrderCents: number };
 type Summary = {
@@ -137,13 +138,13 @@ export default function Reports() {
           <div className="flex items-center gap-2">
             <label>
               <span className="sr-only">From</span>
-              <input
-                type="date"
+              <DatePicker
                 aria-label="From"
                 className="field w-auto py-2 text-sm"
                 value={from}
                 max={to}
-                onChange={(e) => setFrom(e.target.value)}
+                onChange={setFrom}
+                allowClear={false}
               />
             </label>
             <span className="text-sm text-muted" aria-hidden>
@@ -151,13 +152,13 @@ export default function Reports() {
             </span>
             <label>
               <span className="sr-only">To</span>
-              <input
-                type="date"
+              <DatePicker
                 aria-label="To"
                 className="field w-auto py-2 text-sm"
                 value={to}
                 min={from}
-                onChange={(e) => setTo(e.target.value)}
+                onChange={setTo}
+                allowClear={false}
               />
             </label>
           </div>

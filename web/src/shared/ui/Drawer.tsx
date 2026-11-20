@@ -10,13 +10,15 @@ type Props = {
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  /** A bottom sheet at every size (centred on wide screens), for short pick-one lists. */
+  sheet?: boolean;
 };
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])';
 
 /** Bottom sheet on phones, side panel from 768px. Traps focus, closes on Esc and backdrop. */
-export function Drawer({ open, onClose, title, children, footer, wide }: Props) {
+export function Drawer({ open, onClose, title, children, footer, wide, sheet }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -62,13 +64,17 @@ export function Drawer({ open, onClose, title, children, footer, wide }: Props) 
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-3xl border-t border-line-strong bg-surface shadow-pop motion-safe:animate-[sheet_.22s_cubic-bezier(.2,.8,.2,1)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-full ${wide ? 'md:max-w-xl' : 'md:max-w-md'} md:rounded-none md:rounded-l-3xl md:border-l md:border-t-0 md:motion-safe:animate-[panel_.22s_cubic-bezier(.2,.8,.2,1)]`}
+        className={`absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-3xl border-t border-line-strong bg-surface shadow-pop motion-safe:animate-[sheet_.22s_cubic-bezier(.2,.8,.2,1)] ${
+          sheet
+            ? 'mx-auto w-full max-w-lg md:mb-6 md:rounded-3xl md:border'
+            : `md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-full ${wide ? 'md:max-w-xl' : 'md:max-w-md'} md:rounded-none md:rounded-l-3xl md:border-l md:border-t-0 md:motion-safe:animate-[panel_.22s_cubic-bezier(.2,.8,.2,1)]`
+        }`}
       >
         <div
-          className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-raised md:hidden"
+          className={`mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-raised ${sheet ? '' : 'md:hidden'}`}
           aria-hidden
         />
-        <div className="flex items-center justify-between px-5 pb-3 pt-3 md:pt-6">
+        <div className={`flex items-center justify-between px-5 pb-3 pt-3 ${sheet ? '' : 'md:pt-6'}`}>
           <h2 id={titleId} className="title-section text-xl">
             {title}
           </h2>
