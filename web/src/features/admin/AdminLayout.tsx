@@ -93,6 +93,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div lang="en" className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
+      <a
+        href="#admin-main"
+        className="sr-only z-50 rounded-xl bg-yellow px-4 py-2 font-semibold text-yellow-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
+      >
+        Skip to content
+      </a>
       {/* Desktop sidebar */}
       <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface/60 px-3 py-5 lg:flex">
         <Brand />
@@ -133,7 +139,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </Link>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10">
+      <main
+        id="admin-main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-6 outline-none sm:px-6 lg:px-8 lg:pb-10"
+      >
         {children}
       </main>
 

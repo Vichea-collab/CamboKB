@@ -113,6 +113,18 @@ export async function announcePaymentConfirmed(db: Db, orderId: string) {
   );
 }
 
+/** The shop marked a paid-then-cancelled order refunded: tell the customer the money is on its way. */
+export async function announcePaymentRefunded(db: Db, orderId: string) {
+  const { order, customerChatId } = await loadSnapshot(db, orderId);
+  await publishEvent(db, 'order.snapshot', order);
+  await publishEvent(
+    db,
+    'payment.refunded',
+    { order, customerChatId },
+    { dedupeKey: `order:${orderId}:refunded` },
+  );
+}
+
 /** The payment window is closing: remind the customer (only when they have Telegram). */
 export async function announcePaymentReminder(db: Db, orderId: string, minutesLeft: number) {
   const { order, customerChatId } = await loadSnapshot(db, orderId);

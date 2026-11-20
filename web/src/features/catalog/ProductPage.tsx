@@ -49,7 +49,7 @@ export default function ProductDetail() {
   const lowStock = !p.isSoldOut && p.stock <= 3;
 
   return (
-    <div className="pb-24 md:pb-0">
+    <div>
       {/* Phones: a clean back button with arrow. Tablets and desktop: the full breadcrumb. */}
       <div className="mb-2 sm:hidden">
         <BackLink to={p.category.slug ? `/?category=${p.category.slug}` : '/'}>
@@ -152,7 +152,7 @@ export default function ProductDetail() {
           <h2 id="more-heading" className="title-section mb-4">
             {t.product.moreIn(categoryName(p.category.slug, p.category.name))}
           </h2>
-          <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+          <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
             {more.map((x) => (
               <div
                 key={x.id}

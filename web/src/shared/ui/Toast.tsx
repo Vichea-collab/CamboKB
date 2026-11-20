@@ -13,7 +13,7 @@ export function Toast() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 md:bottom-8"
+      className="pointer-events-none fixed inset-x-0 top-[calc(var(--hdr-h,56px)+0.75rem)] z-[60] flex justify-center px-4"
     >
       {toast && (
         <div
@@ -24,7 +24,7 @@ export function Toast() {
             <Check className="size-3" strokeWidth={3.5} aria-hidden />
           </span>
           {toast.text}
-          <style>{`@keyframes toast{from{opacity:0;transform:translateY(8px)}}`}</style>
+          <style>{`@keyframes toast{from{opacity:0;transform:translateY(-8px)}}`}</style>
         </div>
       )}
     </div>

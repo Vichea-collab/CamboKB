@@ -68,6 +68,8 @@ export const eventDataSchemas = {
     customerChatId: chat,
     adminAlerts: z.boolean(),
   }),
+  /** The shop sent a paid-then-cancelled order's money back (marked refunded by hand). */
+  'payment.refunded': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
   'payment.reminder': z.object({
     order: orderSnapshotSchema,
     customerChatId: chat,
@@ -109,6 +111,7 @@ export const EVENT_TARGETS = {
   'order.tracking_set': 'notification',
   'payment.confirmed': 'notification',
   'payment.expired': 'notification',
+  'payment.refunded': 'notification',
   'payment.reminder': 'notification',
   'product.low_stock': 'notification',
   'customer.signed_up': 'notification',

@@ -16,7 +16,7 @@ import type { AppDeps } from '../../http/app';
 import { toPublicUser } from '../auth/sessions';
 import { abandonedOrder, orderInclude, toOrderDto } from './orders';
 import { kickEvents } from '../events/outbox';
-import { announceSnapshot, announceTrackingSet } from '../events/snapshot';
+import { announcePaymentRefunded, announceSnapshot, announceTrackingSet } from '../events/snapshot';
 import { changeOrderStatus, publishOrderUpdate } from './status';
 import { AppError, notFound } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
@@ -186,7 +186,9 @@ export function adminOrdersRouter(deps: AppDeps): Router {
           where: { orderId: id },
           data: { status, paidAt: status === 'PAID' ? (payment.paidAt ?? new Date()) : null },
         });
-        await announceSnapshot(tx, id);
+        // Only the moment it becomes refunded: marking it again, or back and forth, does not message the customer twice.
+        if (status === 'REFUNDED' && payment.status !== 'REFUNDED') await announcePaymentRefunded(tx, id);
+        else await announceSnapshot(tx, id);
       });
       kickEvents(deps);
       void publishOrderUpdate(deps, id, 'payment');

@@ -62,7 +62,7 @@ export const orderUrl = (webOrigin: string, number: string) =>
 export const payUrl = (webOrigin: string, number: string) =>
   `${webOrigin}/orders/${encodeURIComponent(number)}/pay`;
 
-export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired' | 'tracking' | 'reminder';
+export type CustomerKind = 'placed' | 'status' | 'paid' | 'expired' | 'tracking' | 'reminder' | 'refunded';
 
 const STATUS_MESSAGE: Record<string, string> = {
   CONFIRMED: '👍 Your order {n} is confirmed.',
@@ -85,6 +85,8 @@ export function customerMessage(
       : '✅ We received your order {n}. Total {total}. We will confirm it shortly.';
   } else if (kind === 'paid')
     text = '💳 Payment received for order {n} ({total}). Your order is confirmed.';
+  else if (kind === 'refunded')
+    text = '💸 We sent back {total} for your cancelled order {n}. It should reach your bank account shortly. Message us if it does not arrive.';
   else if (kind === 'expired')
     text =
       "⏰ Order {n} expired because it wasn't paid within {hold} minutes. You can order again any time.";

@@ -175,6 +175,19 @@ describe('events from the api become Telegram messages', () => {
     expect(text).not.toMatch(/cancelled/);
   });
 
+  it('tells the customer their money was sent back, once, and nobody else', async () => {
+    const o = order({ status: 'CANCELLED', payment: { method: 'KHQR', status: 'REFUNDED' }, totalCents: 3250 });
+    await send(event('payment.refunded', { order: o, customerChatId: String(CUSTOMER) }));
+    await send(event('payment.refunded', { order: o, customerChatId: String(CUSTOMER) }));
+    await flush();
+    const messages = ctx.telegram.to(CUSTOMER);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.text).toContain(o.number);
+    expect(messages[0]!.text).toContain('$32.50');
+    expect(messages[0]!.text).toMatch(/sent back/);
+    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0);
+  });
+
   it('reminds the customer to pay, with the time left and a link to pay, and tells nobody else', async () => {
     const o = order({ payment: { method: 'KHQR', status: 'PENDING' }, totalCents: 4350 });
     await send(event('payment.reminder', { order: o, customerChatId: String(CUSTOMER), minutesLeft: 3 }));

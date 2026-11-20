@@ -29,6 +29,7 @@ const NOTIFICATION_EVENTS = [
   'order.tracking_set',
   'payment.confirmed',
   'payment.reminder',
+  'payment.refunded',
   'product.low_stock',
   'customer.signed_up',
   'payment.expired',
@@ -115,6 +116,11 @@ export function messagesFor<T extends NotificationEvent>(
     case 'payment.reminder': {
       const d = data as EventData<'payment.reminder'>;
       customer(d.customerChatId, d.order, 'reminder', undefined, d.minutesLeft);
+      break;
+    }
+    case 'payment.refunded': {
+      const d = data as EventData<'payment.refunded'>;
+      customer(d.customerChatId, d.order, 'refunded');
       break;
     }
     case 'payment.expired': {

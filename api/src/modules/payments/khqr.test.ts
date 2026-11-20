@@ -329,6 +329,34 @@ describe('KHQR payments with Bakong', () => {
     );
   });
 
+  it('tells the customer once when the admin marks a paid, cancelled order as refunded', async () => {
+    const admin = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
+    const o = await placeKhqr();
+    const [code] = await codes(o.id);
+    ctx.bakong.pay(code!.md5, { amount: 44 });
+    await payment(o.number);
+    const setPayment = (status: string) =>
+      admin.agent
+        .post(`/api/v1/admin/orders/${o.id}/payment`)
+        .set('Origin', WEB_ORIGIN)
+        .send({ status });
+    await admin.agent
+      .post(`/api/v1/admin/orders/${o.id}/status`)
+      .set('Origin', WEB_ORIGIN)
+      .send({ status: 'CANCELLED' });
+    expect(await queued('payment.refunded')).toHaveLength(0);
+
+    expect((await setPayment('REFUNDED')).status).toBe(200);
+    // Marking it again, or flipping it back and forth, never sends a second message.
+    expect((await setPayment('REFUNDED')).status).toBe(200);
+    const [refunded] = await queued<Placed>('payment.refunded');
+    expect(refunded).toMatchObject({
+      order: { number: o.number, status: 'CANCELLED', payment: { status: 'REFUNDED' } },
+      customerChatId: String(TG),
+    });
+    expect(await queued('payment.refunded')).toHaveLength(1);
+  });
+
   it('keeps waiting and warns the admin once when Bakong rejects the token', async () => {
     const o = await placeKhqr();
     ctx.bakong.failWith = new BakongError('UNAUTHORIZED', 'token rejected');
