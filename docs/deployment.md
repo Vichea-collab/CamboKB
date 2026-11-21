@@ -93,7 +93,7 @@ openssl rand -base64 36        # run once per secret / password
 ```
 
 Fill in `.env.production`: `PUBLIC_ORIGIN`, `IMAGE_REPO`, the four database passwords, the four service secrets, the
-Telegram bot token, username, webhook secret and your chat id, `GRAFANA_ADMIN_PASSWORD`, the Cloudflare Tunnel settings,
+Telegram bot token, username, webhook secret, `TELEGRAM_WEBAPP_KEY` (see "Telegram login" below) and your chat id, `GRAFANA_ADMIN_PASSWORD`, the Cloudflare Tunnel settings,
 and (optionally) the Bakong account and token and the R2 settings. The services refuse to start with short or placeholder secrets.
 
 ## 4. First start
@@ -104,7 +104,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production pull
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 docker compose -f docker-compose.prod.yml --env-file .env.production ps           # everything healthy
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/seed.js        # optional demo catalog
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/promote-admin.js 012345678   # after you sign up
+docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/promote-admin.js 012345678   # after you have logged in with Telegram once
 ```
 
 Each service creates its own tables on start. The notification service registers the Telegram webhook at
@@ -112,6 +112,70 @@ Each service creates its own tables on start. The notification service registers
 
 Then run the smoke test against the real address from your laptop: `WEB=https://shop.example.com scripts/smoke.sh`
 (the parts that reach into Docker need to run on the server: `scripts/smoke.sh` there).
+
+## 4b. Telegram login
+
+Customers and admins log in only with Telegram (no passwords). Three settings in `.env.production` make that work; the
+stack refuses to start (`docker compose … up`) when `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` or
+`TELEGRAM_WEBAPP_KEY` is empty, before it touches any running container.
+
+| Setting | Used by | What it is |
+|---|---|---|
+| `TELEGRAM_WEBHOOK_SECRET` | notification | Telegram sends it in the header `X-Telegram-Bot-Api-Secret-Token` on every update. A login tap is trusted only because of it. Make it with `openssl rand -hex 32` (Telegram allows only `A-Z a-z 0-9 _ -`, so not `-base64`) |
+| `TELEGRAM_WEBAPP_KEY` | api | The key that checks logins from inside the Telegram Mini App. It is made from the bot token, but it is **not** the token: with it the api can check signatures and cannot control the bot. The api never gets the token |
+| `PUBLIC_ORIGIN` | all | Must start with `https://`. Mini Apps only open https pages, and the session cookie is `Secure` (sent over https only) |
+
+**Make or recompute `TELEGRAM_WEBAPP_KEY`.** It is 64 hex characters: HMAC-SHA256 of the bot token, with the key `WebAppData`.
+Run this on your own machine or the server. The token is typed at the hidden prompt, so it stays out of the shell history
+and out of any file:
+
+```bash
+read -rs T; printf %s "$T" | openssl dgst -sha256 -hmac "WebAppData" -hex | awk '{print $NF}'; unset T
+```
+
+Paste the output into `.env.production` as `TELEGRAM_WEBAPP_KEY=…`, then restart the api:
+`docker compose -f docker-compose.prod.yml --env-file .env.production up -d api`.
+**Do it again every time the bot token changes** (a rotation in @BotFather, or a token that leaked). Update
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBAPP_KEY` together, then `up -d notification api`. If you forget, Mini App logins
+fail the signature check and customers fall back to the bot link, so nothing locks anyone out, but the silent login is gone.
+
+**Check before a release goes live** (run on the server, in the folder with `.env.production`):
+
+1. *Webhook secret is set and works.* `docker compose -f docker-compose.prod.yml --env-file .env.production config`
+   fails with a clear message if a setting is empty. Then, from anywhere, a call with no header must be refused:
+   `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://shop.example.com/telegram/webhook -H 'content-type: application/json' -d '{}'`
+   prints `401`, never `200`. A `200` means anyone could fake a login tap: stop and fix it.
+2. *Telegram has the webhook.* Ask Telegram (the token is read from the shell, not written into a file):
+   `read -rs T; curl -s "https://api.telegram.org/bot$T/getWebhookInfo"; unset T` shows the url
+   `https://shop.example.com/telegram/webhook`, `has_custom_certificate:false`, no recent `last_error_message`.
+   Keep the output to yourself: it names your server.
+3. *The site is https end to end.* `curl -sI http://shop.example.com | head -1` shows a redirect (`301`/`308`) to https
+   (Cloudflare: SSL/TLS **Full**, **Always Use HTTPS**), and `curl -sI https://shop.example.com/healthz` is `200`.
+   After a login, the `cs_session` cookie has `Secure; HttpOnly; SameSite=Lax` (browser dev tools → Application → Cookies).
+   If the api is started with `COOKIE_SECURE=false` in production, logins work on plain http and the cookie can be stolen: never set it.
+4. *The Mini App opens.* In @BotFather → your bot → Bot Settings → Menu Button (or Configure Mini App), the URL is the
+   same `https://shop.example.com`. Open the bot in Telegram, tap the menu button: the shop loads and logs in without a tap.
+
+**Release order (the database changes in two steps, so a rollback is always possible).**
+
+1. **Release 1** (api tasks 2 to 7): `passwordHash` becomes optional and nothing reads it. Before deploying, add
+   `TELEGRAM_WEBAPP_KEY` to the server's `.env.production`, and take a backup (`scripts/backup.sh`, see section 6).
+   Deploy as in section 5.
+2. **Watch it** (at least a day with real traffic): login and sign-up errors in Grafana (Loki, `service=api`, path
+   `/auth/`), the count of failed `/auth/telegram/webapp` calls, `login-confirm` calls from the bot, and the `cs_session`
+   logins per hour against the days before. A drop to zero is the alarm.
+3. **Release 2** (api task 9): the migration that drops `passwordHash`, `passwordChangedAt` and the `RESET` value. It
+   cannot be undone by an image rollback, so run `scripts/backup.sh` first and keep that backup until the release has
+   run a week.
+4. **Rollback.** Before Release 2: deploy the previous image tag only (section 5); the database needs nothing, because
+   Release 1 only added a nullable column and a new enum value. After Release 2: restore the backup taken just before it,
+   then deploy the Release 1 tag. Customers' orders placed in between are lost with that restore, so decide quickly.
+
+**Owner recovery (lost Telegram account).** There is no password to fall back on. Over SSH, on the server:
+`docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/unlink-telegram.js <phone>`
+(the production form of `npm run admin:unlink-telegram -w api -- <phone>`; ships with api task 8). It clears the
+Telegram link and ends that account's sessions. The owner then opens the bot, shares their phone number and logs in
+with the new Telegram account. Admin sessions last 1 day. For a customer, use **Unlink Telegram** on the customer page in Admin.
 
 ## 5. Later deploys
 

@@ -60,13 +60,14 @@ Open http://localhost:5173.
 The bot belongs to the **notification service**.
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
-2. In `notification/.env`: `TELEGRAM_MODE=polling`, `TELEGRAM_BOT_TOKEN=…`. In `api/.env`: `TELEGRAM_BOT_USERNAME=YourBot` (the api builds the sign-up link from it).
+2. In `notification/.env`: `TELEGRAM_MODE=polling`, `TELEGRAM_BOT_TOKEN=…`. In `api/.env`: `TELEGRAM_BOT_USERNAME=YourBot` (the api builds the login link from it). `TELEGRAM_WEBAPP_KEY` in `api/.env` is only for logging in inside the Telegram Mini App; it is made from the token, and `api/.env.example` shows how.
 3. For new-order alerts, set `TELEGRAM_ADMIN_CHAT_ID` (in `notification/.env`) to your Telegram user id or a group id
    (send a message to [@userinfobot](https://t.me/userinfobot) to get yours).
 
-Polling is for development. Production uses a webhook (`TELEGRAM_MODE=webhook`, a random `TELEGRAM_WEBHOOK_SECRET`,
+Polling is for development. Production uses a webhook (`TELEGRAM_MODE=webhook`, a random `TELEGRAM_WEBHOOK_SECRET` made with `openssl rand -hex 32`,
 and `TELEGRAM_WEBHOOK_URL=https://your-domain/telegram/webhook`); the notification service registers it on start and
-nginx forwards that one path to it.
+nginx forwards that one path to it. Production also needs `TELEGRAM_WEBAPP_KEY` and an https `PUBLIC_ORIGIN`:
+see `docs/deployment.md`, "Telegram login".
 
 What customers get from the bot, with no extra setup (they've already started it when they sign up):
 
