@@ -7,9 +7,7 @@ vi.mock('../../shared/lib/api', async (orig) => ({ ...(await orig<typeof import(
 import { api, ApiError } from '../../shared/lib/api';
 import { resetMiniAppLogin } from './auth';
 import Login from './LoginPage';
-import { router } from '../../app/router';
 
-const USER = { id: 'u1', name: 'Dara Sok', phone: '+85512345678', role: 'CUSTOMER', telegramUsername: 'dara' };
 const mockApi = vi.mocked(api);
 
 type Handler = (path: string, init?: { body?: unknown }) => unknown;
