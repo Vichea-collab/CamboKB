@@ -127,6 +127,7 @@ services:
       NOTIFICATION_SERVICE_SECRET: ${NOTIFICATION_SERVICE_SECRET}
       API_INTERNAL_SECRET: ${API_INTERNAL_SECRET}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      ADMIN_SESSION_TTL_DAYS: ${ADMIN_SESSION_TTL_DAYS:-1}
       # Derived from the bot token, NOT the token: the api can check Mini App signatures but cannot control the bot.
       # Recompute when the bot token changes (docs/deployment.md, "Telegram login").
       TELEGRAM_WEBAPP_KEY: ${TELEGRAM_WEBAPP_KEY:?set TELEGRAM_WEBAPP_KEY in .env.production (docs/deployment.md, Telegram login)}

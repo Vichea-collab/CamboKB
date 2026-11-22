@@ -117,7 +117,7 @@ Then run the smoke test against the real address from your laptop: `WEB=https://
 
 Customers and admins log in only with Telegram (no passwords). Three settings in `.env.production` make that work; the
 stack refuses to start (`docker compose … up`) when `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` or
-`TELEGRAM_WEBAPP_KEY` is empty, before it touches any running container.
+`TELEGRAM_WEBAPP_KEY` is empty, before it touches any running container. `ADMIN_SESSION_TTL_DAYS` is optional (default 1).
 
 | Setting | Used by | What it is |
 |---|---|---|
@@ -173,9 +173,9 @@ fail the signature check and customers fall back to the bot link, so nothing loc
 
 **Owner recovery (lost Telegram account).** There is no password to fall back on. Over SSH, on the server:
 `docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/unlink-telegram.js <phone>`
-(the production form of `npm run admin:unlink-telegram -w api -- <phone>`; ships with api task 8). It clears the
+(the production form of `npm run admin:unlink-telegram -w api -- <phone>`; npm script `admin:unlink-telegram:prod`). It clears the
 Telegram link and ends that account's sessions. The owner then opens the bot, shares their phone number and logs in
-with the new Telegram account. Admin sessions last 1 day. For a customer, use **Unlink Telegram** on the customer page in Admin.
+with the new Telegram account. Admin sessions last `ADMIN_SESSION_TTL_DAYS` days (default 1) from login and do not extend with use. For a customer, use **Unlink Telegram** on the customer page in Admin.
 
 ## 5. Later deploys
 
