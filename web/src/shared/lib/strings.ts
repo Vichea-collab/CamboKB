@@ -34,6 +34,10 @@ const en = {
     delivery: 'Delivery',
     warranty: 'Warranty & returns',
     privacy: 'Privacy',
+    help: 'Help',
+    contactUs: 'Contact us',
+    callUs: 'Call us',
+    telegram: 'Message us on Telegram',
   },
   home: {
     heading: 'Keyboards, mice and desk gear',
@@ -415,6 +419,10 @@ const km: Strings = {
     delivery: 'ការដឹកជញ្ជូន',
     warranty: 'ការធានា និងការប្ដូរ/សងវិញ',
     privacy: 'ឯកជនភាព',
+    help: 'ជំនួយ',
+    contactUs: 'ទំនាក់ទំនងយើង',
+    callUs: 'ទូរស័ព្ទមកយើង',
+    telegram: 'ផ្ញើសារតាម Telegram',
   },
   home: {
     heading: 'ក្ដារចុច កណ្ដុរ និងឧបករណ៍តុកុំព្យូទ័រ',

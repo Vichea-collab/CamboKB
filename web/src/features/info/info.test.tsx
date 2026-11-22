@@ -92,4 +92,34 @@ describe('footer', () => {
     }
     expect(screen.getByRole('link', { name: '087 522 210' })).toHaveAttribute('href', 'tel:+85587522210');
   });
+
+  it('offers a Telegram button (a leading @ is ignored) and hides it when not set', async () => {
+    const { unmount } = renderPage(<Footer />, store({ telegram: '@Cambo_KB_Bot' }));
+    expect(await screen.findByRole('link', { name: 'Message us on Telegram' })).toHaveAttribute(
+      'href',
+      'https://t.me/Cambo_KB_Bot',
+    );
+    unmount();
+    renderPage(<Footer />, store({ phone: '087 522 210' }));
+    await screen.findByRole('link', { name: '087 522 210' });
+    expect(screen.queryByRole('link', { name: 'Message us on Telegram' })).not.toBeInTheDocument();
+  });
+
+  it('shows the Admin link only to admins', async () => {
+    const as = (user: { role: string } | null) =>
+      vi.mocked(api).mockImplementation(async (path: string) => (path === '/auth/session' ? { user } : store()));
+    const wrap = (node: React.ReactNode) => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>{node}</MemoryRouter>
+      </QueryClientProvider>
+    );
+    as({ role: 'ADMIN' });
+    const admin = render(wrap(<Footer />));
+    expect(await screen.findByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin');
+    admin.unmount();
+    as({ role: 'CUSTOMER' });
+    render(wrap(<Footer />));
+    await screen.findByRole('link', { name: 'Privacy' });
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+  });
 });
