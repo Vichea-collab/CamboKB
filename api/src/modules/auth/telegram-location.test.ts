@@ -41,10 +41,10 @@ const sendLocation = (ctx: Ctx, fromId: number, latitude: number, longitude: num
 
 const STORE_NEARBY = { latitude: 11.5651, longitude: 104.9123 };
 
-async function startShare(agent: ReturnType<typeof request.agent>) {
+async function startShare(agent: ReturnType<typeof request.agent>, origin = WEB_ORIGIN) {
   const res = await agent
     .post('/api/v1/auth/telegram/start')
-    .set('Origin', WEB_ORIGIN)
+    .set('Origin', origin)
     .send({ purpose: 'SHARE_LOCATION' });
   expect(res.status).toBe(200);
   const token = new URL(res.body.deepLink).searchParams.get('start')!;
@@ -170,6 +170,67 @@ describe('sharing the delivery location through the Telegram bot', () => {
       .get('/api/v1/auth/telegram/current')
       .query({ purpose: 'SHARE_LOCATION' });
     expect(current.body.request).toMatchObject({ status: 'VERIFIED', lat: 11.57, lng: 104.9 });
+  });
+
+  describe('returning to the mini app', () => {
+    const SHOP = 'https://shop.example.com';
+    async function httpsCtx() {
+      return createTestApp({ config: { ...ctx.deps.config, webOrigin: [SHOP] } });
+    }
+
+    it('sends a button that opens checkout in the mini app once the location is saved', async () => {
+      const web = await httpsCtx();
+      const user = await createUser(web.prisma, { telegramUserId: 777 });
+      const agent = await loginAs(web.app, user.phone);
+      const { token } = await startShare(agent, SHOP);
+      await sendStart(web, 777, token);
+      await sendLocation(web, 777, 11.57, 104.9);
+      const [saved, back] = said.slice(-2);
+      expect(saved!.replyMarkup).toEqual({ remove_keyboard: true });
+      expect(back!.replyMarkup).toEqual({
+        inline_keyboard: [[{ text: expect.stringContaining('checkout'), web_app: { url: `${SHOP}/checkout` } }]],
+      });
+    });
+
+    it('sends no button when the site is not on https (Telegram only opens mini apps from https)', async () => {
+      const { agent } = await signedIn();
+      const { token } = await startShare(agent);
+      await sendStart(ctx, 777, token);
+      await sendLocation(ctx, 777, 11.57, 104.9);
+      expect(said.at(-1)!.replyMarkup).toEqual({ remove_keyboard: true });
+      expect(JSON.stringify(said)).not.toContain('web_app');
+    });
+
+    it('lets a fresh mini app (no cookie from the earlier page) pick up the location of the signed-in customer', async () => {
+      const { user, agent } = await signedIn();
+      const { token } = await startShare(agent);
+      await sendStart(ctx, 777, token);
+      await sendLocation(ctx, 777, 11.57, 104.9);
+      const reopened = await loginAs(ctx.app, user.phone); // new webview: session cookie only
+      const current = await reopened
+        .get('/api/v1/auth/telegram/current')
+        .query({ purpose: 'SHARE_LOCATION' });
+      expect(current.body.request).toMatchObject({ status: 'VERIFIED', lat: 11.57, lng: 104.9 });
+    });
+
+    it('does not hand one customer the location another one shared, or an expired one', async () => {
+      const { agent } = await signedIn(777);
+      const { token } = await startShare(agent);
+      await sendStart(ctx, 777, token);
+      await sendLocation(ctx, 777, 11.57, 104.9);
+      const other = await createUser(ctx.prisma, { telegramUserId: 999 });
+      const otherAgent = await loginAs(ctx.app, other.phone);
+      const theirs = await otherAgent.get('/api/v1/auth/telegram/current').query({ purpose: 'SHARE_LOCATION' });
+      expect(theirs.body.request).toBeNull();
+
+      await ctx.prisma.telegramAuthRequest.updateMany({
+        where: { purpose: 'SHARE_LOCATION' },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      const user = (await ctx.prisma.user.findFirst({ where: { telegramUserId: 777n } }))!;
+      const late = await (await loginAs(ctx.app, user.phone)).get('/api/v1/auth/telegram/current').query({ purpose: 'SHARE_LOCATION' });
+      expect(late.body.request).toBeNull();
+    });
   });
 
   it('lets a customer retry sharing many times without using up the login allowance', async () => {
