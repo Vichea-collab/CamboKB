@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DatePicker } from './DatePicker';
 
 function Harness({
@@ -75,5 +75,38 @@ describe('DatePicker (a calendar in a bottom sheet)', () => {
     render(<Harness allowClear={false} />);
     await userEvent.click(field());
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+  });
+});
+
+describe('DatePicker on a desktop screen (a calendar under the field)', () => {
+  const asDesktop = () =>
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('opens a small calendar, not a sheet, and closes after a pick', async () => {
+    asDesktop();
+    render(<Harness />);
+    await userEvent.click(field());
+    const calendar = screen.getByRole('dialog', { name: 'Day' });
+    expect(calendar.parentElement).toBe(document.body);
+    await userEvent.click(screen.getByRole('button', { name: '12 November 2026' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(field()).toHaveTextContent('12 Nov 2026');
+  });
+
+  it('closes on Escape and on a click outside', async () => {
+    asDesktop();
+    render(<Harness />);
+    await userEvent.click(field());
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await userEvent.click(field());
+    await userEvent.click(document.body);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
