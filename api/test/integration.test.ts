@@ -94,6 +94,8 @@ describe('the services working together', () => {
       invoices: {
         render: async (d) => Buffer.from(`%PDF-1.7 invoice ${d.number}`),
         renderHtml: async (d) => `<!doctype html><p>invoice ${d.number}</p>`,
+        renderSales: async (d) => Buffer.from(`%PDF-1.7 sales report ${d.from}`),
+        renderSalesHtml: async (d) => `<!doctype html><p>sales report ${d.from}</p>`,
         close: async () => {},
       },
       logger: reportLogger('silent'),
@@ -211,6 +213,11 @@ describe('the services working together', () => {
     const invoice = await customer.agent.get(`/api/v1/orders/${res.body.number}/invoice.pdf`);
     expect(invoice.status).toBe(200);
     expect(invoice.body.toString()).toContain(`invoice ${res.body.number}`);
+    // The sales report PDF is asked for the same way: api -> report service (which holds the order) -> PDF.
+    const report = await admin.agent.get('/api/v1/admin/reports/report.pdf').query({ from: today, to: today });
+    expect(report.status).toBe(200);
+    expect(report.headers['content-type']).toBe('application/pdf');
+    expect(report.body.toString()).toContain(`sales report ${today}`);
   });
 
   it('the owner confirms the order with a Telegram button: Telegram -> notification -> api -> report and the customer', async () => {

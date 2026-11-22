@@ -28,6 +28,7 @@ export async function seedOrder(opts: {
   region?: 'PHNOM_PENH' | 'PROVINCE';
   contactName?: string;
   method?: 'COD' | 'KHQR';
+  paymentStatus?: 'UNPAID' | 'PENDING' | 'PAID';
   emittedAt?: string;
 }) {
   seq += 1;
@@ -54,7 +55,7 @@ export async function seedOrder(opts: {
     discountCents: discount,
     totalCents: subtotal + fee - discount,
     promoCode: null,
-    payment: { method: opts.method ?? 'COD', status: 'UNPAID' },
+    payment: { method: opts.method ?? 'COD', status: opts.paymentStatus ?? 'UNPAID' },
     items: opts.items.map((i) => ({ ...i, lineTotalCents: i.priceCents * i.quantity })),
   };
   await applySnapshot(pool, order, opts.emittedAt ?? new Date().toISOString());

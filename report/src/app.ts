@@ -17,7 +17,8 @@ import { ReportError } from './errors';
 import { getInvoiceData, type InvoiceRenderer } from './invoice';
 import type { Logger } from './logger';
 import { applySnapshot, orderStats } from './orders';
-import { rangeSchema } from './range';
+import { rangeSchema, resolveRange } from './range';
+import { getSalesReportData } from './sales-report';
 import { breakdown, ordersForCsv, salesSummary, topProducts } from './sales';
 
 export type ReportDeps = {
@@ -209,6 +210,35 @@ export function createReportApp({ config, pool, invoices, logger }: ReportDeps) 
 
   r.get('/sales/breakdown', async (req, res) => {
     res.json(await breakdown(pool, parse(rangeSchema, req.query)));
+  });
+
+  // The printed report: summary, sales by day or month, products, payments, regions and every order, each with its total.
+  r.get('/sales/report.:ext', async (req, res) => {
+    if (req.params.ext !== 'pdf' && req.params.ext !== 'html') throw new ReportError(404, 'NOT_FOUND', 'Not found');
+    const q = parse(
+      rangeSchema.extend({ groupBy: z.enum(['day', 'month']).default('day') }),
+      req.query,
+    );
+    resolveRange(q); // the same limits as every other report (at most a year, from before to)
+    const data = await getSalesReportData(pool, q, q.groupBy);
+    if (req.params.ext === 'html') {
+      res.set({
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; frame-ancestors 'self'",
+        'Cache-Control': 'private, no-store',
+      });
+      res.send(await invoices.renderSalesHtml(data, { name: config.storeName }));
+      return;
+    }
+    const stop = rendered.startTimer();
+    const pdf = await invoices.renderSales(data, { name: config.storeName });
+    stop();
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="sales-report-${q.from}-to-${q.to}.pdf"`,
+      'Cache-Control': 'private, no-store',
+    });
+    res.send(pdf);
   });
 
   r.get('/sales/orders.csv', async (req, res) => {

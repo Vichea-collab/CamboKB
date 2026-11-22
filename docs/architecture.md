@@ -49,7 +49,7 @@ flowchart LR
 |---|---|---|---|
 | `api` | Accounts and sessions, catalog, pricing, orders, KHQR payments, admin screens' data | It is the business core: orders and money must stay in one transaction | `api-db`: users, products, orders, payments, promos |
 | `file` | Resize and store images, serve them with long cache headers | CPU-heavy image work and storage (disk or S3) with a different scaling and failure profile | `file-db`: a record of every stored asset; the blobs themselves |
-| `report` | Sales summaries, top products, CSV export, invoice PDFs | Headless Chrome for PDFs is heavy, and reporting must not slow down checkout | `report-db`: a copy of the order facts it needs |
+| `report` | Sales summaries, top products, the sales report PDF, CSV export, invoice PDFs | Headless Chrome for PDFs is heavy, and reporting must not slow down checkout | `report-db`: a copy of the order facts it needs |
 | `notification` | Everything Telegram: message queue, retries, rate limits, new-order alerts, the owner's order buttons, the bot webhook | A third-party that is often slow or down must never block an order. Customers' and the owner's messages are one concern | `notification-db`: queued/sent messages, events already handled |
 | `web` | The React app and the single public entry point (nginx) | Static files and routing | nothing |
 

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sales report {{period}}</title>
+<style>
+  /* Same paper as the invoice: black ink, brand yellow as the one accent. Local fonts only (no network during rendering). */
+  @page { size: A4; }
+  * { box-sizing: border-box; }
+  :root { --ink: #14171c; --gold: #e8b23f; --soft: #fbf1d6; --muted: #4a5260; }
+  body {
+    margin: 0;
+    font-family: 'Plus Jakarta Sans', 'Noto Sans', 'Noto Sans Khmer', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ink);
+    font-size: 8.6pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* On screen (the preview) the report is shown as a sheet of paper; the PDF is printed without this. */
+  @media screen {
+    html { background: #e7eaf0; }
+    body { padding: 16px; }
+    .page { width: 210mm; margin: 0 auto; background: #fff; box-shadow: 0 2px 18px rgba(20, 23, 28, 0.18); border-radius: 4px; padding: 10mm 12mm 16mm; }
+  }
+
+  .top { position: relative; height: 30mm; }
+  .logo { position: absolute; left: 0; top: 0; width: 26mm; height: 26mm; border-radius: 50%; }
+  .title { text-align: center; padding: 4mm 0 0 26mm; }
+  .title .shop { font-family: 'Anton', 'Oswald', 'Impact', 'Noto Sans', Arial, sans-serif; font-weight: 800; font-size: 17pt; letter-spacing: 0.22em; text-transform: uppercase; line-height: 1.1; }
+  .title .doc { font-family: 'Anton', 'Oswald', 'Impact', 'Noto Sans', Arial, sans-serif; font-weight: 800; font-size: 27pt; letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.1; margin-top: 1.5mm; }
+
+  .meta { display: grid; grid-template-columns: 1.7fr 0.55fr 0.95fr 1.3fr; gap: 4mm; margin: 1mm 0 6mm; padding: 2.5mm 3mm; border: 0.35mm solid var(--ink); }
+  .meta div b { display: block; font-size: 7.4pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .meta div span { font-weight: 700; font-size: 9.6pt; }
+  .meta .r { text-align: right; }
+  .meta .no { font-size: 8.6pt; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin-bottom: 2mm; }
+  .kpi { border: 0.35mm solid var(--ink); padding: 2.2mm 3mm; break-inside: avoid; }
+  .kpi.main { background: var(--gold); }
+  .kpi b { display: block; font-size: 7.4pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .kpi span { display: block; font-size: 15pt; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .sub { display: flex; gap: 6mm; flex-wrap: wrap; font-size: 8.2pt; color: var(--muted); margin: 0 0 1mm; }
+  .sub b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .note { font-size: 8pt; color: var(--muted); margin: 1mm 0 0; }
+
+  h2 { margin: 6mm 0 2mm; font-size: 11pt; font-weight: 800; padding-left: 2.5mm; border-left: 1.4mm solid var(--gold); line-height: 1.2; break-after: avoid; }
+  h2 small { font-weight: 500; font-size: 8pt; color: var(--muted); margin-left: 2mm; }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { border: 0.3mm solid var(--ink); padding: 0 2mm; height: 6.2mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  thead th { background: var(--gold); font-weight: 800; font-size: 8.4pt; text-align: center; }
+  thead { display: table-header-group; }
+  tbody tr:nth-child(even) td { background: #fafafa; }
+  tr { break-inside: avoid; }
+  td.c { text-align: center; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  td.l { text-align: left; }
+  td.wrap { white-space: normal; padding-top: 0.8mm; padding-bottom: 0.8mm; height: auto; min-height: 6.2mm; }
+  tfoot td { background: var(--gold); font-weight: 800; }
+  tfoot { display: table-row-group; }
+  .paid { font-weight: 700; color: #065f46; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; break-inside: avoid; }
+  .two h2 { margin-top: 6mm; }
+  .keep { break-inside: avoid; }
+  .empty { padding: 10mm 0; text-align: center; color: var(--muted); border: 0.3mm dashed var(--muted); }
+  .thanks { margin-top: 8mm; text-align: center; color: var(--muted); font-size: 8pt; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <img class="logo" src="{{{logo}}}" alt="" />
+    <div class="title">
+      <div class="shop">Cambo Keyboard Supply</div>
+      <div class="doc">Sales Report</div>
+    </div>
+  </div>
+
+  <section class="meta">
+    <div><b>Period</b><span>{{period}}</span></div>
+    <div><b>Grouped by</b><span>{{groupLabel}}</span></div>
+    <div><b>Prepared</b><span>{{generated}}</span></div>
+    <div class="r"><b>Report no.</b><span class="no">{{reportNo}}</span></div>
+  </section>
+
+  <section class="kpis">
+    <div class="kpi main"><b>Revenue</b><span>{{kpi.revenue}}</span></div>
+    <div class="kpi"><b>Orders</b><span>{{kpi.orders}}</span></div>
+    <div class="kpi"><b>Items sold</b><span>{{kpi.units}}</span></div>
+    <div class="kpi"><b>Average order</b><span>{{kpi.average}}</span></div>
+  </section>
+  <div class="sub">
+    <span>Paid: <b>{{kpi.paid}}</b></span>
+    <span>Not yet paid: <b>{{kpi.unpaid}}</b></span>
+  </div>
+  {{#if cancelled}}<p class="note">{{cancelled}}</p>{{/if}}
+
+  {{#if hasSales}}
+  <h2>Sales by {{groupLabel}}</h2>
+  <table>
+    <colgroup><col /><col style="width:15%" /><col style="width:15%" /><col style="width:21%" /><col style="width:13%" /></colgroup>
+    <thead><tr><th>{{groupLabel}}</th><th>Orders</th><th>Items</th><th>Revenue</th><th>Share</th></tr></thead>
+    <tbody>
+      {{#each periods}}
+      <tr><td class="l">{{label}}</td><td class="c">{{orders}}</td><td class="c">{{units}}</td><td class="r">{{revenue}}</td><td class="r">{{share}}</td></tr>
+      {{/each}}
+    </tbody>
+    <tfoot><tr><td class="l">Total</td><td class="c">{{kpi.orders}}</td><td class="c">{{kpi.units}}</td><td class="r">{{kpi.revenue}}</td><td class="r">100%</td></tr></tfoot>
+  </table>
+  {{#if periodNote}}<p class="note">{{periodNote}}</p>{{/if}}
+
+  <div class="{{#if keepProducts}}keep{{/if}}">
+  <h2>Products sold <small>before delivery and discounts</small></h2>
+  <table>
+    <colgroup><col style="width:8%" /><col /><col style="width:13%" /><col style="width:21%" /><col style="width:13%" /></colgroup>
+    <thead><tr><th>No.</th><th>Product</th><th>Sold</th><th>Amount</th><th>Share</th></tr></thead>
+    <tbody>
+      {{#each products}}
+      <tr><td class="c">{{index}}</td><td class="l wrap">{{name}}</td><td class="c">{{units}}</td><td class="r">{{revenue}}</td><td class="r">{{share}}</td></tr>
+      {{/each}}
+    </tbody>
+    <tfoot><tr><td></td><td class="l">Total</td><td class="c">{{productUnits}}</td><td class="r">{{productRevenue}}</td><td class="r">100%</td></tr></tfoot>
+  </table>
+  </div>
+
+  <div class="two">
+    <div>
+      <h2>How customers paid</h2>
+      <table>
+        <colgroup><col /><col style="width:16%" /><col style="width:28%" /><col style="width:17%" /></colgroup>
+        <thead><tr><th>Method</th><th>Orders</th><th>Revenue</th><th>Share</th></tr></thead>
+        <tbody>
+          {{#each methods}}<tr><td class="l">{{label}}</td><td class="c">{{orders}}</td><td class="r">{{revenue}}</td><td class="r">{{share}}</td></tr>{{/each}}
+        </tbody>
+        <tfoot><tr><td class="l">Total</td><td class="c">{{kpi.orders}}</td><td class="r">{{kpi.revenue}}</td><td class="r">100%</td></tr></tfoot>
+      </table>
+    </div>
+    <div>
+      <h2>Where orders went</h2>
+      <table>
+        <colgroup><col /><col style="width:16%" /><col style="width:28%" /><col style="width:17%" /></colgroup>
+        <thead><tr><th>Region</th><th>Orders</th><th>Revenue</th><th>Share</th></tr></thead>
+        <tbody>
+          {{#each regions}}<tr><td class="l">{{label}}</td><td class="c">{{orders}}</td><td class="r">{{revenue}}</td><td class="r">{{share}}</td></tr>{{/each}}
+        </tbody>
+        <tfoot><tr><td class="l">Total</td><td class="c">{{kpi.orders}}</td><td class="r">{{kpi.revenue}}</td><td class="r">100%</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <h2>Every order <small>newest last · Phnom Penh time</small></h2>
+  <table>
+    <colgroup><col style="width:12.5%" /><col style="width:17%" /><col /><col style="width:14.5%" /><col style="width:10%" /><col style="width:9.5%" /><col style="width:9.5%" /><col style="width:11%" /></colgroup>
+    <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Payment</th><th>Subtotal</th><th>Delivery</th><th>Discount</th><th>Total</th></tr></thead>
+    <tbody>
+      {{#each orders}}
+      <tr><td class="l">{{number}}</td><td class="l">{{date}}</td><td class="l">{{customer}}</td><td class="l {{#if paid}}paid{{/if}}">{{payment}}</td><td class="r">{{subtotal}}</td><td class="r">{{delivery}}</td><td class="r">{{discount}}</td><td class="r">{{total}}</td></tr>
+      {{/each}}
+    </tbody>
+    <tfoot><tr><td colspan="4" class="l">Total · {{kpi.orders}} orders</td><td class="r">{{sums.subtotal}}</td><td class="r">{{sums.delivery}}</td><td class="r">{{sums.discount}}</td><td class="r">{{sums.total}}</td></tr></tfoot>
+  </table>
+  {{else}}
+  <div class="empty">No sales in this period.</div>
+  {{/if}}
+
+  <div class="thanks">Prepared for {{storeName}} · Cancelled orders are not counted · Amounts in US dollars</div>
+</div>
+</body>
+</html>

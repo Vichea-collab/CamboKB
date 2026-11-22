@@ -14,6 +14,8 @@ const queries = {
   'top-products': range.extend({ limit: z.coerce.number().int().min(1).max(100).default(10) }),
   breakdown: range,
   'orders.csv': range,
+  'report.pdf': range.extend({ groupBy: z.enum(['day', 'month']).default('day') }),
+  'report.html': range.extend({ groupBy: z.enum(['day', 'month']).default('day') }),
 } as const;
 
 const stringify = (q: Record<string, unknown>) => Object.fromEntries(Object.entries(q).map(([k, v]) => [k, String(v)]));
@@ -79,11 +81,17 @@ export function adminReportsRouter(deps: AppDeps): Router {
   });
 
   for (const [name, schema] of Object.entries(queries)) {
-    r.get(`/reports/${name}`, validate({ query: schema }), async (req, res) => {
-      const query = stringify(req.valid.query as Record<string, unknown>);
+    r.get(`/reports/${name}`, validate({ query: schema.extend({ download: z.enum(['1']).optional() }) }), async (req, res) => {
+      const { download, ...rest } = req.valid.query as Record<string, unknown>;
+      const query = stringify(rest);
       const out = await deps.reports.get(`/internal/sales/${name}`, query);
       res.set('Cache-Control', 'private, no-store').type(out.contentType);
       if (name === 'orders.csv') res.set('Content-Disposition', `attachment; filename="orders-${query.from}-to-${query.to}.csv"`);
+      // The printed report: saved as a file with `?download=1`, shown in the browser otherwise. Its page form holds customer text, so no scripts.
+      if (name === 'report.pdf')
+        res.set('Content-Disposition', `${download === '1' ? 'attachment' : 'inline'}; filename="sales-report-${query.from}-to-${query.to}.pdf"`);
+      if (name === 'report.html')
+        res.set('Content-Security-Policy', "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; frame-ancestors 'self'");
       res.send(out.body);
     });
   }

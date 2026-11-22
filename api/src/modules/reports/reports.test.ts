@@ -86,6 +86,27 @@ describe('invoices and reports through the api', () => {
     expect(invoice.status).toBe(200);
   });
 
+  it('gives admins the sales report as a PDF, to look at or to save, and as a page', async () => {
+    const q = { from: '2026-11-01', to: '2026-11-30', groupBy: 'month' };
+    expect((await customer.get('/api/v1/admin/reports/report.pdf').query(q)).status).toBe(403);
+    expect((await request(ctx.app).get('/api/v1/admin/reports/report.pdf').query(q)).status).toBe(401);
+    const { agent: admin } = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
+    const view = await admin.get('/api/v1/admin/reports/report.pdf').query(q);
+    expect(view.status).toBe(200);
+    expect(view.headers['content-type']).toBe('application/pdf');
+    expect(view.headers['content-disposition']).toBe('inline; filename="sales-report-2026-11-01-to-2026-11-30.pdf"');
+    expect(view.headers['cache-control']).toBe('private, no-store');
+    // The report service gets the dates and the grouping, nothing else (the download flag is for this api only).
+    expect(ctx.reports.calls.at(-1)).toEqual({ path: '/internal/sales/report.pdf', query: q });
+    const dl = await admin.get('/api/v1/admin/reports/report.pdf').query({ ...q, download: '1' });
+    expect(dl.headers['content-disposition']).toBe('attachment; filename="sales-report-2026-11-01-to-2026-11-30.pdf"');
+    expect(ctx.reports.calls.at(-1)!.query).toEqual(q);
+    const page = await admin.get('/api/v1/admin/reports/report.html').query(q);
+    expect(page.headers['content-type']).toMatch(/^text\/html/);
+    expect(page.headers['content-security-policy']).toContain("script-src 'none'");
+    expect((await admin.get('/api/v1/admin/reports/report.pdf').query({ from: 'x', to: q.to })).status).toBe(400);
+  });
+
   it('validates report queries before calling the report service', async () => {
     const { agent: admin } = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
     const res = await admin.get('/api/v1/admin/reports/summary').query({ from: 'yesterday', to: '2026-11-30' });

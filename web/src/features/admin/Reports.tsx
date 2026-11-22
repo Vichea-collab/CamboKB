@@ -111,9 +111,19 @@ export default function Reports() {
         title="Reports"
         description="Sales for the dates you pick. Cancelled orders are left out."
         actions={
-          <a className="btn-ghost btn-sm" href={apiUrl(`/admin/reports/orders.csv?${range}`)}>
-            <Download className="size-4" aria-hidden /> Export orders (CSV)
-          </a>
+          // The printed report for the dates and the grouping on screen: totals, products, payments and every order.
+          valid ? (
+            <a
+              className="btn-ghost btn-sm"
+              href={apiUrl(`/admin/reports/report.pdf?${range}&groupBy=${groupBy}&download=1`)}
+            >
+              <Download className="size-4" aria-hidden /> Download report (PDF)
+            </a>
+          ) : (
+            <span className="btn-ghost btn-sm opacity-50" aria-disabled="true">
+              <Download className="size-4" aria-hidden /> Download report (PDF)
+            </span>
+          )
         }
       />
 

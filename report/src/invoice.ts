@@ -5,6 +5,7 @@ import jsreport from '@jsreport/jsreport-core';
 import chromePdf from '@jsreport/jsreport-chrome-pdf';
 import handlebars from '@jsreport/jsreport-handlebars';
 import type pg from 'pg';
+import { salesReportView, type SalesReportData } from './sales-report';
 
 export type InvoiceData = {
   number: string;
@@ -62,10 +63,15 @@ export type InvoiceRenderer = {
   render(data: InvoiceData, store: { name: string }): Promise<Buffer>;
   /** The same invoice as a web page, for looking at it before downloading the PDF. */
   renderHtml(data: InvoiceData, store: { name: string }): Promise<string>;
+  /** The sales report for a range of dates, as a PDF in the invoice's style. */
+  renderSales(data: SalesReportData, store: { name: string }): Promise<Buffer>;
+  /** The same report as a web page, for looking at it before downloading the PDF. */
+  renderSalesHtml(data: SalesReportData, store: { name: string }): Promise<string>;
   close(): Promise<void>;
 };
 
 const TEMPLATE_PATH = fileURLToPath(new URL('../templates/invoice.html', import.meta.url));
+const SALES_TEMPLATE_PATH = fileURLToPath(new URL('../templates/sales-report.html', import.meta.url));
 const LOGO_PATH = fileURLToPath(new URL('../templates/logo.png', import.meta.url));
 
 /** The printed form always shows at least this many item rows, like the paper invoice. */
@@ -161,6 +167,38 @@ export async function createInvoiceRenderer(
           },
         },
         data: invoiceView(data, store, logo),
+      });
+      return res.content;
+    },
+    async renderSalesHtml(data, store) {
+      const res = await reporter.render({
+        template: { content: await readFile(SALES_TEMPLATE_PATH, 'utf8'), engine: 'handlebars', recipe: 'html' },
+        data: salesReportView(data, store, logo),
+      });
+      return res.content.toString('utf8');
+    },
+    async renderSales(data, store) {
+      const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const view = salesReportView(data, store, logo);
+      const res = await reporter.render({
+        template: {
+          content: await readFile(SALES_TEMPLATE_PATH, 'utf8'),
+          engine: 'handlebars',
+          recipe: 'chrome-pdf',
+          chrome: {
+            format: 'A4',
+            printBackground: true,
+            marginTop: '10mm',
+            marginBottom: '16mm',
+            marginLeft: '12mm',
+            marginRight: '12mm',
+            // Every page says what it belongs to and where it is: a report is read page by page.
+            displayHeaderFooter: true,
+            headerTemplate: '<span></span>',
+            footerTemplate: `<div style="width:100%;font-size:7pt;font-family:Arial,sans-serif;color:#4a5260;padding:0 12mm;display:flex;justify-content:space-between;border-top:0.3mm solid #e8b23f;padding-top:1.5mm"><span>${esc(store.name)} · Sales report ${esc(view.period)}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+          },
+        },
+        data: view,
       });
       return res.content;
     },

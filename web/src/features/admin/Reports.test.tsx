@@ -1,6 +1,7 @@
 import { phnomPenhDate } from '@cambo/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../shared/lib/api', async (orig) => ({
@@ -107,7 +108,7 @@ describe('Admin reports', () => {
     expect(screen.getAllByText(/vs previous 30 days/).length).toBe(4);
     // Words as well as colour for screen readers.
     expect(screen.getAllByText('Up', { exact: false }).length).toBeGreaterThan(0);
-    expect(screen.getByText('Down', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/^Down\b/)).toBeInTheDocument();
   });
 
   it('names the best day above the chart', async () => {
@@ -142,5 +143,19 @@ describe('Admin reports', () => {
     renderReports();
     expect(await screen.findByText('No sales in these dates')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /Revenue by day/ })).not.toBeInTheDocument();
+  });
+
+  it('downloads the printed PDF report for the dates and grouping on screen', async () => {
+    mockServer();
+    renderReports();
+    const link = await screen.findByRole('link', { name: /Download report \(PDF\)/ });
+    const url = new URL(link.getAttribute('href')!, 'http://x');
+    expect(url.pathname.endsWith('/admin/reports/report.pdf')).toBe(true);
+    expect(url.searchParams.get('to')).toBe(today());
+    expect(url.searchParams.get('groupBy')).toBe('day');
+    expect(url.searchParams.get('download')).toBe('1');
+    expect(screen.queryByText(/CSV/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '12 months' }));
+    expect(new URL(screen.getByRole('link', { name: /Download report/ }).getAttribute('href')!, 'http://x').searchParams.get('groupBy')).toBe('month');
   });
 });

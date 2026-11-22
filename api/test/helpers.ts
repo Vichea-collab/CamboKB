@@ -117,6 +117,10 @@ export class FakeReportClient implements ReportClient {
     this.calls.push({ path, query });
     if (path.endsWith('.csv'))
       return { body: Buffer.from('number,total\r\n'), contentType: 'text/csv; charset=utf-8' };
+    if (path.endsWith('/report.pdf'))
+      return { body: Buffer.from('%PDF-1.7 fake sales report'), contentType: 'application/pdf' };
+    if (path.endsWith('/report.html'))
+      return { body: Buffer.from('<!doctype html><title>fake sales report</title>'), contentType: 'text/html; charset=utf-8' };
     return {
       body: Buffer.from(JSON.stringify({ path, query })),
       contentType: 'application/json; charset=utf-8',
