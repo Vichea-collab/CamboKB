@@ -98,8 +98,10 @@ services:
       API_INTERNAL_SECRET: local-compose-api-internal-secret-3c8f20a9d6
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       ADMIN_SESSION_TTL_DAYS: ${ADMIN_SESSION_TTL_DAYS:-1}
-      # Optional locally: empty turns off silent Mini App login (the deep link still works).
-      TELEGRAM_WEBAPP_KEY: ${TELEGRAM_WEBAPP_KEY:-}
+      # The containers run in production mode, where the api needs a 64-hex key to start. This default is a placeholder for
+      # the local stack only (it is public, so Mini App signatures are not really checked here). For real Mini App tests,
+      # set TELEGRAM_WEBAPP_KEY (see api/.env.example). Never use this value in production.
+      TELEGRAM_WEBAPP_KEY: ${TELEGRAM_WEBAPP_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     depends_on:
       db: { condition: service_healthy }
       file: { condition: service_started }
