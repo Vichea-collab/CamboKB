@@ -1,6 +1,7 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useIsDesktop } from '../lib/useIsDesktop';
 import { Drawer } from './Drawer';
 
 export type SelectOption = { value: string; label: ReactNode };
@@ -19,23 +20,6 @@ type Props = {
   /** Shown when no option matches the value. */
   placeholder?: ReactNode;
 };
-
-/** True on screens at least 768px wide (the Tailwind `md` size). Without matchMedia (old browsers, tests) it is false. */
-function useIsDesktop() {
-  const query = '(min-width: 768px)';
-  const [desktop, setDesktop] = useState(
-    () => typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const mq = window.matchMedia(query);
-    const on = () => setDesktop(mq.matches);
-    on();
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return desktop;
-}
 
 /**
  * A dropdown that looks the same everywhere instead of using the browser's own list. On phones and in the Telegram

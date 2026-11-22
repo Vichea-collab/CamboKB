@@ -20,7 +20,7 @@ Everyone should be able to explain the whole picture; split the speaking by sect
 ```bash
 docker compose --profile observability up -d --build --wait
 scripts/smoke.sh                       # must end with "All checks passed"
-npm run db:seed -w @cambo/api          # optional: a catalogue to show (needs the file service)
+npm run db:sync-live                   # optional: fill the local shop with the live catalogue
 ```
 
 - Log in to Grafana (admin / admin), open both dashboards, set the time range to the last 15 minutes.

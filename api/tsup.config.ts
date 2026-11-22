@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  // Named so the output is dist/server.js, dist/seed.js, dist/promote-admin.js, dist/unlink-telegram.js (what the Docker image runs).
+  // Named so the output is dist/server.js, dist/promote-admin.js, dist/unlink-telegram.js (what the Docker image runs).
   entry: {
     server: 'src/server.ts',
-    seed: 'scripts/seed.ts',
     'promote-admin': 'scripts/promote-admin.ts',
     'unlink-telegram': 'scripts/unlink-telegram.ts',
     events: 'scripts/events.ts',

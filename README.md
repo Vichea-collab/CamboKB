@@ -50,7 +50,7 @@ cp web/.env.example web/.env.local
 
 npx prisma migrate deploy --schema api/prisma/schema.prisma   # with DATABASE_URL exported
 npm run dev                         # starts file, report, notification, api and web together
-npm run db:seed                     # in another terminal: 44 products, photos, banners, CAMBOKBSHOP promo
+npm run db:sync-live                # in another terminal: copy the live shop's products, photos and banners (needs Docker + the live stack)
 ```
 
 Open http://localhost:5173.
@@ -257,7 +257,7 @@ api/src/
                   promos, customers, store, dashboard, reports, seo, bot (routes, logic, tests)
   integrations/   outside services: bakong, files, reports, and the events sent to report and notification
   http/           express app, middleware, errors
-  db/ lib/ cli/   prisma client, logger, seed and admin scripts
+  db/ lib/ cli/   prisma client, logger, admin scripts
 file/ report/ notification/   the other services (small, flat), each with migrations/ for its own database
 shared/           rules and contracts every service shares: money, phone numbers, delivery fees, validation, events
 service-kit/      logger, metrics, request ids, migrations (used by every service)
@@ -269,7 +269,7 @@ docker/ observability/ scripts/ docs/
 | Command | What it does |
 |---|---|
 | `npm run dev` | All five services with hot reload |
-| `npm run db:seed` | Load the scraped catalog (needs the file service running) |
+| `npm run db:sync-live` | Replace your local catalog with a copy of the live one (products, photos, banners only; read-only on live, refuses a non-local database) |
 | `npm run admin:promote -w api -- <phone>` | Make an account an admin |
 | `npm run admin:unlink-telegram -w api -- <phone>` | Owner recovery: cut an account's Telegram link and log it out everywhere (they link again with Continue with Telegram). In production: `node dist/unlink-telegram.js <phone>` |
 | `npm run events -w @cambo/api -- backfill` | Re-send every order to the report service |

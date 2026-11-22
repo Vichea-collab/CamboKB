@@ -30,6 +30,107 @@ describe('public catalog', () => {
     expect(await q('MICE')).toEqual(['Attack Shark X11 White']);
   });
 
+  it('finds products despite a typo, a missing letter or a split word', async () => {
+    await createProduct(ctx.prisma, { name: 'Mechanical Keyboard K8', specsLine: 'Hot-Swap' });
+    await createProduct(ctx.prisma, { name: 'Wireless Gaming Mouse' });
+    const q = async (term: string) =>
+      (await request(ctx.app).get('/api/v1/products').query({ q: term })).body.items.map(
+        (p: { name: string }) => p.name,
+      );
+    expect(await q('keybord')).toEqual(['Mechanical Keyboard K8']);
+    expect(await q('wirless mouse')).toEqual(['Wireless Gaming Mouse']);
+    expect(await q('mechancal')).toEqual(['Mechanical Keyboard K8']);
+    expect(await q('zzzzqqq')).toEqual([]);
+  });
+
+  it('understands plurals and the shop\'s own words, so "wireless mouse" finds a wireless product in Mice', async () => {
+    const mice = await createCategory(ctx.prisma, { name: 'Mice', slug: 'mice' });
+    const pads = await createCategory(ctx.prisma, { name: 'Mousepads', slug: 'mousepads' });
+    await createProduct(ctx.prisma, {
+      name: 'Attack Shark X11 White',
+      specsLine: 'Wireless • 2.4G',
+      categoryId: mice.id,
+    });
+    await createProduct(ctx.prisma, { name: 'Wired Gaming Mouse G1', categoryId: mice.id });
+    await createProduct(ctx.prisma, { name: 'Desk Mat XL', categoryId: pads.id });
+    await createProduct(ctx.prisma, { name: 'Aula F75 Keyboard' });
+    const q = async (term: string) =>
+      (await request(ctx.app).get('/api/v1/products').query({ q: term })).body.items.map(
+        (p: { name: string }) => p.name,
+      );
+    expect(await q('wireless mouse')).toEqual(['Attack Shark X11 White']);
+    expect(await q('wirless mouse')).toEqual(['Attack Shark X11 White']);
+    expect((await q('mouse')).slice(0, 2).sort()).toEqual([
+      'Attack Shark X11 White',
+      'Wired Gaming Mouse G1',
+    ]);
+    expect(await q('keyboards')).toEqual(['Aula F75 Keyboard']);
+    expect(await q('keeb')).toEqual(['Aula F75 Keyboard']);
+    expect(await q('mousepad')).toContain('Desk Mat XL');
+  });
+
+  it('puts the best match first when a search is given', async () => {
+    await createProduct(ctx.prisma, {
+      name: 'Desk Mat',
+      description: 'Fits a keyboard and a mouse',
+      sortOrder: 1,
+    });
+    await createProduct(ctx.prisma, { name: 'Keyboard Cover', sortOrder: 2 });
+    await createProduct(ctx.prisma, { name: 'Keyboard', sortOrder: 3 });
+    const res = await request(ctx.app).get('/api/v1/products').query({ q: 'keyboard' });
+    expect(res.body.items.map((p: { name: string }) => p.name)).toEqual([
+      'Keyboard',
+      'Keyboard Cover',
+      'Desk Mat',
+    ]);
+    expect(res.body.total).toBe(3);
+  });
+
+  it('filters by a price range in dollars, together with search and category', async () => {
+    const mice = await createCategory(ctx.prisma, { name: 'Mice', slug: 'mice' });
+    await createProduct(ctx.prisma, { name: 'Cheap Mouse', priceCents: 1500, categoryId: mice.id });
+    await createProduct(ctx.prisma, { name: 'Mid Mouse', priceCents: 3000, categoryId: mice.id });
+    await createProduct(ctx.prisma, { name: 'Pro Mouse', priceCents: 9000, categoryId: mice.id });
+    await createProduct(ctx.prisma, { name: 'Mid Keyboard', priceCents: 3000 });
+    const names = async (query: Record<string, string>) =>
+      (await request(ctx.app).get('/api/v1/products').query(query)).body.items.map(
+        (p: { name: string }) => p.name,
+      );
+    expect(await names({ minPrice: '20' })).toEqual(['Mid Mouse', 'Pro Mouse', 'Mid Keyboard']);
+    expect(await names({ maxPrice: '30' })).toEqual(['Cheap Mouse', 'Mid Mouse', 'Mid Keyboard']);
+    expect(await names({ minPrice: '20', maxPrice: '30' })).toEqual(['Mid Mouse', 'Mid Keyboard']);
+    expect(await names({ minPrice: '20', maxPrice: '30', category: 'mice' })).toEqual([
+      'Mid Mouse',
+    ]);
+    expect(await names({ minPrice: '20', maxPrice: '30', q: 'mouse' })).toEqual(['Mid Mouse']);
+    expect(await names({ minPrice: '100' })).toEqual([]);
+    expect(await names({ minPrice: '29.99', maxPrice: '30.00' })).toEqual([
+      'Mid Mouse',
+      'Mid Keyboard',
+    ]);
+  });
+
+  it('treats % and _ in a search as plain characters, and ignores one- and two-letter guesses', async () => {
+    await createProduct(ctx.prisma, { name: 'Aula F75' });
+    await createProduct(ctx.prisma, { name: 'Mouse 100% Wireless' });
+    const q = async (term: string) =>
+      (await request(ctx.app).get('/api/v1/products').query({ q: term })).body.items.map(
+        (p: { name: string }) => p.name,
+      );
+    expect(await q('%')).toEqual(['Mouse 100% Wireless']);
+    expect(await q('_')).toEqual([]);
+    expect(await q('zz')).toEqual([]);
+  });
+
+  it('rejects a price that is not a number or is negative', async () => {
+    expect((await request(ctx.app).get('/api/v1/products').query({ minPrice: 'abc' })).status).toBe(
+      400,
+    );
+    expect((await request(ctx.app).get('/api/v1/products').query({ maxPrice: '-5' })).status).toBe(
+      400,
+    );
+  });
+
   it('filters by category slug', async () => {
     const mice = await createCategory(ctx.prisma, { name: 'Mice', slug: 'mice' });
     await createProduct(ctx.prisma, { name: 'Mouse', categoryId: mice.id });

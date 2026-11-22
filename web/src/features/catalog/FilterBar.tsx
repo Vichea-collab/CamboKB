@@ -4,6 +4,7 @@ import { Drawer } from '../../shared/ui/Drawer';
 import { Select } from '../../shared/ui/Select';
 import type { Category } from '../../shared/lib/types';
 import { categoryName, t } from '../../shared/lib/strings';
+import { PriceFilter } from './PriceFilter';
 
 export type SortKey = 'featured' | 'price-asc' | 'price-desc';
 
@@ -20,12 +21,19 @@ export function FilterBar({
   onCategory,
   sort,
   onSort,
+  minPrice = '',
+  maxPrice = '',
+  onPrice,
 }: {
   categories: Category[];
   category: string;
   onCategory: (slug: string) => void;
   sort: SortKey;
   onSort: (s: SortKey) => void;
+  /** Price range in dollars, '' when not set. The Price button shows only when `onPrice` is given. */
+  minPrice?: string;
+  maxPrice?: string;
+  onPrice?: (min: string, max: string) => void;
 }) {
   const [sheet, setSheet] = useState(false);
   const chips = [{ slug: '', name: t.home.all }, ...categories];
@@ -52,6 +60,7 @@ export function FilterBar({
             );
           })}
         </div>
+        {onPrice && <PriceFilter min={minPrice} max={maxPrice} onApply={onPrice} />}
         {/* Phones: an icon button that opens a bottom sheet (the browser's own menu floats loose over the page). */}
         <button
           type="button"
