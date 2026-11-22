@@ -79,6 +79,10 @@ export class FakeTelegramClient implements TelegramClient {
   async editReplyMarkup(chatId: number | string, messageId: number, replyMarkup: unknown) {
     this.edits.push({ chatId, messageId, replyMarkup });
   }
+  textEdits: { chatId: number | string; messageId: number; text: string; entities: unknown[] | undefined; replyMarkup: unknown }[] = [];
+  async editText(chatId: number | string, messageId: number, text: string, entities: unknown[] | undefined, replyMarkup: unknown) {
+    this.textEdits.push({ chatId, messageId, text, entities, replyMarkup });
+  }
   async getUpdates() {
     return [] as TgUpdate[];
   }

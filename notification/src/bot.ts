@@ -7,7 +7,9 @@ import {
   LETTER_TO_STATUS,
   orderKeyboard,
   plainLabel,
+  statusLine,
 } from './buttons';
+import { withStatusLine } from './render';
 import type { NotificationConfig } from './config';
 import type { Logger } from './logger';
 import type { Outbox } from './outbox';
@@ -81,16 +83,20 @@ async function handleButton(deps: BotDeps, cq: TgCallbackQuery): Promise<void> {
   const orderId = m[1]!;
   const code = m[2]!;
   const known = m[3] ? LETTER_TO_STATUS[m[3]] : undefined;
-  const show = (status: OrderStatus, askCancel = false) =>
-    cq.message
-      ? telegram
-          .editReplyMarkup(
-            cq.message.chat.id,
-            cq.message.message_id,
-            orderKeyboard({ id: orderId, status }, askCancel),
-          )
-          .catch((err) => logger.debug({ err }, 'could not update buttons'))
-      : Promise.resolve();
+  /** Swap the buttons, and (when the status really changed) the status line in the text, so the two always agree. */
+  const show = (status: OrderStatus, askCancel = false, newStatus = false) => {
+    const msg = cq.message;
+    if (!msg) return Promise.resolve();
+    const keyboard = orderKeyboard({ id: orderId, status }, askCancel, config.webOrigin);
+    const edit =
+      newStatus && msg.text
+        ? (() => {
+            const next = withStatusLine(msg.text, msg.entities, statusLine(status));
+            return telegram.editText(msg.chat.id, msg.message_id, next.text, next.entities, keyboard);
+          })()
+        : telegram.editReplyMarkup(msg.chat.id, msg.message_id, keyboard);
+    return edit.catch((err) => logger.debug({ err }, 'could not update the order message'));
+  };
 
   try {
     if (code === 'x') {
@@ -107,14 +113,14 @@ async function handleButton(deps: BotDeps, cq: TgCallbackQuery): Promise<void> {
       telegramUserId: cq.from.id,
       requireLinkedAdmin,
     });
-    await show(done.status);
+    await show(done.status, false, true);
     await answer(`${done.number} → ${plainLabel(done.status)}`);
   } catch (err) {
     if (err instanceof ApiError && err.status === 403)
       return void (await answer('Only the shop admin can do this.', true));
     if (err instanceof ApiError && err.status === 409 && err.details?.status) {
       // Someone already moved this order (the website, or another tap). Show where it really is.
-      await show(err.details.status);
+      await show(err.details.status, false, true);
       return void (await answer(
         `Order ${err.details.number ?? ''} is already ${plainLabel(err.details.status)}.`.replace(
           '  ',

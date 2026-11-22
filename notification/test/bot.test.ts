@@ -22,13 +22,21 @@ const message = (text: string, fromId = CUSTOMER, chatType = 'private') => ({
     text,
   },
 });
-const press = (ctx: Ctx, data: string, o: { fromId?: number; chatId?: number } = {}) =>
+const press = (
+  ctx: Ctx,
+  data: string,
+  o: { fromId?: number; chatId?: number; text?: string; entities?: unknown[] } = {},
+) =>
   post(ctx, {
     update_id: updateId++,
     callback_query: {
       id: `cb${updateId}`,
       from: { id: o.fromId ?? ADMIN_CHAT, first_name: 'Owner' },
-      message: { message_id: 99, chat: { id: o.chatId ?? ADMIN_CHAT, type: 'private' } },
+      message: {
+        message_id: 99,
+        chat: { id: o.chatId ?? ADMIN_CHAT, type: 'private' },
+        ...(o.text ? { text: o.text, entities: o.entities } : {}),
+      },
       data,
     },
   });
@@ -117,13 +125,64 @@ describe('order buttons in Telegram', () => {
       },
     ]);
     expect(ctx.telegram.answers.at(-1)).toMatchObject({ text: `${o.number} → Confirmed` });
-    expect(keyboardOf()).toEqual(['✅ Confirmed', '📦 Mark packed', '❌ Cancel']);
+    expect(keyboardOf()).toEqual(['📦 Mark packed', '❌ Cancel']);
+  });
+
+  describe('the status line in the message text', () => {
+    // What Telegram hands back for the new-order message: plain text, with the bold title and the map link as entities.
+    const text = '🛒 New order CS-1\n🆕 Status: Pending\n🗺 Open map pin\nTotal: $5';
+    const entities = [
+      { type: 'bold', offset: 3, length: 11 },
+      { type: 'text_link', offset: text.indexOf('Open map pin'), length: 12, url: 'https://maps.google.com/?q=1,2' },
+    ];
+
+    it('updates the status line with the buttons, keeps the formatting, and keeps the Open order button', async () => {
+      const https = makeApp({ config: { ...testConfig(), webOrigin: 'https://shop.example.com' } });
+      https.api.orders.set(o.id, { number: o.number, status: 'PENDING' });
+      await press(https, `o:${o.id}:c`, { text, entities });
+      const [edit] = https.telegram.textEdits;
+      expect(edit!.text).toBe(text.replace('🆕 Status: Pending', '✅ Status: Confirmed'));
+      // The link starts after the changed line: its offset still points at the same words.
+      const link = edit!.entities!.find((e) => (e as { type: string }).type === 'text_link') as { offset: number; length: number };
+      expect(edit!.text.slice(link.offset, link.offset + link.length)).toBe('Open map pin');
+      expect(edit!.entities![0]).toEqual(entities[0]); // before the line: unchanged
+      const rows = (edit!.replyMarkup as { inline_keyboard: { text: string }[][] }).inline_keyboard;
+      expect(rows.flat().map((b) => b.text)).toEqual(['📦 Mark packed', '❌ Cancel', '🔗 Open order']);
+      expect(https.telegram.edits).toHaveLength(0);
+    });
+
+    it('walks the line forward through every status, and shows the real one when the order moved elsewhere', async () => {
+      let current = text;
+      for (const code of ['c', 'p', 's', 'd'])
+        await press(ctx, `o:${o.id}:${code}`, { text: current, entities: [] }).then(() => {
+          current = ctx.telegram.textEdits.at(-1)!.text;
+        });
+      expect(current.split('\n')[1]).toBe('🎉 Status: Delivered');
+      ctx.api.orders.set(o.id, { number: o.number, status: 'PACKED' });
+      await press(ctx, `o:${o.id}:c`, { text, entities });
+      expect(ctx.telegram.textEdits.at(-1)!.text.split('\n')[1]).toBe('📦 Status: Packed');
+    });
+
+    it('adds the line under the title on a message sent before the line existed', async () => {
+      await press(ctx, `o:${o.id}:c`, { text: '🛒 New order CS-1\nTotal: $5', entities: [{ type: 'bold', offset: 18, length: 8 }] });
+      const [edit] = ctx.telegram.textEdits;
+      expect(edit!.text).toBe('🛒 New order CS-1\n✅ Status: Confirmed\nTotal: $5');
+      const bold = edit!.entities![0] as { offset: number; length: number };
+      expect(edit!.text.slice(bold.offset, bold.offset + bold.length)).toBe('Total: $');
+    });
+
+    it('leaves the text alone for the cancel question and "keep" (only the buttons change)', async () => {
+      await press(ctx, `o:${o.id}:x:p`, { text, entities });
+      await press(ctx, `o:${o.id}:k:p`, { text, entities });
+      expect(ctx.telegram.textEdits).toHaveLength(0);
+      expect(ctx.telegram.edits).toHaveLength(2);
+    });
   });
 
   it('walks the order all the way to delivered', async () => {
     for (const code of ['c', 'p', 's', 'd']) await press(ctx, `o:${o.id}:${code}`);
     expect(ctx.api.orders.get(o.id)!.status).toBe('DELIVERED');
-    expect(keyboardOf()).toEqual(['🎉 Delivered']);
+    expect(keyboardOf()).toEqual([]); // nothing left to do: the status is in the text
   });
 
   it('asks before cancelling, then cancels', async () => {
@@ -134,7 +193,7 @@ describe('order buttons in Telegram', () => {
     expect(keyboardOf()).toContain('✅ Confirm order');
     await press(ctx, `o:${o.id}:X`);
     expect(ctx.api.orders.get(o.id)!.status).toBe('CANCELLED');
-    expect(keyboardOf()).toEqual(['❌ Cancelled']);
+    expect(keyboardOf()).toEqual([]);
   });
 
   it("ignores taps from any chat but the owner's, without bothering the api", async () => {

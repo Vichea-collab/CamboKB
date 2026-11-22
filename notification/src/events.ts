@@ -81,7 +81,7 @@ export function messagesFor<T extends NotificationEvent>(
             id: d.order.id,
             status: d.order.status,
             awaitingPayment: awaiting(d.order),
-          }),
+          }, false, config.webOrigin),
           dedupeKey: `order:${d.order.id}:admin:new`,
         },
         d.adminAlerts,
@@ -105,7 +105,7 @@ export function messagesFor<T extends NotificationEvent>(
       admin(
         {
           text: paymentReceivedAlert(d.order),
-          replyMarkup: orderKeyboard({ id: d.order.id, status: d.order.status }),
+          replyMarkup: orderKeyboard({ id: d.order.id, status: d.order.status }, false, config.webOrigin),
           dedupeKey: `order:${d.order.id}:admin:paid`,
         },
         d.adminAlerts,

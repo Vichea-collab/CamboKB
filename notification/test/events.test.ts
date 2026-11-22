@@ -57,7 +57,27 @@ describe('events from the api become Telegram messages', () => {
     expect(msg!.text).toContain('https://maps.google.com/?q=11.58,104.89');
     expect(msg!.text).toContain(`${WEB_ORIGIN}/admin/orders/${o.id}`);
     expect(msg!.opts?.parseMode).toBe('HTML');
-    expect(keyboardTexts(msg!.opts)).toEqual(['🆕 Pending', '✅ Confirm order', '❌ Cancel']);
+    // The status is a line of text now, not a button.
+    expect(msg!.text.split('\n')[1]).toBe('🆕 Status: Pending');
+    expect(keyboardTexts(msg!.opts)).toEqual(['✅ Confirm order', '❌ Cancel']);
+  });
+
+  it('on https the owner gets an "Open order" button instead of the raw link', async () => {
+    const https = makeApp({ config: { ...testConfig(), webOrigin: 'https://shop.example.com' } });
+    const o = order();
+    await request(https.app)
+      .post('/internal/events')
+      .set(AUTH)
+      .send(event('order.placed', { order: o, customerChatId: null, adminAlerts: true, holdMinutes: 10 }) as object);
+    await flush();
+    const msg = https.telegram.to(ADMIN_CHAT)[0]!;
+    expect(msg.text).not.toContain('/admin/orders/');
+    expect(msg.text.trimEnd().endsWith('💳 Cash on Delivery')).toBe(true);
+    const rows = (msg.opts!.replyMarkup as { inline_keyboard: unknown[][] }).inline_keyboard;
+    expect(rows).toEqual([
+      [expect.objectContaining({ text: '✅ Confirm order' }), expect.objectContaining({ text: '❌ Cancel' })],
+      [{ text: '🔗 Open order', url: `https://shop.example.com/admin/orders/${o.id}` }],
+    ]);
   });
 
   it('warns the owner when a Grab order has no map pin, and has no warning when there is one', async () => {
@@ -106,9 +126,8 @@ describe('events from the api become Telegram messages', () => {
     );
     await flush();
     expect(ctx.telegram.to(CUSTOMER)[0]!.text).toContain('KHQR within 10 minutes');
-    expect(keyboardTexts(ctx.telegram.to(ADMIN_CHAT)[0]!.opts)).toEqual([
-      '⏳ Waiting for KHQR payment',
-    ]);
+    expect(ctx.telegram.to(ADMIN_CHAT)[0]!.text.split('\n')[1]).toBe('⏳ Status: Waiting for KHQR payment');
+    expect(keyboardTexts(ctx.telegram.to(ADMIN_CHAT)[0]!.opts)).toEqual([]);
   });
 
   it.each([
@@ -137,7 +156,7 @@ describe('events from the api become Telegram messages', () => {
     expect(ctx.telegram.to(CUSTOMER)[0]!.text).toContain('Payment received');
     const owner = ctx.telegram.to(ADMIN_CHAT)[0]!;
     expect(owner.text).toContain(`Payment received: order ${o.number}`);
-    expect(keyboardTexts(owner.opts)).toEqual(['✅ Confirmed', '📦 Mark packed', '❌ Cancel']);
+    expect(keyboardTexts(owner.opts)).toEqual(['📦 Mark packed', '❌ Cancel']);
   });
 
   it('gives the customer the tracking number and the carrier, and tells nobody else', async () => {
