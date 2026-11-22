@@ -12,6 +12,10 @@ export const LABEL: Record<OrderStatus, string> = {
 };
 export const plainLabel = (s: OrderStatus) => LABEL[s].replace(/^\S+\s/, '');
 
+/** The status as a line of the message text ("🆕 Status: Pending"): the buttons below only carry actions. */
+export const statusLine = (status: OrderStatus, awaitingPayment = false) =>
+  awaitingPayment ? '⏳ Status: Waiting for KHQR payment' : LABEL[status].replace(/^(\S+)\s(.*)$/, '$1 Status: $2');
+
 /** The one step forward from each status, and the short code that goes in the button. */
 const NEXT: Partial<Record<OrderStatus, { status: OrderStatus; text: string; code: string }>> = {
   PENDING: { status: 'CONFIRMED', text: '✅ Confirm order', code: 'c' },
@@ -45,27 +49,29 @@ const data = (orderId: string, code: string, status?: OrderStatus) =>
 export const BUTTON_PATTERN = /^o:([0-9a-f-]{36}):([cpsdxXk])(?::([pckdsx]))?$/;
 
 type Button = { text: string; callback_data: string };
+type UrlButton = { text: string; url: string };
+
+/** Telegram only takes an address a phone can reach, so the button is for https sites; on http the message carries the link. */
+export const openOrderUrl = (webOrigin: string, orderId: string) => `${webOrigin}/admin/orders/${orderId}`;
 
 export function orderKeyboard(
   o: { id: string; status: OrderStatus; awaitingPayment?: boolean },
   askCancel = false,
+  webOrigin?: string,
 ) {
+  const rows: (Button | UrlButton)[][] = [];
+  const open: UrlButton[] = webOrigin?.startsWith('https://')
+    ? [{ text: '🔗 Open order', url: openOrderUrl(webOrigin, o.id) }]
+    : [];
+  const done = () => ({ inline_keyboard: open.length ? [...rows, open] : rows });
   // An unpaid KHQR order confirms itself when the money arrives, or cancels itself when the time is up.
-  const rows: Button[][] = [
-    [
-      {
-        text: o.awaitingPayment ? '⏳ Waiting for KHQR payment' : LABEL[o.status],
-        callback_data: 'noop',
-      },
-    ],
-  ];
-  if (o.awaitingPayment) return { inline_keyboard: rows };
+  if (o.awaitingPayment) return done();
   if (askCancel && CANCELLABLE.includes(o.status)) {
     rows.push([
       { text: '⚠️ Yes, cancel it', callback_data: data(o.id, 'X') },
       { text: '↩️ Keep order', callback_data: data(o.id, 'k', o.status) },
     ]);
-    return { inline_keyboard: rows };
+    return done();
   }
   const action: Button[] = [];
   const next = NEXT[o.status];
@@ -73,5 +79,5 @@ export function orderKeyboard(
   if (CANCELLABLE.includes(o.status))
     action.push({ text: '❌ Cancel', callback_data: data(o.id, 'x', o.status) });
   if (action.length) rows.push(action);
-  return { inline_keyboard: rows };
+  return done();
 }

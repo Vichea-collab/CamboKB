@@ -1,4 +1,5 @@
 import { formatPhone, formatUsd, type OrderSnapshot } from '@cambo/shared';
+import { openOrderUrl, statusLine } from './buttons';
 
 /** What the messages say. Pure functions of the event data: easy to read, easy to test. */
 
@@ -16,6 +17,7 @@ const awaitingKhqr = (o: OrderSnapshot) =>
 export function newOrderAlert(o: OrderSnapshot, webOrigin: string): string {
   return [
     `🛒 <b>New order ${o.number}</b>`,
+    statusLine(o.status, awaitingKhqr(o)),
     `👤 ${escapeHtml(o.contactName)} · ${escapeHtml(o.contactPhone)}`,
     `🚚 ${REGION[o.region]} · ${SERVICE[o.deliveryService]}${o.distanceKm !== null ? ` · ${o.distanceKm} km` : ''}`,
     `📍 ${escapeHtml(o.addressLine)}`,
@@ -37,8 +39,8 @@ export function newOrderAlert(o: OrderSnapshot, webOrigin: string): string {
       : []),
     `<b>Total: ${formatUsd(o.totalCents)}</b>`,
     `💳 ${o.payment ? PAYMENT[o.payment.method] : '—'}`,
-    '',
-    `${webOrigin}/admin/orders/${o.id}`,
+    // With the "Open order" button (https) the link would only repeat it.
+    ...(canOpenInTelegram(webOrigin) ? [] : ['', openOrderUrl(webOrigin, o.id)]),
   ].join('\n');
 }
 
@@ -119,4 +121,24 @@ export function customerKeyboard(kind: CustomerKind, o: OrderSnapshot, webOrigin
         ? { text: '💳 Pay now', web_app: { url: payUrl(webOrigin, o.number) } }
         : { text: '📦 View my order', web_app: { url: orderUrl(webOrigin, o.number) } };
   return { inline_keyboard: [[button]] };
+}
+
+type Entity = { type: string; offset: number; length: number; [k: string]: unknown };
+const STATUS_LINE = /^\S+ Status: [^\n]*$/m;
+
+/**
+ * The message text with its status line replaced (or added under the title, for a message sent before the line existed).
+ * Telegram hands back a message as plain text plus entities (bold, links), so entities after the change move with it.
+ * Offsets count UTF-16 units, which is what JavaScript string lengths count too.
+ */
+export function withStatusLine(text: string, entities: Entity[] | undefined, line: string) {
+  const found = STATUS_LINE.exec(text);
+  const at = found ? found.index : (text.indexOf('\n') < 0 ? text.length : text.indexOf('\n')) + 1;
+  const removed = found ? found[0].length : 0;
+  const insert = found ? line : text.indexOf('\n') < 0 ? `\n${line}` : `${line}\n`;
+  const delta = insert.length - removed;
+  return {
+    text: text.slice(0, at) + insert + text.slice(at + removed),
+    entities: entities?.map((e) => (e.offset >= at + removed ? { ...e, offset: e.offset + delta } : e)),
+  };
 }

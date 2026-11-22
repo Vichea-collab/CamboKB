@@ -18,7 +18,13 @@ export type TgCallbackQuery = {
   id: string;
   from: TgUser;
   /** The message the pressed button is attached to. */
-  message?: { message_id: number; chat: { id: number; type: string } };
+  message?: {
+    message_id: number;
+    chat: { id: number; type: string };
+    /** The text as Telegram shows it (no markup), with bold and link spans as entities. */
+    text?: string;
+    entities?: { type: string; offset: number; length: number; [k: string]: unknown }[];
+  };
   data?: string;
 };
 export type TgUpdate = { update_id: number; message?: TgMessage; callback_query?: TgCallbackQuery };
@@ -56,6 +62,14 @@ export interface TelegramClient {
   answerCallbackQuery(callbackQueryId: string, text?: string, alert?: boolean): Promise<void>;
   /** Swap the buttons under a message we sent earlier. */
   editReplyMarkup(chatId: number | string, messageId: number, replyMarkup: unknown): Promise<void>;
+  /** Replace the text (keeping its bold and links through `entities`) and the buttons of a message we sent earlier. */
+  editText(
+    chatId: number | string,
+    messageId: number,
+    text: string,
+    entities: unknown[] | undefined,
+    replyMarkup: unknown,
+  ): Promise<void>;
   getUpdates(offset: number, timeoutSec: number): Promise<TgUpdate[]>;
   setWebhook(url: string, secret: string): Promise<void>;
   /** The "/" command menu shown in the chat. */
@@ -136,6 +150,23 @@ export class HttpTelegramClient implements TelegramClient {
     });
   }
 
+  async editText(
+    chatId: number | string,
+    messageId: number,
+    text: string,
+    entities: unknown[] | undefined,
+    replyMarkup: unknown,
+  ) {
+    await this.call('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      ...(entities?.length ? { entities } : {}),
+      link_preview_options: { is_disabled: true },
+      reply_markup: replyMarkup,
+    });
+  }
+
   getUpdates(offset: number, timeoutSec: number) {
     return this.call<TgUpdate[]>(
       'getUpdates',
@@ -175,6 +206,7 @@ export class NoopTelegramClient implements TelegramClient {
   }
   async answerCallbackQuery() {}
   async editReplyMarkup() {}
+  async editText() {}
   async getUpdates() {
     return [];
   }
