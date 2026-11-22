@@ -12,12 +12,15 @@ export const useCategories = () =>
 export const useBanners = () =>
   useQuery({ queryKey: ['catalog', 'banners'], queryFn: () => api<{ items: Banner[] }>('/banners').then((r) => r.items), staleTime: 5 * 60_000 });
 
-export function useProducts(params: { q?: string; category?: string }) {
+/** `minPrice` and `maxPrice` are dollars as typed in the address bar (`?min=10&max=50`). */
+export function useProducts(params: { q?: string; category?: string; minPrice?: string; maxPrice?: string }) {
   const qs = new URLSearchParams({ pageSize: '100' });
   if (params.q) qs.set('q', params.q);
   if (params.category) qs.set('category', params.category);
+  if (params.minPrice) qs.set('minPrice', params.minPrice);
+  if (params.maxPrice) qs.set('maxPrice', params.maxPrice);
   return useQuery({
-    queryKey: ['products', params.q ?? '', params.category ?? ''],
+    queryKey: ['products', params.q ?? '', params.category ?? '', params.minPrice ?? '', params.maxPrice ?? ''],
     queryFn: () => api<Paged<ProductCardData>>(`/products?${qs}`),
     placeholderData: keepPreviousData,
   });

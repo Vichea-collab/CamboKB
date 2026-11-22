@@ -9,6 +9,7 @@ import { useAddToCart } from '../cart/useAddToCart';
 import { useBanners, useCategories, useProducts } from './api';
 import { BannerCarousel } from './BannerCarousel';
 import { FilterBar, type SortKey } from './FilterBar';
+import { cleanDollars } from './PriceFilter';
 import { ProductCard, ProductCardSkeleton } from './ProductCard';
 import { ProductGrid } from './ProductGrid';
 
@@ -19,6 +20,8 @@ export default function Home() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const category = params.get('category') ?? '';
+  const minPrice = cleanDollars(params.get('min') ?? '');
+  const maxPrice = cleanDollars(params.get('max') ?? '');
   const sort = (
     SORTS.includes(params.get('sort') as SortKey) ? params.get('sort') : 'featured'
   ) as SortKey;
@@ -46,7 +49,7 @@ export default function Home() {
 
   const categories = useCategories();
   const banners = useBanners();
-  const products = useProducts({ q, category });
+  const products = useProducts({ q, category, minPrice, maxPrice });
   const addToCart = useAddToCart();
 
   const items = useMemo(() => {
@@ -93,6 +96,23 @@ export default function Home() {
             onCategory={(s) => update('category', s)}
             sort={sort}
             onSort={(s) => update('sort', s === 'featured' ? '' : s)}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            onPrice={(min, max) =>
+              setParams(
+                (p) => {
+                  const next = new URLSearchParams(p);
+                  for (const [k, v] of [
+                    ['min', min],
+                    ['max', max],
+                  ] as const)
+                    if (v) next.set(k, v);
+                    else next.delete(k);
+                  return next;
+                },
+                { replace: true },
+              )
+            }
           />
         )}
         <p className="mb-3 mt-4 text-sm font-semibold text-muted" aria-live="polite">
@@ -112,7 +132,7 @@ export default function Home() {
             icon={SearchX}
             title={t.home.empty}
             action={
-              (q || category) && (
+              (q || category || minPrice || maxPrice) && (
                 <button
                   className="btn-ghost"
                   onClick={() => {
