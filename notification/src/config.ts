@@ -31,11 +31,18 @@ const envSchema = z
         message: 'required when TELEGRAM_MODE is not off',
       });
     if (e.TELEGRAM_MODE === 'webhook') {
+      // The webhook secret is the only proof that an update (and so a login confirmation) came from Telegram.
       if (!e.TELEGRAM_WEBHOOK_SECRET)
         ctx.addIssue({
           code: 'custom',
           path: ['TELEGRAM_WEBHOOK_SECRET'],
           message: 'required for webhook mode',
+        });
+      else if (!/^[A-Za-z0-9_-]{32,256}$/.test(e.TELEGRAM_WEBHOOK_SECRET))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['TELEGRAM_WEBHOOK_SECRET'],
+          message: 'use 32 to 256 random characters: letters, digits, _ and - (Telegram allows nothing else)',
         });
       if (!e.TELEGRAM_WEBHOOK_URL)
         ctx.addIssue({
