@@ -103,7 +103,6 @@ export COMPOSE_PROFILES=tunnel   # only when using the Cloudflare Tunnel
 docker compose -f docker-compose.prod.yml --env-file .env.production pull
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 docker compose -f docker-compose.prod.yml --env-file .env.production ps           # everything healthy
-docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/seed.js        # optional demo catalog
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api node dist/promote-admin.js 012345678   # after you have logged in with Telegram once
 ```
 

@@ -22,7 +22,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "db:seed": "npm run db:seed --workspace @cambo/api"
+    "db:sync-live": "node scripts/sync-live.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

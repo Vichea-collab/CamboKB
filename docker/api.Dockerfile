@@ -24,7 +24,6 @@ COPY --from=build --chown=node:node /app/node_modules node_modules
 COPY --from=build --chown=node:node /app/api/package.json api/package.json
 COPY --from=build --chown=node:node /app/api/prisma api/prisma
 COPY --from=build --chown=node:node /app/api/dist api/dist
-COPY --from=build --chown=node:node /app/api/seed-data api/seed-data
 USER node
 WORKDIR /app/api
 EXPOSE 4000
