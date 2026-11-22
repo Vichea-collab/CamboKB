@@ -186,13 +186,13 @@ describe('admin operations', () => {
   });
 
   it("reports today's orders, pending count and low stock", async () => {
-    await placeOrder({ items: [{ productId: product.id, quantity: 3 }] });
+    await placeOrder({ items: [{ productId: product.id, quantity: 4 }] });
     const res = await admin.get('/api/v1/admin/stats');
     expect(res.status).toBe(200);
-    expect(res.body.today).toEqual({ orders: 1, revenueCents: 6300 + 150 });
+    expect(res.body.today).toEqual({ orders: 1, revenueCents: 8400 + 150 });
     expect(res.body.pendingCount).toBe(1);
     expect(res.body.lowStock).toEqual([
-      { id: product.id, name: 'Attack Shark X11 White', stock: 2 },
+      { id: product.id, name: 'Attack Shark X11 White', stock: 1 },
     ]);
   });
 
@@ -342,9 +342,10 @@ describe('admin operations', () => {
   });
 
   it('queues what the report and notification services need, in the same transaction as the order', async () => {
+    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
     const o = await placeOrder({ note: '<b>ring twice</b>' });
     const rows = await ctx.prisma.serviceEvent.findMany({ orderBy: { createdAt: 'asc' } });
-    // The product only had 5 in stock, so taking 2 leaves it low: the owner is warned too.
+    // The product only had 3 in stock, so taking 2 leaves 1: low: the owner is warned too.
     expect(rows.map((r) => `${r.target}:${r.type}`).sort()).toEqual([
       'notification:order.placed',
       'notification:product.low_stock',
@@ -364,6 +365,7 @@ describe('admin operations', () => {
 
   it('still places the order, and keeps the events waiting, when the other services are down', async () => {
     ctx.events.failWith = new EventDeliveryError('notification unreachable', true);
+    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
     await placeOrder();
     await vi.waitFor(async () =>
       expect(

@@ -1,4 +1,4 @@
-import { formatUsd } from '@cambo/shared';
+import { formatUsd, LOW_STOCK_THRESHOLD } from '@cambo/shared';
 import { ChevronRight, PackageSearch } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -46,7 +46,7 @@ export default function ProductDetail() {
   const max = Math.min(MAX_QTY, Math.max(1, p.stock));
   const specs = allSpecs ? p.specs : p.specs.slice(0, SPECS_PREVIEW);
   const more = (related.data?.items ?? []).filter((x) => x.id !== p.id).slice(0, 4);
-  const lowStock = !p.isSoldOut && p.stock <= 3;
+  const lowStock = !p.isSoldOut && p.stock <= LOW_STOCK_THRESHOLD;
 
   return (
     <div>
