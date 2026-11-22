@@ -111,9 +111,18 @@ export function authRouter(deps: AppDeps): Router {
   r.get('/telegram/current', validate({ query: z.object({ purpose: z.enum(TELEGRAM_AUTH_PURPOSES) }) }), async (req, res) => {
     const { purpose } = req.valid.query as { purpose: (typeof TELEGRAM_AUTH_PURPOSES)[number] };
     const id = req.cookies?.[TG_REQUEST_COOKIE];
-    const found = typeof id === 'string' && uuidSchema.safeParse(id).success ? await findOwnRequest(deps, req, id) : null;
-    const open = found && found.purpose === purpose && ['PENDING', 'VERIFIED'].includes(effectiveStatus(found));
-    res.set('Cache-Control', 'no-store').json({ request: open ? { requestId: found.id, ...statusView(found) } : null });
+    let found = typeof id === 'string' && uuidSchema.safeParse(id).success ? await findOwnRequest(deps, req, id) : null;
+    // A location shared in the bot comes back to the store through its "Back to checkout" button, which opens a
+    // new Mini App window that has none of the earlier page's cookies. The signed-in customer is enough proof here:
+    // the request was opened for their account and only their linked Telegram account could answer it.
+    if (purpose === 'SHARE_LOCATION' && req.user && !(found && found.purpose === purpose && effectiveStatus(found) !== 'EXPIRED')) {
+      found = await prisma.telegramAuthRequest.findFirst({
+        where: { userId: req.user.id, purpose, status: 'VERIFIED', expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    const open = found && found.purpose === purpose && ['PENDING', 'VERIFIED'].includes(effectiveStatus(found)) ? found : null;
+    res.set('Cache-Control', 'no-store').json({ request: open ? { requestId: open.id, ...statusView(open) } : null });
   });
 
   r.get('/telegram/:id/status', validate({ params: z.object({ id: uuidSchema }) }), async (req, res) => {

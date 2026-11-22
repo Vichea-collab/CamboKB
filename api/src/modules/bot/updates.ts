@@ -48,6 +48,8 @@ export const BOT_TEXT = {
     "Your Telegram app can't send a location (Telegram on a computer can't). Open Telegram on your phone, or go back to checkout and tap “Use my location” or drag the pin on the map.",
   shareLocationButton: '📍 Share my location',
   locationSaved: '✅ Got your location! Go back to checkout: your delivery fee is updated.',
+  backToCheckout: 'Tap the button to go back to checkout. Your location is already there.',
+  backToCheckoutButton: '🛒 Back to checkout',
   locationNotYours:
     'This link is for a different Cambo Supply account. Open checkout on the website and try again.',
   noLocationRequest:
@@ -283,6 +285,18 @@ async function handleLocation(deps: AppDeps, msg: TgMessage, say: Say) {
     data: { status: 'VERIFIED', lat: latitude, lng: longitude, verifiedAt: new Date() },
   });
   say(msg.chat.id, BOT_TEXT.locationSaved, { replyMarkup: removeKeyboard });
+  // On https the customer can step straight back into the store as a Mini App (the page picks the location up).
+  // Telegram can't carry two keyboards in one message, so the button comes in its own.
+  const url = origin(deps);
+  if (url.startsWith('https://')) {
+    say(msg.chat.id, BOT_TEXT.backToCheckout, {
+      replyMarkup: {
+        inline_keyboard: [
+          [{ text: BOT_TEXT.backToCheckoutButton, web_app: { url: `${url}/checkout` } }],
+        ],
+      },
+    });
+  }
 }
 
 async function handleContact(deps: AppDeps, msg: TgMessage, say: Say) {
