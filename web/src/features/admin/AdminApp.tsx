@@ -12,6 +12,7 @@ import ProductEdit from './ProductEdit';
 import Products from './Products';
 import Promos from './Promos';
 import Reports from './Reports';
+import ReportPreview from './ReportPreview';
 import Settings from './Settings';
 
 /** Admin section: lazy-loaded, so none of this ships to shoppers. */
@@ -32,6 +33,7 @@ export default function AdminApp() {
         <Route path="customers" element={<Customers />} />
         <Route path="customers/:id" element={<CustomerDetail />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="reports/preview" element={<ReportPreview />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<p className="text-muted">Page not found.</p>} />
       </Routes>

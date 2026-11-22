@@ -2,6 +2,7 @@ import { phnomPenhDate } from '@cambo/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../shared/lib/api', async (orig) => ({
@@ -53,11 +54,13 @@ function mockServer(opts: { empty?: boolean } = {}) {
   });
 }
 
-function renderReports() {
+function renderReports(at = '/admin/reports') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <Reports />
+      <MemoryRouter initialEntries={[at]}>
+        <Reports />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -145,17 +148,36 @@ describe('Admin reports', () => {
     expect(screen.queryByRole('img', { name: /Revenue by day/ })).not.toBeInTheDocument();
   });
 
-  it('downloads the printed PDF report for the dates and grouping on screen', async () => {
+  it('opens the printed report as a preview for the dates and grouping on screen (it is downloaded from there)', async () => {
     mockServer();
     renderReports();
-    const link = await screen.findByRole('link', { name: /Download report \(PDF\)/ });
+    const link = await screen.findByRole('link', { name: /View report \(PDF\)/ });
     const url = new URL(link.getAttribute('href')!, 'http://x');
-    expect(url.pathname.endsWith('/admin/reports/report.pdf')).toBe(true);
+    expect(url.pathname).toBe('/admin/reports/preview');
     expect(url.searchParams.get('to')).toBe(today());
     expect(url.searchParams.get('groupBy')).toBe('day');
-    expect(url.searchParams.get('download')).toBe('1');
+    expect(url.searchParams.has('download')).toBe(false); // viewing, not downloading
+    expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/CSV/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '12 months' }));
-    expect(new URL(screen.getByRole('link', { name: /Download report/ }).getAttribute('href')!, 'http://x').searchParams.get('groupBy')).toBe('month');
+    expect(new URL(screen.getByRole('link', { name: /View report/ }).getAttribute('href')!, 'http://x').searchParams.get('groupBy')).toBe('month');
+  });
+
+  it('shows the dates and grouping it is given in the address, so coming back from the preview keeps them', async () => {
+    mockServer();
+    renderReports('/admin/reports?from=2026-10-01&to=2026-10-31&groupBy=month');
+    const link = await screen.findByRole('link', { name: /View report/ });
+    const url = new URL(link.getAttribute('href')!, 'http://x');
+    expect(url.searchParams.get('from')).toBe('2026-10-01');
+    expect(url.searchParams.get('to')).toBe('2026-10-31');
+    expect(url.searchParams.get('groupBy')).toBe('month');
+  });
+
+  it('ignores nonsense in the address and uses the usual last 30 days', async () => {
+    mockServer();
+    renderReports('/admin/reports?from=yesterday&to=%3Cb%3E&groupBy=year');
+    const url = new URL((await screen.findByRole('link', { name: /View report/ })).getAttribute('href')!, 'http://x');
+    expect(url.searchParams.get('to')).toBe(today());
+    expect(url.searchParams.get('groupBy')).toBe('day');
   });
 });

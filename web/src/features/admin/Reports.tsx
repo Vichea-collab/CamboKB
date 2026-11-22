@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Banknote,
   Calculator,
-  Download,
+  FileText,
   LineChart,
   Package,
   Receipt,
@@ -11,7 +11,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useState } from 'react';
-import { api, apiUrl } from '../../shared/lib/api';
+import { Link, useSearchParams } from 'react-router';
+import { api } from '../../shared/lib/api';
 import { t } from '../../shared/lib/strings';
 import { EmptyState, ErrorState, Section } from '../../shared/ui/Page';
 import { RevenueChart } from './components/RevenueChart';
@@ -61,9 +62,15 @@ const shortDay = (iso: string, groupBy: 'day' | 'month') =>
   });
 
 export default function Reports() {
-  const [from, setFrom] = useState(daysAgo(29));
-  const [to, setTo] = useState(today());
-  const [groupBy, setGroupBy] = useState<'day' | 'month'>('day');
+  // Coming back from the report preview, the dates and grouping are in the address, so the page is as it was left.
+  const [params] = useSearchParams();
+  const dateParam = (key: string) => {
+    const v = params.get(key) ?? '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+  };
+  const [from, setFrom] = useState(() => dateParam('from') ?? daysAgo(29));
+  const [to, setTo] = useState(() => dateParam('to') ?? today());
+  const [groupBy, setGroupBy] = useState<'day' | 'month'>(params.get('groupBy') === 'month' ? 'month' : 'day');
   const valid = Boolean(from && to && from <= to);
   const range = `from=${from}&to=${to}`;
   const prev = valid ? previousRange(from, to) : undefined;
@@ -112,16 +119,14 @@ export default function Reports() {
         description="Sales for the dates you pick. Cancelled orders are left out."
         actions={
           // The printed report for the dates and the grouping on screen: totals, products, payments and every order.
+          // It opens as a preview first; the PDF is downloaded from there.
           valid ? (
-            <a
-              className="btn-ghost btn-sm"
-              href={apiUrl(`/admin/reports/report.pdf?${range}&groupBy=${groupBy}&download=1`)}
-            >
-              <Download className="size-4" aria-hidden /> Download report (PDF)
-            </a>
+            <Link className="btn-ghost btn-sm" to={`/admin/reports/preview?${range}&groupBy=${groupBy}`}>
+              <FileText className="size-4" aria-hidden /> View report (PDF)
+            </Link>
           ) : (
             <span className="btn-ghost btn-sm opacity-50" aria-disabled="true">
-              <Download className="size-4" aria-hidden /> Download report (PDF)
+              <FileText className="size-4" aria-hidden /> View report (PDF)
             </span>
           )
         }
