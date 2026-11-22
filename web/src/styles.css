@@ -44,8 +44,9 @@
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
-  /* No 300ms wait or accidental zoom on double-tap: taps act at once (pinch zoom still works). */
-  touch-action: manipulation;
+  /* The page never zooms (no pinch, no double-tap): only scrolling. Zoom lives in the photo viewer and the invoice
+     view, which handle their own gestures. Taps act at once, with no 300ms wait. */
+  touch-action: pan-x pan-y;
   scroll-padding-top: 5rem;
 }
 

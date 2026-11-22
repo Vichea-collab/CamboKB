@@ -6,7 +6,10 @@ import { LanguageBoundary } from './app/LanguageToggle';
 import { queryClient } from './app/queryClient';
 import { router } from './app/router';
 import './styles.css';
+import { blockPageZoom } from './shared/lib/noPageZoom';
 import { configureTelegramApp, loadTelegramScript, telegramApp } from './shared/lib/telegram';
+
+blockPageZoom();
 
 // Inside the Telegram app, make the web view full height and match our colours.
 // (Ordinary visitors never load Telegram's script, so the first paint doesn't wait for telegram.org.)
