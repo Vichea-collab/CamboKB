@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { safeStorage } from '../../shared/lib/safe-storage';
 
 export type CartLine = { productId: string; quantity: number };
 export const MAX_QTY = 20;
@@ -13,31 +14,6 @@ type CartState = {
   clear: () => void;
   count: () => number;
 };
-
-/** localStorage that never throws (private mode, blocked storage). */
-const safeStorage = createJSONStorage(() => ({
-  getItem: (k: string) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  setItem: (k: string, v: string) => {
-    try {
-      localStorage.setItem(k, v);
-    } catch {
-      /* storage unavailable: cart lives in memory only */
-    }
-  },
-  removeItem: (k: string) => {
-    try {
-      localStorage.removeItem(k);
-    } catch {
-      /* ignore */
-    }
-  },
-}));
 
 export const useCart = create<CartState>()(
   persist(

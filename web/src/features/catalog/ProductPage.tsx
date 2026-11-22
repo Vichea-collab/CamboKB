@@ -9,6 +9,7 @@ import { BackLink, Badge, EmptyState, LoadingState } from '../../shared/ui/Page'
 import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
 import { MAX_QTY } from '../cart/cart-store';
+import { WishlistButton } from '../wishlist/WishlistButton';
 import { useAddToCart } from '../cart/useAddToCart';
 import { useProduct, useProducts } from './api';
 import { ImageGallery } from './ImageGallery';
@@ -90,6 +91,7 @@ export default function ProductDetail() {
             <Badge tone={p.isSoldOut ? 'danger' : lowStock ? 'yellow' : 'green'}>
               {p.isSoldOut ? t.product.soldOut : t.product.inStock(p.stock)}
             </Badge>
+            <WishlistButton product={p} variant="page" className="sm:ml-auto" />
           </div>
 
           <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">

@@ -1,8 +1,9 @@
-import { Package, ShoppingBag, UserRound } from 'lucide-react';
+import { Heart, Package, ShoppingBag, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useMe } from '../features/auth/auth';
 import { useCart } from '../features/cart/cart-store';
+import { useWishlist } from '../features/wishlist/wishlist-store';
 import { t } from '../shared/lib/strings';
 import { useUi } from '../shared/lib/ui-store';
 import { useBottomNavVisible } from './BottomNav';
@@ -70,6 +71,7 @@ function useHideOnScroll() {
 
 export function Header() {
   const count = useCart((s) => s.count());
+  const saved = useWishlist((s) => s.ids.length);
   const openCart = useUi((s) => s.openCart);
   const me = useMe();
   const hidden = useHideOnScroll();
@@ -89,6 +91,22 @@ export function Header() {
             </Link>
           )}
           <LanguageToggle />
+          <Link
+            to="/wishlist"
+            className="btn-icon relative"
+            aria-label={t.nav.wishlistLabel(saved)}
+            title={t.nav.wishlist}
+          >
+            <Heart className="size-[18px]" strokeWidth={2.2} aria-hidden />
+            {saved > 0 && (
+              <span
+                key={saved}
+                className="bump absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-extrabold leading-4 text-white tabular-nums"
+              >
+                {saved}
+              </span>
+            )}
+          </Link>
           {me.data && (
             <Link
               to="/account/orders"

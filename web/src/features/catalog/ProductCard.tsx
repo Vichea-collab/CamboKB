@@ -5,6 +5,7 @@ import type { ProductCardData } from '../../shared/lib/types';
 import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
 import { useCart } from '../cart/cart-store';
+import { WishlistButton } from '../wishlist/WishlistButton';
 
 export function ProductCard({
   product: p,
@@ -63,6 +64,7 @@ export function ProductCard({
           {p.specsLine && <p className="mt-1 line-clamp-1 text-xs text-muted">{p.specsLine}</p>}
         </div>
       </Link>
+      <WishlistButton product={p} className="absolute right-2 top-2 z-10" />
       <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
         <Price cents={p.priceCents} compareAt={p.compareAtCents} className="text-[1.3rem]" />
         {qty > 0 && !p.isSoldOut ? (

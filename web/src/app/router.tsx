@@ -19,6 +19,7 @@ const Profile = lazy(() => import('../features/account/ProfilePage'));
 const Orders = lazy(() => import('../features/account/OrdersPage'));
 const OrderDetail = lazy(() => import('../features/account/OrderDetailPage'));
 const Invoice = lazy(() => import('../features/account/InvoicePage'));
+const Wishlist = lazy(() => import('../features/wishlist/WishlistPage'));
 const Contact = lazy(() => import('../features/info/ContactPage'));
 const Delivery = lazy(() => import('../features/info/DeliveryPage'));
 const Warranty = lazy(() => import('../features/info/WarrantyPage'));
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
       { path: 'account/orders', element: authed(<Orders />) },
       { path: 'account/orders/:number', element: authed(<OrderDetail />) },
       { path: 'account/orders/:number/invoice', element: authed(<Invoice />) },
+      { path: 'wishlist', element: page(<Wishlist />) },
       { path: 'contact', element: page(<Contact />) },
       { path: 'delivery', element: page(<Delivery />) },
       { path: 'warranty', element: page(<Warranty />) },
