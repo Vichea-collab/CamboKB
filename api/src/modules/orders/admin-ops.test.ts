@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventDeliveryError } from '../../integrations/services/events';
+import { eventsIdle } from '../events/outbox';
 import {
   createProduct,
   createTestApp,
@@ -73,6 +74,48 @@ describe('admin operations', () => {
       fromStatus: 'PENDING',
       note: 'Called customer',
       actorUserId: adminId,
+    });
+  });
+
+  describe('payment when the order is delivered', () => {
+    const paymentOf = (id: string) => ctx.prisma.payment.findUniqueOrThrow({ where: { orderId: id } });
+
+    it('marks a cash-on-delivery order paid, with the time, when it is delivered', async () => {
+      const o = await placeOrder();
+      expect((await paymentOf(o.id)).status).toBe('UNPAID');
+      await setStatus(o.id, 'CONFIRMED');
+      expect((await paymentOf(o.id)).status).toBe('UNPAID'); // not before the cash is handed over
+      expect((await setStatus(o.id, 'DELIVERED')).status).toBe(200);
+      expect(await paymentOf(o.id)).toMatchObject({ status: 'PAID', paidAt: expect.any(Date) });
+    });
+
+    it('is already paid in the messages sent about the delivery', async () => {
+      const o = await placeOrder();
+      await setStatus(o.id, 'DELIVERED');
+      await vi.waitFor(async () => {
+        await eventsIdle();
+        expect(ctx.events.data('order.status_changed')).not.toHaveLength(0);
+      });
+      const delivered = ctx.events.data('order.status_changed').at(-1)!;
+      expect(delivered.order.status).toBe('DELIVERED');
+      expect(delivered.order.payment?.status).toBe('PAID');
+    });
+
+    it('does not touch a payment that is already paid, or a cancelled order', async () => {
+      const o = await placeOrder();
+      await ctx.prisma.payment.update({ where: { orderId: o.id }, data: { status: 'PAID', paidAt: new Date('2026-01-01') } });
+      await setStatus(o.id, 'DELIVERED');
+      expect((await paymentOf(o.id)).paidAt).toEqual(new Date('2026-01-01'));
+
+      const c = await placeOrder();
+      await setStatus(c.id, 'CANCELLED');
+      expect((await paymentOf(c.id)).status).not.toBe('PAID');
+    });
+
+    it('leaves a KHQR order alone: only the bank confirmation pays it', async () => {
+      const o = await placeOrder({ paymentMethod: 'KHQR' });
+      await setStatus(o.id, 'DELIVERED');
+      expect((await paymentOf(o.id)).status).not.toBe('PAID');
     });
   });
 

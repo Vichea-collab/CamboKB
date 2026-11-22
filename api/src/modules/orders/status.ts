@@ -43,7 +43,7 @@ export async function changeOrderStatus(
   status: OrderStatus,
   actorUserId: string | null,
   note?: string,
-): Promise<{ number: string; from: OrderStatus }> {
+): Promise<{ number: string; from: OrderStatus; paidOnDelivery: boolean }> {
   const { prisma } = deps;
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id}::uuid FOR UPDATE`;
@@ -70,10 +70,21 @@ export async function changeOrderStatus(
         },
       });
     }
+    // Cash on delivery is collected at the door, so a delivered COD order is a paid one. Done before the
+    // announcement so the messages and reports already show it as paid. (KHQR is paid by the bank's confirmation.)
+    let paidOnDelivery = false;
+    if (status === 'DELIVERED') {
+      const { count } = await tx.payment.updateMany({
+        where: { orderId: id, method: 'COD', status: { not: 'PAID' } },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
+      paidOnDelivery = count > 0;
+    }
     await announceStatusChanged(tx, id);
-    return { number: order.number, from: order.status };
+    return { number: order.number, from: order.status, paidOnDelivery };
   });
   kickEvents(deps);
   void publishOrderUpdate(deps, id);
+  if (result.paidOnDelivery) void publishOrderUpdate(deps, id, 'payment');
   return result;
 }
