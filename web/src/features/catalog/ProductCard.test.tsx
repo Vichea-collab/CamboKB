@@ -29,8 +29,8 @@ const renderCard = (p: ProductCardData, onAdd = vi.fn()) =>
 
 describe('ProductCard', () => {
   it('warns when only a few are left, and says nothing when there is plenty', () => {
-    const { unmount } = renderCard(product({ lowStock: 2 }));
-    expect(screen.getByText('Only 2 left')).toBeInTheDocument();
+    const { unmount } = renderCard(product({ lowStock: 1 }));
+    expect(screen.getByText('Only 1 left')).toBeInTheDocument();
     unmount();
     renderCard(product({ lowStock: null }));
     expect(screen.queryByText(/left/)).not.toBeInTheDocument();

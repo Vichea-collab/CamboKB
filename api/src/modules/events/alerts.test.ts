@@ -32,15 +32,14 @@ describe('owner alerts: stock', () => {
   };
   const stockEvents = () => ctx.events.data('product.low_stock').map((e) => e.stock);
 
-  it('warns once when stock falls to 3 or fewer, and again when it runs out', async () => {
+  it('warns only when 1 is left, and again when it runs out', async () => {
     await order(1); // 4 left: still fine
+    await order(2); // 2 left: still fine
     expect(stockEvents()).toEqual([]);
-    await order(1); // 3 left: low
-    expect(stockEvents()).toEqual([3]);
-    await order(1); // 2 left: already warned
-    expect(stockEvents()).toEqual([3]);
-    await order(2); // 0 left: sold out
-    expect(stockEvents()).toEqual([3, 0]);
+    await order(1); // 1 left: low
+    expect(stockEvents()).toEqual([1]);
+    await order(1); // 0 left: sold out
+    expect(stockEvents()).toEqual([1, 0]);
     expect(ctx.events.data('product.low_stock')[1]).toMatchObject({ productId: product.id, name: 'Attack Shark X11 White', adminAlerts: true });
   });
 
@@ -50,11 +49,11 @@ describe('owner alerts: stock', () => {
   });
 
   it('does not warn when stock goes back up (an order cancelled)', async () => {
-    const o = await order(3); // 2 left: low
-    expect(stockEvents()).toEqual([2]);
+    const o = await order(4); // 1 left: low
+    expect(stockEvents()).toEqual([1]);
     const { agent: admin } = await signedInAgent(ctx.app, ctx.prisma, { role: 'ADMIN' });
     await admin.post(`/api/v1/admin/orders/${o.id}/status`).set('Origin', WEB_ORIGIN).send({ status: 'CANCELLED' });
     await eventsIdle();
-    expect(stockEvents()).toEqual([2]);
+    expect(stockEvents()).toEqual([1]);
   });
 });

@@ -89,7 +89,7 @@ const en = {
     added: (name: string) => `Added ${name}`,
     notFound: "This product isn't available any more.",
     backToShop: 'Back to the shop',
-    inStock: (n: number) => (n <= 3 ? `Only ${n} left` : 'In stock'),
+    inStock: (n: number) => (n <= 1 ? `Only ${n} left` : 'In stock'),
     breadcrumb: 'Breadcrumb',
     shop: 'Shop',
     moreIn: (category: string) => `More in ${category}`,
