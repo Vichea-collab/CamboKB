@@ -24,7 +24,7 @@ export function seoRouter({ prisma, config, files }: AppDeps): Router {
 
   r.get('/robots.txt', (_req, res) => {
     res.type('text/plain').set('Cache-Control', 'public, max-age=3600').send(
-      ['User-agent: *', 'Allow: /', 'Disallow: /admin', 'Disallow: /account', 'Disallow: /checkout', 'Disallow: /orders/', 'Disallow: /login', 'Disallow: /signup', 'Disallow: /forgot-password', '', `Sitemap: ${site()}/sitemap.xml`, ''].join('\n'),
+      ['User-agent: *', 'Allow: /', 'Disallow: /admin', 'Disallow: /account', 'Disallow: /checkout', 'Disallow: /orders/', 'Disallow: /login', '', `Sitemap: ${site()}/sitemap.xml`, ''].join('\n'),
     );
   });
 
