@@ -68,7 +68,7 @@ describe('shop bottom navigation (phones)', () => {
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
   });
 
-  it.each(['/products/attack-shark-x11-white', '/checkout', '/orders/CS-250001/pay', '/orders/CS-250001/success', '/login', '/signup', '/forgot-password'])(
+  it.each(['/products/attack-shark-x11-white', '/checkout', '/orders/CS-250001/pay', '/orders/CS-250001/success', '/login'])(
     'gets out of the way on %s, which has its own bottom bar or is a focused form',
     (path) => {
       show(path);

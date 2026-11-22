@@ -23,4 +23,11 @@ export type Promo = {
   usedCount: number;
   isActive: boolean;
 };
-export type Customer = PublicUser & { disabled: boolean; createdAt: string; orderCount: number; totalSpentCents: number };
+export type Customer = PublicUser & {
+  disabled: boolean;
+  createdAt: string;
+  orderCount: number;
+  totalSpentCents: number;
+  /** A Telegram account is linked (the only way to log in). Older api answers lack it: fall back to the username. */
+  telegramLinked?: boolean;
+};

@@ -2,7 +2,7 @@
 
 Online store for mechanical keyboards, mice, mousepads and desk accessories in
 Cambodia. Customers sign up by sharing their phone number with the store's
-Telegram bot, then log in with phone + password. Admins run the shop from
+Telegram bot, then log in with Telegram (no passwords). Admins run the shop from
 `/admin`: products, banners, promo codes, orders, customers, reports and invoices.
 
 Design and decisions: [`docs/superpowers/specs/2026-11-16-cambo-supply-rebuild-design.md`](docs/superpowers/specs/2026-11-16-cambo-supply-rebuild-design.md)
@@ -60,13 +60,14 @@ Open http://localhost:5173.
 The bot belongs to the **notification service**.
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
-2. In `notification/.env`: `TELEGRAM_MODE=polling`, `TELEGRAM_BOT_TOKEN=…`. In `api/.env`: `TELEGRAM_BOT_USERNAME=YourBot` (the api builds the sign-up link from it).
+2. In `notification/.env`: `TELEGRAM_MODE=polling`, `TELEGRAM_BOT_TOKEN=…`. In `api/.env`: `TELEGRAM_BOT_USERNAME=YourBot` (the api builds the login link from it). `TELEGRAM_WEBAPP_KEY` in `api/.env` is only for logging in inside the Telegram Mini App; it is made from the token, and `api/.env.example` shows how.
 3. For new-order alerts, set `TELEGRAM_ADMIN_CHAT_ID` (in `notification/.env`) to your Telegram user id or a group id
    (send a message to [@userinfobot](https://t.me/userinfobot) to get yours).
 
-Polling is for development. Production uses a webhook (`TELEGRAM_MODE=webhook`, a random `TELEGRAM_WEBHOOK_SECRET`,
+Polling is for development. Production uses a webhook (`TELEGRAM_MODE=webhook`, a random `TELEGRAM_WEBHOOK_SECRET` made with `openssl rand -hex 32`,
 and `TELEGRAM_WEBHOOK_URL=https://your-domain/telegram/webhook`); the notification service registers it on start and
-nginx forwards that one path to it.
+nginx forwards that one path to it. Production also needs `TELEGRAM_WEBAPP_KEY` and an https `PUBLIC_ORIGIN`:
+see `docs/deployment.md`, "Telegram login".
 
 What customers get from the bot, with no extra setup (they've already started it when they sign up):
 
@@ -270,6 +271,7 @@ docker/ observability/ scripts/ docs/
 | `npm run dev` | All five services with hot reload |
 | `npm run db:seed` | Load the scraped catalog (needs the file service running) |
 | `npm run admin:promote -w api -- <phone>` | Make an account an admin |
+| `npm run admin:unlink-telegram -w api -- <phone>` | Owner recovery: cut an account's Telegram link and log it out everywhere (they link again with Continue with Telegram). In production: `node dist/unlink-telegram.js <phone>` |
 | `npm run events -w @cambo/api -- backfill` | Re-send every order to the report service |
 | `scripts/smoke.sh` | Check a running Docker stack end to end |
 | `npm run build` | Production builds of every service |

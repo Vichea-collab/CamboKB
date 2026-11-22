@@ -14,12 +14,19 @@ const envSchema = z
     WEB_ORIGIN: z.string().default('http://localhost:5173'),
     COOKIE_DOMAIN: z.string().optional(),
     SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
+    // Admins get a shorter session: it never slides, it ends this many days after login.
+    ADMIN_SESSION_TTL_DAYS: z.coerce.number().int().positive().default(1),
     TRUST_PROXY: bool,
     // Secure cookies need https. Defaults to on in production; set COOKIE_SECURE=false only for a plain-http local stack.
     COOKIE_SECURE: z.enum(['true', 'false']).optional(),
     // The bot itself (token, webhook, admin chat) belongs to the notification service. The api only
     // needs the bot's name to build the sign-up link.
     TELEGRAM_BOT_USERNAME: z.string().optional(),
+    // hex(HMAC_SHA256("WebAppData", bot token)): lets the api check Mini App signatures without holding the bot token.
+    TELEGRAM_WEBAPP_KEY: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/i, 'Use the 64-character hex key (see docs/deployment.md)')
+      .optional(),
     NOTIFICATION_SERVICE_URL: z.url().default('http://localhost:4300'),
     NOTIFICATION_SERVICE_SECRET: z.string().default('dev-notification-secret-change-me-012345'),
     // What the notification service must send when it calls the api (/internal/*).
@@ -56,6 +63,13 @@ const envSchema = z
   })
   .superRefine((e, ctx) => {
     if (e.NODE_ENV === 'production') {
+      if (!e.TELEGRAM_WEBAPP_KEY) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['TELEGRAM_WEBAPP_KEY'],
+          message: 'required in production: 64 hex characters, hex(HMAC_SHA256("WebAppData", bot token))',
+        });
+      }
       for (const key of [
         'FILE_SERVICE_SECRET',
         'REPORT_SERVICE_SECRET',
@@ -83,8 +97,9 @@ export type Config = {
   webOrigin: string[];
   cookieDomain?: string;
   sessionTtlDays: number;
+  adminSessionTtlDays: number;
   trustProxy: boolean;
-  telegram: { botUsername?: string };
+  telegram: { botUsername?: string; webAppKey?: string };
   services: {
     notificationUrl: string;
     notificationSecret: string;
@@ -133,8 +148,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     cookieDomain: e.COOKIE_DOMAIN,
     sessionTtlDays: e.SESSION_TTL_DAYS,
+    adminSessionTtlDays: e.ADMIN_SESSION_TTL_DAYS,
     trustProxy: e.TRUST_PROXY,
-    telegram: { botUsername: e.TELEGRAM_BOT_USERNAME },
+    telegram: { botUsername: e.TELEGRAM_BOT_USERNAME, webAppKey: e.TELEGRAM_WEBAPP_KEY },
     services: {
       notificationUrl: e.NOTIFICATION_SERVICE_URL.replace(/\/$/, ''),
       notificationSecret: e.NOTIFICATION_SERVICE_SECRET,

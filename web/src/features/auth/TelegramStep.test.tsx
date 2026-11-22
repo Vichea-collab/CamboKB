@@ -11,7 +11,7 @@ describe('TelegramStep while waiting', () => {
   afterEach(() => vi.useRealTimers());
 
   it('stays quiet at first, then offers help if nothing has happened for a while', async () => {
-    render(<TelegramStep tg={waiting} startLabel="Sign up with Telegram" />);
+    render(<TelegramStep tg={waiting} startLabel="Continue with Telegram" />);
     expect(screen.queryByText('Nothing happening?')).not.toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(25_000));
     expect(screen.getByText('Nothing happening?')).toBeInTheDocument();
@@ -20,7 +20,13 @@ describe('TelegramStep while waiting', () => {
   });
 
   it('keeps the link that reopens Telegram', () => {
-    render(<TelegramStep tg={waiting} startLabel="Sign up with Telegram" />);
+    render(<TelegramStep tg={waiting} startLabel="Continue with Telegram" />);
     expect(screen.getByRole('link', { name: 'Open Telegram' })).toHaveAttribute('href', waiting.deepLink);
+  });
+
+  it('shows the code the bot shows, so the customer can tell it is their own request', () => {
+    render(<TelegramStep tg={{ ...waiting, matchCode: '47' }} startLabel="Continue with Telegram" />);
+    expect(screen.getByText('47')).toBeInTheDocument();
+    expect(screen.getByText(/Only confirm if they match/)).toBeInTheDocument();
   });
 });

@@ -49,6 +49,8 @@ export type TelegramBackButton = {
 
 /** The parts of Telegram's WebApp object we use. Older Telegram versions lack the newer calls. */
 export type TelegramWebApp = {
+  /** The signed launch data (query-string form) the server checks to log the customer in. */
+  initData?: string;
   ready(): void;
   expand(): void;
   setHeaderColor?(color: string): void;
@@ -94,6 +96,17 @@ export function configureTelegramApp(app: TelegramWebApp | undefined, color: str
 
 export const telegramApp = () =>
   (window as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+
+/**
+ * The Mini App's signed launch data, or undefined outside Telegram. Read from Telegram's script when it
+ * loaded, else from the launch parameters in the address (the script may have timed out).
+ */
+export function telegramInitData(): string | undefined {
+  if (!isTelegramMiniApp()) return undefined;
+  const fromScript = telegramApp()?.initData;
+  if (fromScript) return fromScript;
+  return new URLSearchParams(window.location.hash.slice(1)).get('tgWebAppData') || undefined;
+}
 
 /**
  * Keeps Telegram's native top-bar back button in sync with the router:

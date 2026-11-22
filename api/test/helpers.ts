@@ -207,7 +207,7 @@ export async function createTestApp(
 }
 
 import request from 'supertest';
-import { hashPassword } from '../src/modules/auth/password';
+import { createSession, SESSION_COOKIE } from '../src/modules/auth/sessions';
 import type { Role } from '@prisma/client';
 
 let phoneSeq = 0;
@@ -217,15 +217,12 @@ export function nextPhone(): string {
   return `+85512${String(phoneSeq).padStart(6, '0')}`;
 }
 
-export const TEST_PASSWORD = 'kb-store-2026';
-
 export const INTERNAL_AUTH = { Authorization: 'Bearer test-internal-secret-0123456789abcdef' };
 
 export async function createUser(
   db: PrismaClient,
   opts: {
     phone?: string;
-    password?: string;
     role?: Role;
     name?: string;
     telegramUserId?: number;
@@ -234,7 +231,6 @@ export async function createUser(
   return db.user.create({
     data: {
       phone: opts.phone ?? nextPhone(),
-      passwordHash: await hashPassword(opts.password ?? TEST_PASSWORD),
       name: opts.name ?? 'Test User',
       role: opts.role ?? 'CUSTOMER',
       telegramUserId: opts.telegramUserId !== undefined ? BigInt(opts.telegramUserId) : undefined,
@@ -243,15 +239,20 @@ export async function createUser(
   });
 }
 
-export async function loginAs(app: Express, phone: string, password = TEST_PASSWORD) {
-  const agent = request.agent(app);
-  const res = await agent
-    .post('/api/v1/auth/login')
-    .set('Origin', WEB_ORIGIN)
-    .send({ phone, password });
-  if (res.status !== 200)
-    throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
-  return agent;
+/** A `cs_session=...` cookie value for a fresh session of that user (what a finished Telegram login sets). */
+export async function sessionCookieFor(phone: string): Promise<string> {
+  const db = testPrisma();
+  const user = await db.user.findUniqueOrThrow({ where: { phone } });
+  const { token } = await createSession(db, user.id, {}, user.role === 'ADMIN' ? 1 : 30);
+  return `${SESSION_COOKIE}=${token}`;
+}
+
+/**
+ * A supertest agent signed in as that user. Logging in is Telegram-only, so the test starts the session
+ * the way a finished login does: a Session row, and its token sent as the cs_session cookie.
+ */
+export async function loginAs(app: Express, phone: string) {
+  return request.agent(app).set('Cookie', await sessionCookieFor(phone));
 }
 
 /** Create a user and return a logged-in supertest agent. */
@@ -261,7 +262,7 @@ export async function signedInAgent(
   opts: Parameters<typeof createUser>[1] = {},
 ) {
   const user = await createUser(db, opts);
-  const agent = await loginAs(app, user.phone, opts.password);
+  const agent = await loginAs(app, user.phone);
   return { user, agent };
 }
 

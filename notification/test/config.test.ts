@@ -29,10 +29,17 @@ describe('notification config', () => {
         ...base,
         TELEGRAM_MODE: 'webhook',
         TELEGRAM_BOT_TOKEN: 't',
-        TELEGRAM_WEBHOOK_SECRET: 's',
+        TELEGRAM_WEBHOOK_SECRET: 'w'.repeat(32),
         TELEGRAM_WEBHOOK_URL: 'https://x.test/telegram/webhook',
       }).telegram.mode,
     ).toBe('webhook');
+  });
+
+  it('refuses a short or unusable webhook secret', () => {
+    const webhook = { ...base, TELEGRAM_MODE: 'webhook', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_WEBHOOK_URL: 'https://x.test/w' };
+    expect(() => loadConfig({ ...webhook, TELEGRAM_WEBHOOK_SECRET: 'w'.repeat(31) })).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+    expect(() => loadConfig({ ...webhook, TELEGRAM_WEBHOOK_SECRET: `${'w'.repeat(31)}!` })).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+    expect(loadConfig({ ...webhook, TELEGRAM_WEBHOOK_SECRET: 'w'.repeat(32) }).telegram.webhookSecret).toBe('w'.repeat(32));
   });
 
   it('accepts a user id or a group id for the owner chat, and nothing else', () => {

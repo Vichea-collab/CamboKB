@@ -172,14 +172,14 @@ describe('sharing the delivery location through the Telegram bot', () => {
     expect(current.body.request).toMatchObject({ status: 'VERIFIED', lat: 11.57, lng: 104.9 });
   });
 
-  it('lets a customer retry sharing many times without using up the sign-up allowance', async () => {
+  it('lets a customer retry sharing many times without using up the login allowance', async () => {
     const { agent } = await signedIn();
-    for (let i = 0; i < 15; i++) await startShare(agent); // more than the 10 a sign-up start is allowed
-    const signup = await request(ctx.app)
+    for (let i = 0; i < 15; i++) await startShare(agent); // more than the 10 a login start is allowed
+    const login = await request(ctx.app)
       .post('/api/v1/auth/telegram/start')
       .set('Origin', WEB_ORIGIN)
-      .send({ purpose: 'SIGNUP' });
-    expect(signup.status).toBe(200);
+      .send({ purpose: 'LOGIN' });
+    expect(login.status).toBe(200);
   });
 
   it('rejects coordinates that are not on Earth', async () => {

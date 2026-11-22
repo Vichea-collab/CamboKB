@@ -207,4 +207,42 @@ describe('order buttons in Telegram', () => {
       }
     }
   });
+
+  describe('login buttons', () => {
+    const REQ = '7f1c1f5e-3b0a-4f53-9d0e-2a7a1f6c9b11';
+    const tap = (data: string, fromId = CUSTOMER) => press(ctx, data, { fromId, chatId: fromId });
+
+    it('passes the tap and the tapper\'s Telegram id to the api, then removes the buttons', async () => {
+      ctx.api.loginReply = { outcome: 'confirmed', text: 'Done! You are logged in.' };
+      expect((await tap(`login:${REQ}:y`)).status).toBe(200);
+      await Outbox.idle();
+      expect(ctx.api.loginCalls).toEqual([{ requestId: REQ, telegramUserId: CUSTOMER, decision: 'y' }]);
+      expect(ctx.telegram.edits.at(-1)?.replyMarkup).toEqual({ inline_keyboard: [] });
+      expect(ctx.telegram.answers.at(-1)).toMatchObject({ text: 'Done! You are logged in.' });
+      expect(ctx.telegram.to(CUSTOMER).map((m) => m.text)).toEqual(['Done! You are logged in.']);
+    });
+
+    it('works for anyone in their own chat (not only the shop admin) and never touches order buttons', async () => {
+      await tap(`login:${REQ}:n`, 4242);
+      expect(ctx.api.loginCalls[0]).toMatchObject({ telegramUserId: 4242, decision: 'n' });
+      expect(ctx.api.statusCalls).toEqual([]);
+    });
+
+    it('shows an alert and leaves the buttons when the tap is from another Telegram account', async () => {
+      ctx.api.loginReply = { outcome: 'not_yours', text: 'This login request is for a different Telegram account.' };
+      await tap(`login:${REQ}:y`);
+      expect(ctx.telegram.answers.at(-1)).toMatchObject({ alert: true });
+      expect(ctx.telegram.edits).toEqual([]);
+    });
+
+    it('answers the tap even when the api is down, and ignores malformed data', async () => {
+      ctx.api.down = true;
+      await tap(`login:${REQ}:y`);
+      expect(ctx.telegram.answers.at(-1)).toMatchObject({ alert: true });
+      ctx.api.down = false;
+      ctx.api.loginCalls = [];
+      await tap('login:not-an-id:y');
+      expect(ctx.api.loginCalls).toEqual([]);
+    });
+  });
 });

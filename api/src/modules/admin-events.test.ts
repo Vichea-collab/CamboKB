@@ -1,11 +1,11 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createProduct,
   createTestApp,
   resetDb,
+  sessionCookieFor,
   signedInAgent,
   WEB_ORIGIN,
 } from '../../test/helpers';
@@ -56,16 +56,7 @@ describe('live admin events', () => {
 
   const cookieOf = async (role: 'ADMIN' | 'CUSTOMER') => {
     const u = await signedInAgent(ctx.app, ctx.prisma, { role });
-    const jar = await request(ctx.app)
-      .post('/api/v1/auth/login')
-      .set('Origin', WEB_ORIGIN)
-      .send({ phone: u.user.phone, password: 'kb-store-2026' });
-    return {
-      cookie: (jar.headers['set-cookie'] as unknown as string[])
-        .map((c) => c.split(';')[0])
-        .join('; '),
-      agent: u.agent,
-    };
+    return { cookie: await sessionCookieFor(u.user.phone), agent: u.agent };
   };
 
   it('is for signed-in admins only', async () => {

@@ -85,7 +85,6 @@ export const paymentStatusUpdateSchema = z.object({ status: z.enum(PAYMENT_STATU
 export const customerInputSchema = z.object({
   name: z.string().trim().min(1).max(60),
   phone: z.string().trim().min(8).max(20),
-  password: z.string().min(8).max(128).optional(),
   role: z.enum(['CUSTOMER', 'ADMIN']).default('CUSTOMER'),
 });
 

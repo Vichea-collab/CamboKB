@@ -1,7 +1,10 @@
 import { serviceFetch } from '@cambo/service-kit';
 import {
   botReplySchema,
+  loginConfirmReplySchema,
   type BotAction,
+  type LoginConfirmReply,
+  type LoginConfirmRequest,
   type OrderButtonRequest,
   type OrderStatus,
   type TelegramUpdateInput,
@@ -23,6 +26,8 @@ export class ApiError extends Error {
 export interface ApiClient {
   /** A chat message: the api decides what to answer. */
   forwardUpdate(update: TelegramUpdateInput): Promise<BotAction[]>;
+  /** Someone tapped Log me in / Not me under a login message. */
+  loginConfirm(body: LoginConfirmRequest): Promise<LoginConfirmReply>;
   /** The owner pressed an order button. Throws ApiError (403 not allowed, 404, 409 with the order's real status). */
   changeOrderStatus(
     orderId: string,
@@ -68,6 +73,10 @@ export class HttpApiClient implements ApiClient {
 
   async forwardUpdate(update: TelegramUpdateInput) {
     return botReplySchema.parse(await this.post('/internal/telegram/updates', { update })).actions;
+  }
+
+  async loginConfirm(body: LoginConfirmRequest) {
+    return loginConfirmReplySchema.parse(await this.post('/internal/telegram/login-confirm', body));
   }
 
   changeOrderStatus(orderId: string, body: OrderButtonRequest) {

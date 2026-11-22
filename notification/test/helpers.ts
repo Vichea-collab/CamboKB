@@ -1,6 +1,8 @@
 import { createMetrics, migrate } from '@cambo/service-kit';
 import type {
   BotAction,
+  LoginConfirmReply,
+  LoginConfirmRequest,
   OrderButtonRequest,
   OrderSnapshot,
   OrderStatus,
@@ -15,7 +17,7 @@ import { Outbox } from '../src/outbox';
 import { TelegramError, type SendOptions, type TelegramClient, type TgUpdate } from '../src/telegram';
 
 export const SECRET = 'test-notification-secret-0123456789ab';
-export const WEBHOOK_SECRET = 'test-webhook-secret';
+export const WEBHOOK_SECRET = 'test-webhook-secret-0123456789abcdef';
 export const ADMIN_CHAT = 5000;
 export const AUTH = { Authorization: `Bearer ${SECRET}` };
 export const WEB_ORIGIN = 'http://localhost:5173';
@@ -101,6 +103,13 @@ export class FakeApiClient implements ApiClient {
   orders = new Map<string, { number: string; status: OrderStatus }>();
   down = false;
   forbid = false;
+  loginCalls: LoginConfirmRequest[] = [];
+  loginReply: LoginConfirmReply = { outcome: 'confirmed', text: 'Done' };
+  async loginConfirm(body: LoginConfirmRequest) {
+    this.loginCalls.push(body);
+    if (this.down) throw new ApiError(0, 'API_UNREACHABLE', 'down');
+    return this.loginReply;
+  }
   async forwardUpdate(update: TelegramUpdateInput) {
     if (this.down) throw new ApiError(0, 'API_UNREACHABLE', 'down');
     this.forwarded.push(update);

@@ -119,7 +119,7 @@ describe('the services working together', () => {
       WEB_ORIGIN,
       TELEGRAM_MODE: 'webhook',
       TELEGRAM_BOT_TOKEN: 't',
-      TELEGRAM_WEBHOOK_SECRET: 'hook',
+      TELEGRAM_WEBHOOK_SECRET: 'hook-secret-0123456789abcdefghijklmnop',
       TELEGRAM_WEBHOOK_URL: 'https://x.test/telegram/webhook',
       TELEGRAM_ADMIN_CHAT_ID: String(ADMIN_CHAT),
     });
@@ -224,7 +224,7 @@ describe('the services working together', () => {
 
     const tap = await request(notificationApp)
       .post('/webhook')
-      .set('X-Telegram-Bot-Api-Secret-Token', 'hook')
+      .set('X-Telegram-Bot-Api-Secret-Token', 'hook-secret-0123456789abcdefghijklmnop')
       .send({
         update_id: 1,
         callback_query: {
@@ -249,7 +249,7 @@ describe('the services working together', () => {
   it('a chat message is answered by the api through the notification service', async () => {
     await request(notificationApp)
       .post('/webhook')
-      .set('X-Telegram-Bot-Api-Secret-Token', 'hook')
+      .set('X-Telegram-Bot-Api-Secret-Token', 'hook-secret-0123456789abcdefghijklmnop')
       .send({
         update_id: 2,
         message: {

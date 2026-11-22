@@ -57,6 +57,7 @@ enum TelegramAuthPurpose {
   RESET
   CHANGE_PHONE
   SHARE_LOCATION
+  LOGIN
 }
 
 enum TelegramAuthStatus {
@@ -69,7 +70,8 @@ enum TelegramAuthStatus {
 model User {
   id                String    @id @default(uuid()) @db.Uuid
   phone             String    @unique
-  passwordHash      String
+  /// Telegram-only login: nothing reads this any more. Dropped in the next release (migration 2).
+  passwordHash      String?
   name              String
   role              Role      @default(CUSTOMER)
   telegramUserId    BigInt?   @unique
@@ -118,6 +120,9 @@ model TelegramAuthRequest {
   /** SHARE_LOCATION: where the customer said to deliver. Only shown while the request is valid. */
   lat              Float?
   lng              Float?
+  /** LOGIN: the 2-digit code shown on the website and in the bot, and the browser that asked. */
+  matchCode        String?
+  browser          String?
   expiresAt        DateTime
   verifiedAt       DateTime?
   completedAt      DateTime?
@@ -125,6 +130,15 @@ model TelegramAuthRequest {
   updatedAt        DateTime            @updatedAt
 
   @@index([telegramUserId, status])
+}
+
+/// Mini App initData signatures already accepted, so a captured one cannot be replayed.
+model TelegramWebAppHash {
+  hash      String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 model Address {

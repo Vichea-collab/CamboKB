@@ -97,6 +97,9 @@ services:
       NOTIFICATION_SERVICE_SECRET: local-compose-notification-secret-7d41c9e0
       API_INTERNAL_SECRET: local-compose-api-internal-secret-3c8f20a9d6
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      ADMIN_SESSION_TTL_DAYS: ${ADMIN_SESSION_TTL_DAYS:-1}
+      # Optional locally: empty turns off silent Mini App login (the deep link still works).
+      TELEGRAM_WEBAPP_KEY: ${TELEGRAM_WEBAPP_KEY:-}
     depends_on:
       db: { condition: service_healthy }
       file: { condition: service_started }
