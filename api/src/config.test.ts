@@ -34,6 +34,7 @@ describe('loadConfig', () => {
       NODE_ENV: 'production',
       FILE_SERVICE_SECRET: 'x'.repeat(40),
       REPORT_SERVICE_SECRET: 'y'.repeat(40),
+      TELEGRAM_WEBAPP_KEY: 'ab'.repeat(32),
     };
     expect(() => loadConfig(base)).toThrow(
       /NOTIFICATION_SERVICE_SECRET[\s\S]*API_INTERNAL_SECRET|API_INTERNAL_SECRET[\s\S]*NOTIFICATION_SERVICE_SECRET/,
@@ -47,6 +48,30 @@ describe('loadConfig', () => {
     ).toBe('i'.repeat(40));
   });
 
+  it('refuses to start in production without a 64-hex TELEGRAM_WEBAPP_KEY, but not in development', () => {
+    const prod = {
+      DATABASE_URL: 'postgresql://x@localhost/db',
+      WEB_ORIGIN: 'https://a.test',
+      NODE_ENV: 'production',
+      FILE_SERVICE_SECRET: 'x'.repeat(40),
+      REPORT_SERVICE_SECRET: 'y'.repeat(40),
+      NOTIFICATION_SERVICE_SECRET: 'n'.repeat(40),
+      API_INTERNAL_SECRET: 'i'.repeat(40),
+    };
+    expect(() => loadConfig(prod)).toThrow(/TELEGRAM_WEBAPP_KEY/);
+    expect(() => loadConfig({ ...prod, TELEGRAM_WEBAPP_KEY: 'ab'.repeat(31) })).toThrow(/TELEGRAM_WEBAPP_KEY/);
+    expect(() => loadConfig({ ...prod, TELEGRAM_WEBAPP_KEY: 'zz'.repeat(32) })).toThrow(/TELEGRAM_WEBAPP_KEY/);
+    expect(loadConfig({ ...prod, TELEGRAM_WEBAPP_KEY: 'AB'.repeat(32) }).telegram.webAppKey).toBe('AB'.repeat(32));
+    expect(loadConfig({ DATABASE_URL: 'postgresql://x@localhost/db' }).telegram.webAppKey).toBeUndefined();
+  });
+
+  it('gives admins a 1-day session unless ADMIN_SESSION_TTL_DAYS says otherwise', () => {
+    const base = { DATABASE_URL: 'postgresql://x@localhost/db' };
+    expect(loadConfig(base).adminSessionTtlDays).toBe(1);
+    expect(loadConfig({ ...base, ADMIN_SESSION_TTL_DAYS: '2' }).adminSessionTtlDays).toBe(2);
+    expect(() => loadConfig({ ...base, ADMIN_SESSION_TTL_DAYS: '0' })).toThrow(/ADMIN_SESSION_TTL_DAYS/);
+  });
+
   it('sends Secure cookies in production unless told otherwise (plain-http local containers)', () => {
     const base = { DATABASE_URL: 'postgresql://x@localhost/db', WEB_ORIGIN: 'https://a.test' };
     expect(
@@ -57,6 +82,7 @@ describe('loadConfig', () => {
         REPORT_SERVICE_SECRET: 'y'.repeat(40),
         NOTIFICATION_SERVICE_SECRET: 'n'.repeat(40),
         API_INTERNAL_SECRET: 'i'.repeat(40),
+        TELEGRAM_WEBAPP_KEY: 'ab'.repeat(32),
       }).cookieSecure,
     ).toBe(true);
     expect(loadConfig({ ...base, NODE_ENV: 'development' }).cookieSecure).toBe(false);
@@ -69,6 +95,7 @@ describe('loadConfig', () => {
         REPORT_SERVICE_SECRET: 'y'.repeat(40),
         NOTIFICATION_SERVICE_SECRET: 'n'.repeat(40),
         API_INTERNAL_SECRET: 'i'.repeat(40),
+        TELEGRAM_WEBAPP_KEY: 'ab'.repeat(32),
       }).cookieSecure,
     ).toBe(false);
   });

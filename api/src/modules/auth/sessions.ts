@@ -24,15 +24,24 @@ export async function createSession(
   return { token, expiresAt, sessionId: session.id };
 }
 
-/** Resolve a session token to its user. Slides the expiry at most once a day. */
+/**
+ * Resolve a session token to its user. A customer's expiry slides forward at most once a day.
+ * An admin's session never slides: it ends `adminTtlDays` after login, whatever its stored expiry says
+ * (so a long session from before the role was given, or before this rule, is cut short too).
+ */
 export async function getSessionUser(
   prisma: PrismaClient,
   token: string,
   ttlDays: number,
+  adminTtlDays: number,
 ): Promise<{ user: User; sessionId: string; extendedTo?: Date } | null> {
   const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, include: { user: true } });
   const now = Date.now();
   if (!session || session.revokedAt || session.expiresAt.getTime() <= now || session.user.disabledAt) return null;
+  if (session.user.role === 'ADMIN') {
+    if (session.createdAt.getTime() + adminTtlDays * DAY_MS <= now) return null;
+    return { user: session.user, sessionId: session.id };
+  }
   if (now - session.extendedAt.getTime() > DAY_MS) {
     const extendedTo = new Date(now + ttlDays * DAY_MS);
     await prisma.session.update({ where: { id: session.id }, data: { expiresAt: extendedTo, extendedAt: new Date(now) } });
@@ -82,7 +91,12 @@ export async function startSession(
   user: User,
   meta: { ip?: string; userAgent?: string },
 ) {
-  const { token, expiresAt, sessionId } = await createSession(prisma, user.id, meta, config.sessionTtlDays);
+  const { token, expiresAt, sessionId } = await createSession(
+    prisma,
+    user.id,
+    meta,
+    user.role === 'ADMIN' ? config.adminSessionTtlDays : config.sessionTtlDays,
+  );
   setSessionCookie(res, config, token, expiresAt);
   return sessionId;
 }

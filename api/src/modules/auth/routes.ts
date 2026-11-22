@@ -1,28 +1,22 @@
 import {
-  changePasswordSchema,
   changePhoneCompleteSchema,
-  loginSchema,
-  resetCompleteSchema,
-  signupCompleteSchema,
+  loginCompleteSchema,
   TELEGRAM_AUTH_PURPOSES,
   telegramStartSchema,
+  telegramWebAppSchema,
   uuidSchema,
-  type ChangePasswordInput,
-  type LoginInput,
-  type ResetCompleteInput,
-  type SignupCompleteInput,
+  type LoginCompleteInput,
   type TelegramStartInput,
+  type TelegramWebAppInput,
 } from '@cambo/shared';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { Router, type RequestHandler, type Response } from 'express';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import { requireAuth } from '../../http/middleware/auth';
-import { limiter, loginLimiter } from '../../http/middleware/rate-limit';
+import { limiter } from '../../http/middleware/rate-limit';
 import { validate } from '../../http/middleware/validate';
-import { kickEvents } from '../events/outbox';
-import { announceCustomerSignedUp } from '../events/snapshot';
-import { hashPassword, verifyAgainstDummy, verifyPassword } from './password';
 import { clearSessionCookie, randomToken, revokeAllSessions, revokeSession, sha256, startSession, toPublicUser } from './sessions';
 import {
   consumeVerifiedRequest,
@@ -33,8 +27,7 @@ import {
   TG_REQUEST_COOKIE,
   TG_REQUEST_TTL_MS,
 } from './telegram-verification';
-
-const invalidCredentials = () => new AppError(401, 'INVALID_CREDENTIALS', 'Wrong phone number or password');
+import { verifyWebAppInitData, WEBAPP_MAX_AGE_SEC } from './telegram-webapp';
 
 export function authRouter(deps: AppDeps): Router {
   const { prisma, config } = deps;
@@ -50,15 +43,6 @@ export function authRouter(deps: AppDeps): Router {
       domain: config.cookieDomain || undefined,
       maxAge: TG_REQUEST_TTL_MS + 5 * 60 * 1000,
     });
-
-  r.post('/login', loginLimiter(config), validate({ body: loginSchema }), async (req, res) => {
-    const { phone, password } = req.valid.body as LoginInput;
-    const user = await prisma.user.findUnique({ where: { phone } });
-    const ok = user ? await verifyPassword(user.passwordHash, password) : await verifyAgainstDummy(password);
-    if (!user || !ok || user.disabledAt) throw invalidCredentials();
-    await startSession(prisma, config, res, user, { ip: req.ip, userAgent: req.get('user-agent') });
-    res.json({ user: toPublicUser(user) });
-  });
 
   r.post('/logout', async (req, res) => {
     if (req.sessionId) await revokeSession(prisma, req.sessionId);
@@ -84,21 +68,7 @@ export function authRouter(deps: AppDeps): Router {
     res.json({ user: req.user ? toPublicUser(req.user) : null });
   });
 
-  r.post('/change-password', requireAuth, validate({ body: changePasswordSchema }), async (req, res) => {
-    const { currentPassword, newPassword } = req.valid.body as ChangePasswordInput;
-    const user = req.user!;
-    if (!(await verifyPassword(user.passwordHash, currentPassword))) {
-      throw new AppError(400, 'INVALID_CREDENTIALS', 'Current password is wrong');
-    }
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() },
-    });
-    await revokeAllSessions(prisma, user.id, req.sessionId);
-    res.status(204).end();
-  });
-
-  // --- Telegram phone verification (sign up, reset password, change phone) ---
+  // --- Telegram: log in / sign up, change phone, share a location ---
 
   // Sharing a delivery location is something a signed-in customer retries at checkout, so it has its own,
   // larger allowance and never uses up (or is blocked by) the sign-up / reset budget.
@@ -107,28 +77,28 @@ export function authRouter(deps: AppDeps): Router {
   const startLimiter: RequestHandler = (req, res, next) =>
     (req.body?.purpose === 'SHARE_LOCATION' ? locationStartLimit : startLimit)(req, res, next);
   r.post('/telegram/start', startLimiter, validate({ body: telegramStartSchema }), async (req, res) => {
-    const { purpose, phone } = req.valid.body as TelegramStartInput;
+    const { purpose } = req.valid.body as TelegramStartInput;
     const needsLogin = purpose === 'CHANGE_PHONE' || purpose === 'SHARE_LOCATION';
     if (needsLogin && !req.user) throw new AppError(401, 'UNAUTHENTICATED', 'Please log in');
-    if (purpose === 'RESET' && !phone) throw new AppError(400, 'VALIDATION_ERROR', 'Phone number is required');
     const result = await startTelegramAuth(deps, {
       purpose,
-      phone: purpose === 'RESET' ? phone : undefined,
       userId: needsLogin ? req.user!.id : undefined,
+      userAgent: req.get('user-agent'),
     });
     bindRequest(res, result.requestId);
     res.json(result);
   });
 
   // The website end of a sign-up that started in the bot: the link carries a one-time token. Claiming it
-  // ties the verified request to this browser, and the token stops working so a forwarded link is useless.
+  // ties the verified login request to this browser (then /login/complete starts the session), and the token
+  // stops working so a forwarded link is useless.
   r.post('/telegram/claim', limiter(20, 15 * 60 * 1000), validate({ body: z.object({ token: z.string().min(20).max(128) }) }), async (req, res) => {
     const { token } = req.valid.body as { token: string };
     const notVerified = new AppError(409, 'TELEGRAM_NOT_VERIFIED', 'This link has expired or was already used. Please start again.');
     const found = await prisma.telegramAuthRequest.findUnique({ where: { tokenHash: sha256(token) } });
     if (!found) throw notVerified;
     const { count } = await prisma.telegramAuthRequest.updateMany({
-      where: { id: found.id, tokenHash: found.tokenHash, purpose: 'SIGNUP', status: 'VERIFIED', expiresAt: { gt: new Date() } },
+      where: { id: found.id, tokenHash: found.tokenHash, purpose: 'LOGIN', status: 'VERIFIED', expiresAt: { gt: new Date() } },
       data: { tokenHash: sha256(randomToken()) },
     });
     if (count !== 1) throw notVerified;
@@ -153,49 +123,55 @@ export function authRouter(deps: AppDeps): Router {
     res.set('Cache-Control', 'no-store').json(statusView(found));
   });
 
-  r.post('/signup/complete', validate({ body: signupCompleteSchema }), async (req, res) => {
-    const { requestId, name: typedName, password } = req.valid.body as SignupCompleteInput;
-    const passwordHash = await hashPassword(password);
+  // The website end of "Continue with Telegram": the person tapped "Log me in" in the bot, so the request is
+  // VERIFIED and names the account. It is used once, only by the browser that asked (cookie), and the account
+  // must still be linked to the very Telegram user who confirmed. Admins go through exactly the same checks.
+  r.post('/login/complete', limiter(30, 15 * 60 * 1000), validate({ body: loginCompleteSchema }), async (req, res) => {
+    const { requestId } = req.valid.body as LoginCompleteInput;
     const user = await prisma.$transaction(async (tx) => {
-      const verified = await consumeVerifiedRequest(tx, req, requestId, 'SIGNUP');
-      const taken = await tx.user.findFirst({
-        where: { OR: [{ phone: verified.phone! }, { telegramUserId: verified.telegramUserId! }] },
-      });
-      if (taken) throw new AppError(409, 'PHONE_TAKEN', 'This phone number already has an account');
-      const created = await tx.user.create({
-        data: {
-          phone: verified.phone!,
-          name: typedName ?? verified.firstName ?? 'Customer',
-          passwordHash,
-          telegramUserId: verified.telegramUserId,
-          telegramChatId: verified.telegramChatId,
-          telegramUsername: verified.telegramUsername,
-        },
-      });
-      await announceCustomerSignedUp(tx, created);
-      return created;
+      const verified = await consumeVerifiedRequest(tx, req, requestId, 'LOGIN');
+      const account = verified.userId ? await tx.user.findUnique({ where: { id: verified.userId } }) : null;
+      if (account?.disabledAt) throw new AppError(403, 'ACCOUNT_DISABLED', 'This account is disabled. Please contact the shop.');
+      if (
+        !account ||
+        account.telegramUserId === null ||
+        account.telegramUserId !== verified.telegramUserId
+      ) {
+        throw new AppError(409, 'TELEGRAM_NOT_VERIFIED', 'Login was not confirmed. Please start again.');
+      }
+      return account;
     });
-    kickEvents(deps);
     res.clearCookie(TG_REQUEST_COOKIE, { path: '/api/v1/auth' });
     await startSession(prisma, config, res, user, { ip: req.ip, userAgent: req.get('user-agent') });
-    res.status(201).json({ user: toPublicUser(user) });
+    res.set('Cache-Control', 'no-store').json({ user: toPublicUser(user) });
   });
 
-  r.post('/reset/complete', validate({ body: resetCompleteSchema }), async (req, res) => {
-    const { requestId, password } = req.valid.body as ResetCompleteInput;
-    const passwordHash = await hashPassword(password);
-    const user = await prisma.$transaction(async (tx) => {
-      const verified = await consumeVerifiedRequest(tx, req, requestId, 'RESET');
-      const updated = await tx.user.update({
-        where: { phone: verified.phone! },
-        data: { passwordHash, passwordChangedAt: new Date() },
+  // Inside Telegram the store opens as a Mini App and Telegram already says who is looking, signed with the
+  // bot's key. Check the signature, accept each one once, and log in the account linked to that Telegram user.
+  r.post('/telegram/webapp', limiter(30, 15 * 60 * 1000), validate({ body: telegramWebAppSchema }), async (req, res) => {
+    const { initData } = req.valid.body as TelegramWebAppInput;
+    const key = config.telegram.webAppKey;
+    if (!key) throw new AppError(503, 'TELEGRAM_WEBAPP_NOT_CONFIGURED', 'Telegram sign-in is not available here');
+    const who = verifyWebAppInitData(initData, key);
+    if (!who) throw new AppError(401, 'TELEGRAM_INITDATA_INVALID', 'Telegram could not confirm who you are. Please use Continue with Telegram.');
+    const user = await prisma.user.findUnique({ where: { telegramUserId: BigInt(who.telegramUserId) } });
+    if (!user || user.disabledAt) {
+      throw new AppError(401, 'TELEGRAM_NOT_LINKED', 'This Telegram account has no Cambo Supply account yet. Please use Continue with Telegram.');
+    }
+    try {
+      await prisma.telegramWebAppHash.create({
+        data: { hash: who.hash, expiresAt: new Date((who.authDate + WEBAPP_MAX_AGE_SEC) * 1000 + 60_000) },
       });
-      await tx.session.updateMany({ where: { userId: updated.id, revokedAt: null }, data: { revokedAt: new Date() } });
-      return updated;
-    });
-    res.clearCookie(TG_REQUEST_COOKIE, { path: '/api/v1/auth' });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new AppError(401, 'TELEGRAM_INITDATA_INVALID', 'Telegram could not confirm who you are. Please use Continue with Telegram.');
+      }
+      throw err;
+    }
+    // Housekeeping: forget signatures that can no longer be replayed anyway (they are past the age limit).
+    void prisma.telegramWebAppHash.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => undefined);
     await startSession(prisma, config, res, user, { ip: req.ip, userAgent: req.get('user-agent') });
-    res.json({ user: toPublicUser(user) });
+    res.set('Cache-Control', 'no-store').json({ user: toPublicUser(user) });
   });
 
   r.post('/me/phone/complete', requireAuth, validate({ body: changePhoneCompleteSchema }), async (req, res) => {

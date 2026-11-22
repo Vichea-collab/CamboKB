@@ -2,7 +2,7 @@
 
 Online store for mechanical keyboards, mice, mousepads and desk accessories in
 Cambodia. Customers sign up by sharing their phone number with the store's
-Telegram bot, then log in with phone + password. Admins run the shop from
+Telegram bot, then log in with Telegram (no passwords). Admins run the shop from
 `/admin`: products, banners, promo codes, orders, customers, reports and invoices.
 
 Design and decisions: [`docs/superpowers/specs/2026-11-16-cambo-supply-rebuild-design.md`](docs/superpowers/specs/2026-11-16-cambo-supply-rebuild-design.md)
@@ -270,6 +270,7 @@ docker/ observability/ scripts/ docs/
 | `npm run dev` | All five services with hot reload |
 | `npm run db:seed` | Load the scraped catalog (needs the file service running) |
 | `npm run admin:promote -w api -- <phone>` | Make an account an admin |
+| `npm run admin:unlink-telegram -w api -- <phone>` | Owner recovery: cut an account's Telegram link and log it out everywhere (they link again with Continue with Telegram). In production: `node dist/unlink-telegram.js <phone>` |
 | `npm run events -w @cambo/api -- backfill` | Re-send every order to the report service |
 | `scripts/smoke.sh` | Check a running Docker stack end to end |
 | `npm run build` | Production builds of every service |

@@ -1,5 +1,4 @@
-import crypto from 'node:crypto';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, User } from '@prisma/client';
 import {
   customerInputSchema,
   customerPatchSchema,
@@ -11,13 +10,15 @@ import {
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AppDeps } from '../../http/app';
-import { hashPassword } from '../auth/password';
 import { revokeAllSessions, toPublicUser } from '../auth/sessions';
+import { unlinkTelegram } from '../auth/unlink';
 import { orderInclude, toOrderDto } from '../orders/orders';
 import { AppError, notFound } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
 
 const idParams = z.object({ id: uuidSchema });
+/** What the admin screens show about a customer, beyond the public user. */
+const adminView = (u: User) => ({ ...toPublicUser(u), disabled: Boolean(u.disabledAt), telegramLinked: u.telegramUserId !== null });
 const listQuery = z.object({
   q: z.string().trim().max(60).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -51,7 +52,7 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
     ]);
     const statFor = await stats(users.map((u) => u.id));
     res.json({
-      items: users.map((u) => ({ ...toPublicUser(u), disabled: Boolean(u.disabledAt), createdAt: u.createdAt, ...statFor(u.id) })),
+      items: users.map((u) => ({ ...adminView(u), createdAt: u.createdAt, ...statFor(u.id) })),
       total,
       page,
       pageSize,
@@ -59,28 +60,23 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
   });
 
   r.post('/customers', validate({ body: customerInputSchema }), async (req, res) => {
-    const { name, phone: rawPhone, password, role } = req.valid.body as CustomerInput;
+    const { name, phone: rawPhone, role } = req.valid.body as CustomerInput;
     const phone = normalizePhone(rawPhone);
     if (!phone) throw new AppError(400, 'INVALID_PHONE', 'Enter a valid Cambodian phone number');
 
     const existing = await prisma.user.findUnique({ where: { phone } });
     if (existing) throw new AppError(409, 'PHONE_IN_USE', 'This phone number already has an account');
 
-    const pw = password || crypto.randomBytes(12).toString('base64url');
-    const passwordHash = await hashPassword(pw);
-
     const user = await prisma.user.create({
       data: {
         name,
         phone,
-        passwordHash,
         role: role ?? 'CUSTOMER',
       },
     });
 
     res.status(201).json({
-      ...toPublicUser(user),
-      disabled: false,
+      ...adminView(user),
       createdAt: user.createdAt,
       orderCount: 0,
       totalSpentCents: 0,
@@ -94,7 +90,7 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
     if (!u) throw notFound('Customer');
     const orders = await prisma.order.findMany({ where: { userId: id }, include: orderInclude, orderBy: { createdAt: 'desc' }, take: 50 });
     const statFor = await stats([id]);
-    res.json({ ...toPublicUser(u), disabled: Boolean(u.disabledAt), createdAt: u.createdAt, ...statFor(id), orders: orders.map((o) => toOrderDto(o, files)) });
+    res.json({ ...adminView(u), createdAt: u.createdAt, ...statFor(id), orders: orders.map((o) => toOrderDto(o, files)) });
   });
 
   r.patch('/customers/:id', validate({ params: idParams, body: customerPatchSchema }), async (req, res) => {
@@ -123,8 +119,7 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
 
     const statFor = await stats([id]);
     res.json({
-      ...toPublicUser(updated),
-      disabled: Boolean(updated.disabledAt),
+      ...adminView(updated),
       createdAt: updated.createdAt,
       ...statFor(id),
     });
@@ -160,7 +155,7 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
       if (disabled && id === req.user!.id) throw new AppError(400, 'CANNOT_DISABLE_SELF', "You can't disable your own account");
       const u = await prisma.user.update({ where: { id }, data: { disabledAt: disabled ? new Date() : null } });
       if (disabled) await revokeAllSessions(prisma, id);
-      res.json({ ...toPublicUser(u), disabled });
+      res.json({ ...adminView(u), disabled });
     };
   // Make someone an admin or a customer again. Takes effect on their next request
   // (the role is read from the database every time).
@@ -178,7 +173,20 @@ export function adminCustomersRouter({ prisma, files }: AppDeps): Router {
       }
       return tx.user.update({ where: { id }, data: { role } });
     });
-    res.json({ ...toPublicUser(user), disabled: Boolean(user.disabledAt) });
+    res.json(adminView(user));
+  });
+
+  // Recovery for a lost or changed Telegram account (it replaces "forgot password"): cut the link, end every
+  // session, and the customer links again by sharing their phone in the bot. Works the same for admins.
+  r.post('/customers/:id/unlink-telegram', validate({ params: idParams }), async (req, res) => {
+    const { id } = req.valid.params as { id: string };
+    if (id === req.user!.id) {
+      throw new AppError(400, 'CANNOT_UNLINK_SELF', "You can't unlink your own Telegram. Ask the owner to run the server command.");
+    }
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) throw notFound('Customer');
+    await unlinkTelegram(prisma, id);
+    res.json({ ok: true });
   });
 
   r.post('/customers/:id/disable', validate({ params: idParams }), setDisabled(true));
