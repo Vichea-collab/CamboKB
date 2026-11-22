@@ -120,7 +120,6 @@ function NewCustomerDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const showToast = useUi((s) => s.showToast);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'CUSTOMER' | 'ADMIN'>('CUSTOMER');
   const [error, setError] = useState<string>();
 
@@ -128,14 +127,13 @@ function NewCustomerDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     mutationFn: () =>
       api<Customer>('/admin/customers', {
         method: 'POST',
-        body: { name: name.trim(), phone, password: password || undefined, role },
+        body: { name: name.trim(), phone, role },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
       showToast('Customer created');
       setName('');
       setPhone('');
-      setPassword('');
       setError(undefined);
       onClose();
     },
@@ -170,20 +168,6 @@ function NewCustomerDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             Phone number
           </label>
           <PhoneInput id="new-cust-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-        </div>
-        <div>
-          <label htmlFor="new-cust-pw" className="label">
-            Password (optional)
-          </label>
-          <input
-            id="new-cust-pw"
-            type="password"
-            className="field"
-            placeholder="Auto-generated if left empty"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-          />
         </div>
         <div>
           <label htmlFor="new-cust-role" className="label">

@@ -7,7 +7,6 @@ import { TelegramStep } from '../auth/TelegramStep';
 import { useTelegramVerification } from '../auth/useTelegramVerification';
 import { api, isApiError } from '../../shared/lib/api';
 import { ME_KEY, useLogout, useMe, useSetMe } from '../auth/auth';
-import { passwordProblem } from '../auth/passwordCheck';
 import { t } from '../../shared/lib/strings';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useUi } from '../../shared/lib/ui-store';
@@ -51,7 +50,6 @@ export default function ProfilePage() {
         )}
         <NameForm profile={profile.data} />
         <PhoneSection phone={profile.data.user.phone} />
-        <PasswordForm />
         <Section title={t.account.signOutTitle} description={t.account.signOutHint}>
           <div className="flex flex-wrap gap-3">
             <button
@@ -179,76 +177,5 @@ function PhoneSection({ phone }: { phone: string }) {
         </button>
       )}
     </Section>
-  );
-}
-
-function PasswordForm() {
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [error, setError] = useState<string>();
-  const showToast = useUi((s) => s.showToast);
-  const change = useMutation({
-    mutationFn: () =>
-      api('/auth/change-password', {
-        method: 'POST',
-        body: { currentPassword: current, newPassword: next },
-      }),
-    onSuccess: () => {
-      setCurrent('');
-      setNext('');
-      setError(undefined);
-      showToast(t.account.passwordChanged);
-    },
-    onError: (err) =>
-      setError(
-        isApiError(err, 'INVALID_CREDENTIALS')
-          ? t.account.wrongCurrentPassword
-          : (err as Error).message,
-      ),
-  });
-  return (
-    <form
-      className="panel space-y-4 p-5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const problem = passwordProblem(next);
-        if (problem) return setError(problem);
-        change.mutate();
-      }}
-    >
-      <h2 className="title-section">{t.account.changePassword}</h2>
-      <FormError>{error}</FormError>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="current-password" className="label">
-            {t.account.currentPassword}
-          </label>
-          <input
-            id="current-password"
-            type="password"
-            autoComplete="current-password"
-            className="field"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="new-password" className="label">
-            {t.auth.newPassword}
-          </label>
-          <input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            className="field"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-          />
-        </div>
-      </div>
-      <button className="btn-ghost" disabled={change.isPending || !current || !next}>
-        {t.account.changePassword}
-      </button>
-    </form>
   );
 }

@@ -51,8 +51,17 @@ export default function CustomerDetail() {
       qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
     },
   });
+  const unlink = useMutation({
+    mutationFn: () => api(`/admin/customers/${id}/unlink-telegram`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'customer', id] });
+      qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      showToast('Telegram unlinked');
+    },
+  });
   if (!c.data) return <Loading />;
   const u = c.data;
+  const linked = u.telegramLinked ?? !!u.telegramUsername;
   return (
     <div className="max-w-3xl space-y-5">
       <PageHeader
@@ -116,10 +125,13 @@ export default function CustomerDetail() {
           description={
             u.disabled
               ? "This customer can't log in."
-              : 'Disabling logs them out everywhere and stops them logging in. Their orders are kept.'
+              : `Disabling logs them out everywhere and stops them logging in. Their orders are kept.${
+                  linked ? ' Lost their Telegram account? Unlink Telegram, and they link a new one by sharing this phone number.' : ''
+                }`
           }
         >
           <FormError>{toggle.error ? (toggle.error as Error).message : undefined}</FormError>
+          <FormError>{unlink.error ? (unlink.error as Error).message : undefined}</FormError>
           <FormError>{delError}</FormError>
           <div className="flex flex-wrap items-center gap-3">
             {u.disabled ? (
@@ -135,6 +147,19 @@ export default function CustomerDetail() {
                 }
               >
                 Disable account
+              </button>
+            )}
+            {linked && (
+              <button
+                className="btn-ghost"
+                disabled={unlink.isPending}
+                onClick={() =>
+                  confirm(
+                    `Unlink Telegram from ${u.name}? They are logged out everywhere. To log in again they press Continue with Telegram and share this phone number from their new Telegram account.`,
+                  ) && unlink.mutate()
+                }
+              >
+                {unlink.isPending ? 'Unlinking…' : 'Unlink Telegram'}
               </button>
             )}
             {u.orderCount === 0 ? (

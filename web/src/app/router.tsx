@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Link, useRouteError } from 'react-router';
+import { createBrowserRouter, Link, Navigate, useLocation, useRouteError } from 'react-router';
 import { RequireAdmin, RequireAuth } from '../features/auth/auth';
 import { t } from '../shared/lib/strings';
 import { LoadingState } from '../shared/ui/Page';
@@ -11,8 +11,10 @@ const Checkout = lazy(() => import('../features/checkout/CheckoutPage'));
 const PayPage = lazy(() => import('../features/payments/PayPage'));
 const OrderSuccess = lazy(() => import('../features/checkout/OrderSuccessPage'));
 const Login = lazy(() => import('../features/auth/LoginPage'));
-const Signup = lazy(() => import('../features/auth/SignupPage'));
-const ForgotPassword = lazy(() => import('../features/auth/ForgotPasswordPage'));
+
+function ToLogin() {
+  return <Navigate to={`/login${useLocation().search}`} replace />;
+}
 const Profile = lazy(() => import('../features/account/ProfilePage'));
 const Orders = lazy(() => import('../features/account/OrdersPage'));
 const OrderDetail = lazy(() => import('../features/account/OrderDetailPage'));
@@ -57,8 +59,9 @@ export const router = createBrowserRouter([
       { path: 'orders/:number/pay', element: authed(<PayPage />) },
       { path: 'orders/:number/success', element: authed(<OrderSuccess />) },
       { path: 'login', element: page(<Login />) },
-      { path: 'signup', element: page(<Signup />) },
-      { path: 'forgot-password', element: page(<ForgotPassword />) },
+      // One page logs in and signs up; old links and bookmarks land there, keeping ?next= and ?t=.
+      { path: 'signup', element: <ToLogin /> },
+      { path: 'forgot-password', element: <ToLogin /> },
       { path: 'account', element: authed(<Profile />) },
       { path: 'account/orders', element: authed(<Orders />) },
       { path: 'account/orders/:number', element: authed(<OrderDetail />) },

@@ -10,7 +10,7 @@ import { useUi } from '../shared/lib/ui-store';
  * Pages that already have a bottom bar of their own (product: add to cart, checkout: place order) or are a
  * focused form (log in, sign up) don't get the navigation, so two bars never stack.
  */
-const NO_NAV = /^\/(products\/|checkout|orders\/|login|signup|forgot-password)/;
+const NO_NAV = /^\/(products\/|checkout|orders\/|login)/;
 
 export const useBottomNavVisible = () => !NO_NAV.test(useLocation().pathname);
 
