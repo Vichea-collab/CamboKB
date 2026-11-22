@@ -346,7 +346,6 @@ const en = {
         'Your name and phone number, confirmed through Telegram when you sign up.',
         'Your Telegram user ID and username, so we can message you about your orders.',
         'Your delivery address, map pin and notes, and what you ordered.',
-        "A password, stored only as a secure hash. We can't read it.",
       ],
       useTitle: 'How we use it',
       use: 'To confirm and deliver your orders, send order updates on Telegram, give you your order history and invoices, and keep your account secure.',
@@ -354,10 +353,10 @@ const en = {
       who: "Our team, and the delivery service you choose (Grab, VET or J&T), who only get what they need to deliver: your name, phone number and address. We never sell your information and we don't use advertising trackers.",
       cookiesTitle: 'Cookies and storage',
       cookies:
-        "We use one cookie to keep you logged in, and your browser's storage to remember your cart. Nothing else.",
+        "We use one cookie to keep you logged in (plus a short-lived one while you sign in with Telegram), and your browser's storage to remember your cart. Nothing else.",
       choicesTitle: 'Your choices',
       choices:
-        "You can change your name, phone number and password in your account. To delete your account and data, ask us through the contact page and we'll remove it, except for order records we need to keep.",
+        "You can change your name and phone number in your account. To delete your account and data, ask us through the contact page and we'll remove it, except for order records we need to keep.",
     },
   },
   common: {
@@ -716,7 +715,6 @@ const km: Strings = {
         'ឈ្មោះ និងលេខទូរស័ព្ទរបស់អ្នក ដែលបានបញ្ជាក់តាម Telegram នៅពេលអ្នកចុះឈ្មោះ។',
         'លេខសម្គាល់អ្នកប្រើ និងឈ្មោះអ្នកប្រើ Telegram របស់អ្នក ដើម្បីឱ្យយើងអាចផ្ញើសារអំពីការបញ្ជាទិញរបស់អ្នក។',
         'អាសយដ្ឋានដឹកជញ្ជូន ម្ជុលផែនទី កំណត់ចំណាំរបស់អ្នក និងទំនិញដែលអ្នកបានបញ្ជាទិញ។',
-        'ពាក្យសម្ងាត់ ដែលរក្សាទុកតែជាកូដអ៊ិនគ្រីប (hash) សុវត្ថិភាពប៉ុណ្ណោះ។ យើងមិនអាចអានវាបានទេ។',
       ],
       useTitle: 'របៀបដែលយើងប្រើវា',
       use: 'ដើម្បីបញ្ជាក់ និងដឹកជញ្ជូនការបញ្ជាទិញរបស់អ្នក ផ្ញើដំណឹងអំពីការបញ្ជាទិញតាម Telegram ផ្ដល់ប្រវត្តិការបញ្ជាទិញ និងវិក្កយប័ត្រដល់អ្នក ហើយរក្សាសុវត្ថិភាពគណនីរបស់អ្នក។',
@@ -724,10 +722,10 @@ const km: Strings = {
       who: 'ក្រុមការងាររបស់យើង និងសេវាដឹកជញ្ជូនដែលអ្នកជ្រើសរើស (Grab, VET ឬ J&T) ដែលទទួលបានតែអ្វីដែលចាំបាច់សម្រាប់ការដឹកជញ្ជូន គឺឈ្មោះ លេខទូរស័ព្ទ និងអាសយដ្ឋានរបស់អ្នក។ យើងមិនដែលលក់ព័ត៌មានរបស់អ្នក ហើយក៏មិនប្រើកម្មវិធីតាមដានផ្សាយពាណិជ្ជកម្មដែរ។',
       cookiesTitle: 'ខូគី និងការផ្ទុកទិន្នន័យ',
       cookies:
-        'យើងប្រើខូគីមួយដើម្បីរក្សាការចូលគណនីរបស់អ្នក និងប្រើទំហំផ្ទុករបស់កម្មវិធីរុករកដើម្បីចងចាំកន្ត្រករបស់អ្នក។ គ្មានអ្វីផ្សេងទៀតទេ។',
+        'យើងប្រើខូគីមួយដើម្បីរក្សាការចូលគណនីរបស់អ្នក (និងមួយទៀតរយៈពេលខ្លីពេលអ្នកចូលតាម Telegram) ហើយប្រើទំហំផ្ទុករបស់កម្មវិធីរុករកដើម្បីចងចាំកន្ត្រករបស់អ្នក។ គ្មានអ្វីផ្សេងទៀតទេ។',
       choicesTitle: 'ជម្រើសរបស់អ្នក',
       choices:
-        'អ្នកអាចប្ដូរឈ្មោះ លេខទូរស័ព្ទ និងពាក្យសម្ងាត់របស់អ្នកក្នុងគណនី។ ដើម្បីលុបគណនី និងទិន្នន័យរបស់អ្នក សូមស្នើមកយើងតាមទំព័រទំនាក់ទំនង យើងនឹងលុបវា លើកលែងតែកំណត់ត្រាបញ្ជាទិញដែលយើងត្រូវរក្សាទុក។',
+        'អ្នកអាចប្ដូរឈ្មោះ និងលេខទូរស័ព្ទរបស់អ្នកក្នុងគណនី។ ដើម្បីលុបគណនី និងទិន្នន័យរបស់អ្នក សូមស្នើមកយើងតាមទំព័រទំនាក់ទំនង យើងនឹងលុបវា លើកលែងតែកំណត់ត្រាបញ្ជាទិញដែលយើងត្រូវរក្សាទុក។',
     },
   },
   common: {
