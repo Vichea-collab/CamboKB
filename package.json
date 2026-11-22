@@ -40,7 +40,6 @@
     "esbuild@0.27.7": true,
     "esbuild@0.28.2": true,
     "@prisma/client@6.19.3": true,
-    "argon2": false,
     "fsevents": false,
     "puppeteer@25.17.0": true
   },

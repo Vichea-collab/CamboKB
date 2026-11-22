@@ -61,6 +61,8 @@ async function handleButton(deps: BotDeps, cq: TgCallbackQuery): Promise<void> {
     telegram
       .answerCallbackQuery(cq.id, text, alert)
       .catch((err) => logger.warn({ err }, 'answerCallbackQuery failed'));
+  const login = LOGIN_BUTTON.exec(cq.data ?? '');
+  if (login) return handleLoginButton(deps, cq, login[1]!, login[2] as 'y' | 'n', answer);
   const m = BUTTON_PATTERN.exec(cq.data ?? '');
   if (!m) return void (await answer());
 
@@ -128,6 +130,43 @@ async function handleButton(deps: BotDeps, cq: TgCallbackQuery): Promise<void> {
       err instanceof ApiError && err.status === 0
         ? 'The shop is not reachable right now. Try again in a moment.'
         : 'Something went wrong. Try again from the website.',
+      true,
+    );
+  }
+}
+
+/** "login:<requestId>:y|n", under the message the bot sends when someone opens a login link. */
+const LOGIN_BUTTON = /^login:([0-9a-f-]{36}):([yn])$/;
+
+/**
+ * A tap on Log me in / Not me. Anyone may tap in their own chat; the api checks that Telegram's id of the
+ * person who tapped is the Telegram account the login was opened by, so a forwarded message cannot be used.
+ */
+async function handleLoginButton(
+  deps: BotDeps,
+  cq: TgCallbackQuery,
+  requestId: string,
+  decision: 'y' | 'n',
+  answer: (text?: string, alert?: boolean) => Promise<void>,
+): Promise<void> {
+  const { api, telegram, logger, outbox } = deps;
+  try {
+    const result = await api.loginConfirm({ requestId, telegramUserId: cq.from.id, decision });
+    if (result.outcome === 'not_yours') return void (await answer(result.text, true));
+    // The buttons have done their job: take them away so they cannot be tapped twice.
+    if (cq.message)
+      await telegram
+        .editReplyMarkup(cq.message.chat.id, cq.message.message_id, { inline_keyboard: [] })
+        .catch((err) => logger.debug({ err }, 'could not remove the login buttons'));
+    await answer(result.text);
+    if (cq.message && result.outcome === 'confirmed')
+      await outbox.enqueue({ chatId: cq.message.chat.id, text: result.text, requestId: currentRequestId() });
+  } catch (err) {
+    logger.error({ err, requestId }, 'Telegram login button failed');
+    await answer(
+      err instanceof ApiError && err.status === 0
+        ? 'The shop is not reachable right now. Try again in a moment.'
+        : 'Something went wrong. Start again from the website.',
       true,
     );
   }

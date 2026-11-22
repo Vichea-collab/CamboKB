@@ -3,6 +3,13 @@
 Date: 2026-11-16
 Status: Draft, awaiting approval
 
+> **Update 2026-11-21: login is Telegram-only.** Passwords, forgot-password and change-password were removed:
+> everyone (customers and admins) logs in with **Continue with Telegram** (bot deep link with a confirm button,
+> or the Mini App's signed `initData`). Wherever this document describes phone + password, `/auth/login`,
+> `/auth/reset/complete`, `/auth/change-password` or `passwordHash`, read it as superseded by
+> `docs/telegram-login-design.md`. Admin sessions last 1 day; account recovery is an admin's **Unlink Telegram**
+> button or `npm run admin:unlink-telegram -w api -- <phone>` over SSH.
+
 ## 1. Intent
 
 Rebuild the Cambo Supply store (today: a single static HTML page at

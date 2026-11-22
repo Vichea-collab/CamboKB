@@ -8,7 +8,7 @@ export function loadUser({ prisma, config }: AppDeps): RequestHandler {
   return async (req, res, next) => {
     const token = req.cookies?.[SESSION_COOKIE];
     if (typeof token === 'string' && token.length > 0 && token.length < 200) {
-      const found = await getSessionUser(prisma, token, config.sessionTtlDays);
+      const found = await getSessionUser(prisma, token, config.sessionTtlDays, config.adminSessionTtlDays);
       if (found) {
         req.user = found.user;
         req.sessionId = found.sessionId;

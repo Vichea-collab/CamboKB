@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createOrderSchema, loginSchema, passwordSchema } from './index';
+import {
+  createOrderSchema,
+  customerInputSchema,
+  loginCompleteSchema,
+  telegramStartSchema,
+} from './index';
 
 const order = {
   items: [{ productId: '7f1c1f5e-3b0a-4f53-9d0e-2a7a1f6c9b11', quantity: 1 }],
@@ -12,17 +17,21 @@ const order = {
 };
 
 describe('schemas', () => {
-  it('rejects a common password', () => {
-    expect(passwordSchema.safeParse('password').success).toBe(false);
+  it('starts a Telegram login, but no longer a password reset', () => {
+    expect(telegramStartSchema.safeParse({ purpose: 'LOGIN' }).success).toBe(true);
+    expect(telegramStartSchema.safeParse({ purpose: 'RESET', phone: '012345678' }).success).toBe(false);
   });
-  it('rejects a 7-character password', () => {
-    expect(passwordSchema.safeParse('Ab3$xyz').success).toBe(false);
+  it('completes a login with just the request id', () => {
+    const requestId = '7f1c1f5e-3b0a-4f53-9d0e-2a7a1f6c9b11';
+    expect(loginCompleteSchema.parse({ requestId, password: 'ignored' })).toEqual({ requestId });
+    expect(loginCompleteSchema.safeParse({}).success).toBe(false);
   });
-  it('accepts a decent password', () => {
-    expect(passwordSchema.safeParse('kb-store-2026').success).toBe(true);
-  });
-  it('normalizes the login phone', () => {
-    expect(loginSchema.parse({ phone: '012 345 678', password: 'x' }).phone).toBe('+85512345678');
+  it('has no password in the admin customer form', () => {
+        expect(customerInputSchema.parse({ name: 'Dara', phone: '012345678', password: 'kb-store-2026' })).toEqual({
+      name: 'Dara',
+      phone: '012345678',
+      role: 'CUSTOMER',
+    });
   });
   it.each([0, 21])('rejects quantity %d', (quantity) => {
     const bad = { ...order, items: [{ ...order.items[0], quantity }] };

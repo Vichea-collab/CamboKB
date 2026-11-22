@@ -1,10 +1,16 @@
-import { orderButtonRequestSchema, telegramUpdateSchema, uuidSchema } from '@cambo/shared';
+import {
+  loginConfirmRequestSchema,
+  orderButtonRequestSchema,
+  telegramUpdateSchema,
+  uuidSchema,
+} from '@cambo/shared';
 import { requireServiceSecret } from '@cambo/service-kit';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AppDeps } from '../../http/app';
 import { AppError } from '../../http/errors';
 import { validate } from '../../http/middleware/validate';
+import { confirmLogin } from '../bot/login-confirm';
 import { handleTelegramUpdate } from '../bot/updates';
 import { changeOrderStatus } from '../orders/status';
 
@@ -30,6 +36,12 @@ export function internalRouter(deps: AppDeps): Router {
       res.json({ actions: await handleTelegramUpdate(deps, update) });
     },
   );
+
+  // Someone tapped "Log me in" / "Not me" under a login message. Telegram's id of the person is checked
+  // against the Telegram account the request was opened by.
+  r.post('/telegram/login-confirm', validate({ body: loginConfirmRequestSchema }), async (req, res) => {
+    res.json(await confirmLogin(deps, req.valid.body as z.infer<typeof loginConfirmRequestSchema>));
+  });
 
   // The owner pressed an order button in Telegram. The notification service has already checked the chat;
   // here the order rules apply, and in a group the person must be a linked admin account.

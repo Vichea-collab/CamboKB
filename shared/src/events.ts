@@ -202,6 +202,20 @@ export const orderButtonRequestSchema = z.object({
 });
 export type OrderButtonRequest = z.infer<typeof orderButtonRequestSchema>;
 
+/** Someone tapped "Log me in" or "Not me" under the login confirmation in Telegram. */
+export const loginConfirmRequestSchema = z.object({
+  requestId: z.uuid(),
+  /** Telegram's own id for whoever pressed the button (callback_query.from.id). */
+  telegramUserId: z.number(),
+  decision: z.enum(['y', 'n']),
+});
+export type LoginConfirmRequest = z.infer<typeof loginConfirmRequestSchema>;
+export const loginConfirmReplySchema = z.object({
+  outcome: z.enum(['confirmed', 'declined', 'expired', 'not_yours']),
+  text: z.string(),
+});
+export type LoginConfirmReply = z.infer<typeof loginConfirmReplySchema>;
+
 /** The "/" menu of the bot. The api writes the /help text from it; the notification service registers it with Telegram. */
 export const BOT_COMMANDS = [
   { command: 'shop', description: 'Open the store' },

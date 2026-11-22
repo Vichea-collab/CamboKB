@@ -1,36 +1,15 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createTestApp, createUser, loginAs, resetDb, TEST_PASSWORD, testConfig, WEB_ORIGIN } from '../../../test/helpers';
+import { createTestApp, createUser, loginAs, resetDb, sessionCookieFor, testConfig, WEB_ORIGIN } from '../../../test/helpers';
 
 const post = (app: Parameters<typeof request>[0], path: string) =>
   request(app).post(path).set('Origin', WEB_ORIGIN);
 
-describe('phone + password auth', () => {
+describe('sessions', () => {
   let ctx: Awaited<ReturnType<typeof createTestApp>>;
   beforeEach(async () => {
     await resetDb();
     ctx = await createTestApp();
-  });
-
-  it('logs in with a local-format phone and sets a hardened session cookie', async () => {
-    await createUser(ctx.prisma, { phone: '+85512345678' });
-    const res = await post(ctx.app, '/api/v1/auth/login').send({ phone: '012 345 678', password: TEST_PASSWORD });
-    expect(res.status).toBe(200);
-    expect(res.body.user.phone).toBe('+85512345678');
-    const cookie = String(res.headers['set-cookie']);
-    expect(cookie).toMatch(/cs_session=/);
-    expect(cookie).toMatch(/HttpOnly/);
-    expect(cookie).toMatch(/SameSite=Lax/);
-  });
-
-  it('gives the same error for a wrong password and an unknown phone', async () => {
-    const u = await createUser(ctx.prisma);
-    const wrong = await post(ctx.app, '/api/v1/auth/login').send({ phone: u.phone, password: 'not-the-password' });
-    const unknown = await post(ctx.app, '/api/v1/auth/login').send({ phone: '+85599999999', password: TEST_PASSWORD });
-    expect(wrong.status).toBe(401);
-    expect(unknown.status).toBe(401);
-    expect(wrong.body.error.code).toBe('INVALID_CREDENTIALS');
-    expect(unknown.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
   it('returns the current user without secrets, or 401 when signed out', async () => {
@@ -53,7 +32,6 @@ describe('phone + password auth', () => {
     const signedIn = await agent.get('/api/v1/auth/session');
     expect(signedIn.status).toBe(200);
     expect(signedIn.body.user).toMatchObject({ id: u.id, phone: u.phone });
-    expect(signedIn.body.user.passwordHash).toBeUndefined();
 
     await agent.post('/api/v1/auth/logout').set('Origin', WEB_ORIGIN);
     expect((await agent.get('/api/v1/auth/session')).body).toEqual({ user: null });
@@ -66,31 +44,6 @@ describe('phone + password auth', () => {
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
   });
 
-  it('changing the password revokes other sessions but keeps the current one', async () => {
-    const u = await createUser(ctx.prisma);
-    const a = await loginAs(ctx.app, u.phone);
-    const b = await loginAs(ctx.app, u.phone);
-    const res = await a
-      .post('/api/v1/auth/change-password')
-      .set('Origin', WEB_ORIGIN)
-      .send({ currentPassword: TEST_PASSWORD, newPassword: 'brand-new-pass-1' });
-    expect(res.status).toBe(204);
-    expect((await a.get('/api/v1/auth/me')).status).toBe(200);
-    expect((await b.get('/api/v1/auth/me')).status).toBe(401);
-    expect((await post(ctx.app, '/api/v1/auth/login').send({ phone: u.phone, password: 'brand-new-pass-1' })).status).toBe(200);
-  });
-
-  it('rejects change-password with a wrong current password', async () => {
-    const u = await createUser(ctx.prisma);
-    const a = await loginAs(ctx.app, u.phone);
-    const res = await a
-      .post('/api/v1/auth/change-password')
-      .set('Origin', WEB_ORIGIN)
-      .send({ currentPassword: 'wrong-wrong', newPassword: 'brand-new-pass-1' });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
-  });
-
   it('logout-all revokes every session', async () => {
     const u = await createUser(ctx.prisma);
     const a = await loginAs(ctx.app, u.phone);
@@ -100,12 +53,11 @@ describe('phone + password auth', () => {
     expect((await b.get('/api/v1/auth/me')).status).toBe(401);
   });
 
-  it('blocks disabled users from logging in and from existing sessions', async () => {
+  it('blocks existing sessions of a disabled user', async () => {
     const u = await createUser(ctx.prisma);
     const a = await loginAs(ctx.app, u.phone);
     await ctx.prisma.user.update({ where: { id: u.id }, data: { disabledAt: new Date() } });
     expect((await a.get('/api/v1/auth/me')).status).toBe(401);
-    expect((await post(ctx.app, '/api/v1/auth/login').send({ phone: u.phone, password: TEST_PASSWORD })).status).toBe(401);
   });
 
   it('rejects expired sessions', async () => {
@@ -115,15 +67,16 @@ describe('phone + password auth', () => {
     expect((await a.get('/api/v1/auth/me')).status).toBe(401);
   });
 
-  it('rate limits repeated failed logins', async () => {
-    const limited = await createTestApp({ config: testConfig({ rateLimit: { loginMax: 10, windowMs: 60_000 } }) });
-    const u = await createUser(limited.prisma);
-    for (let i = 0; i < 10; i++) {
-      await post(limited.app, '/api/v1/auth/login').send({ phone: u.phone, password: 'nope-nope' });
-    }
-    const res = await post(limited.app, '/api/v1/auth/login').send({ phone: u.phone, password: 'nope-nope' });
-    expect(res.status).toBe(429);
-    expect(res.body.error.code).toBe('RATE_LIMITED');
+  it('a customer session slides forward at most once a day', async () => {
+    const u = await createUser(ctx.prisma);
+    const a = await loginAs(ctx.app, u.phone);
+    const stale = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    await ctx.prisma.session.updateMany({ where: { userId: u.id }, data: { extendedAt: stale, expiresAt: new Date(Date.now() + 60_000) } });
+    const res = await a.get('/api/v1/auth/me');
+    expect(res.status).toBe(200);
+    expect(String(res.headers['set-cookie'])).toMatch(/cs_session=/);
+    const s = await ctx.prisma.session.findFirstOrThrow({ where: { userId: u.id } });
+    expect(s.expiresAt.getTime()).toBeGreaterThan(Date.now() + 25 * 24 * 60 * 60 * 1000);
   });
 
   it('forbids customers from admin routes and lets admins through', async () => {
@@ -134,5 +87,58 @@ describe('phone + password auth', () => {
     const a = await createUser(ctx.prisma, { role: 'ADMIN' });
     const admin = await loginAs(ctx.app, a.phone);
     expect((await admin.get('/api/v1/admin/stats')).status).not.toBe(403);
+  });
+
+  describe('admin sessions are shorter', () => {
+    it('last one day by default, and never slide forward', async () => {
+      const a = await createUser(ctx.prisma, { role: 'ADMIN' });
+      const agent = await loginAs(ctx.app, a.phone);
+      const s = await ctx.prisma.session.findFirstOrThrow({ where: { userId: a.id } });
+      const hours = (s.expiresAt.getTime() - Date.now()) / 3_600_000;
+      expect(hours).toBeGreaterThan(23);
+      expect(hours).toBeLessThanOrEqual(24);
+      await ctx.prisma.session.update({ where: { id: s.id }, data: { extendedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } });
+      const res = await agent.get('/api/v1/auth/me');
+      expect(res.status).toBe(200);
+      expect(res.headers['set-cookie']).toBeUndefined();
+      expect((await ctx.prisma.session.findUniqueOrThrow({ where: { id: s.id } })).expiresAt.getTime()).toBe(s.expiresAt.getTime());
+    });
+
+    it('end one day after login even when the stored expiry is further away (an older, longer session)', async () => {
+      const a = await createUser(ctx.prisma, { role: 'ADMIN' });
+      const agent = await loginAs(ctx.app, a.phone);
+      await ctx.prisma.session.updateMany({
+        where: { userId: a.id },
+        data: { createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000), expiresAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000) },
+      });
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+    });
+
+    it('follow ADMIN_SESSION_TTL_DAYS, and a promoted customer is cut to the admin length too', async () => {
+      const three = await createTestApp({ config: testConfig({ adminSessionTtlDays: 3 }) });
+      const a = await createUser(three.prisma, { role: 'ADMIN' });
+      const cookie = await sessionCookieFor(a.phone);
+      const agent = request.agent(three.app).set('Cookie', cookie);
+      await three.prisma.session.updateMany({ where: { userId: a.id }, data: { createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(200);
+      await three.prisma.session.updateMany({ where: { userId: a.id }, data: { createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) } });
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+
+      const c = await createUser(ctx.prisma);
+      const customer = await loginAs(ctx.app, c.phone);
+      await ctx.prisma.session.updateMany({ where: { userId: c.id }, data: { createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
+      expect((await customer.get('/api/v1/auth/me')).status).toBe(200);
+      await ctx.prisma.user.update({ where: { id: c.id }, data: { role: 'ADMIN' } });
+      expect((await customer.get('/api/v1/auth/me')).status).toBe(401);
+    });
+  });
+
+  it('the password routes are gone', async () => {
+    const u = await createUser(ctx.prisma);
+    const agent = await loginAs(ctx.app, u.phone);
+    for (const path of ['login', 'reset/complete', 'change-password', 'signup/complete']) {
+      expect((await post(ctx.app, `/api/v1/auth/${path}`).send({ phone: u.phone, password: 'x' })).status).toBe(404);
+      expect((await agent.post(`/api/v1/auth/${path}`).set('Origin', WEB_ORIGIN).send({})).status).toBe(404);
+    }
   });
 });
