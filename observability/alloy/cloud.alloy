@@ -1,0 +1,124 @@
+// Grafana Alloy on a small server: sends every container's logs and every service's metrics to Grafana Cloud, so
+// Loki, Prometheus and Grafana do not have to run here. The logs part is the same as config.alloy.
+
+// ---------------------------------------------------------------- logs
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+  }
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.process.logs.receiver]
+  labels     = { job = "docker" }
+}
+
+loki.process "logs" {
+  stage.match {
+    selector = "{service=~\"api|file|report|notification\"}"
+    stage.json {
+      expressions = { level = "level" }
+    }
+    stage.labels {
+      values = { level = "" }
+    }
+  }
+  // Health checks every few seconds say nothing and would be most of the lines.
+  stage.drop {
+    expression = "\"url\":\"/(healthz|readyz|metrics)"
+  }
+  // Visitors' addresses stay on this server: IPv4, then IPv6.
+  stage.replace {
+    expression = "(\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b)"
+    replace    = "<ip>"
+  }
+  stage.replace {
+    expression = "((?:[0-9a-fA-F]{1,4}:){4,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F:]*[0-9a-fA-F])"
+    replace    = "<ip>"
+  }
+  forward_to = [loki.write.cloud.receiver]
+}
+
+loki.write "cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+}
+
+// ---------------------------------------------------------------- metrics
+// The same job and service labels as observability/prometheus/prometheus.yml, so the same dashboards work.
+prometheus.scrape "api" {
+  targets         = [{ __address__ = "api:4000", service = "api" }]
+  job_name        = "api"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+}
+
+prometheus.scrape "file" {
+  targets         = [{ __address__ = "file:4100", service = "file" }]
+  job_name        = "file"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+}
+
+prometheus.scrape "report" {
+  targets         = [{ __address__ = "report:4200", service = "report" }]
+  job_name        = "report"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+}
+
+prometheus.scrape "notification" {
+  targets         = [{ __address__ = "notification:4300", service = "notification" }]
+  job_name        = "notification"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+}
+
+// The server itself: CPU, memory, swap, disk.
+prometheus.exporter.unix "host" {
+  procfs_path    = "/host/proc"
+  sysfs_path     = "/host/sys"
+  rootfs_path    = "/host/root"
+  set_collectors = ["cpu", "loadavg", "meminfo", "vmstat", "filesystem"]
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  job_name        = "host"
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+}
+
+prometheus.remote_write "cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+}

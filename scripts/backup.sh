@@ -10,6 +10,8 @@
 #
 # Restore one database:  gunzip -c backups/<timestamp>/cambo_supply.sql.gz | docker compose -f docker-compose.prod.yml \
 #                          --env-file .env.production exec -T db psql -U "$POSTGRES_USER" -d cambo_supply
+# On a small server restore as the service's own login, so it owns its tables: psql -U cambo_api -d cambo_supply
+# (cambo_file/cambo_files, cambo_report/cambo_reports, cambo_notification/cambo_notifications).
 # The report database can also simply be rebuilt: see the README ("Rebuilding the report database").
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -23,8 +25,14 @@ KEEP_DAYS="${KEEP_DAYS:-14}"
 OUT="${BACKUP_DIR:-backups}/$(date -u +%Y-%m-%dT%H%M%SZ)"
 mkdir -p "$OUT"
 
-# service:database, as in the Compose files
-for pair in db:cambo_supply file-db:cambo_files report-db:cambo_reports notification-db:cambo_notifications; do
+# service:database, as in the Compose files. On a small server (docker-compose.small.yml) one Postgres holds all four.
+# shellcheck disable=SC2086
+if [ -n "$($COMPOSE_CMD ps -q file-db 2>/dev/null)" ]; then
+  PAIRS="db:cambo_supply file-db:cambo_files report-db:cambo_reports notification-db:cambo_notifications"
+else
+  PAIRS="db:cambo_supply db:cambo_files db:cambo_reports db:cambo_notifications"
+fi
+for pair in $PAIRS; do
   svc="${pair%%:*}"; name="${pair##*:}"
   echo "backing up $name ($svc)"
   # shellcheck disable=SC2086

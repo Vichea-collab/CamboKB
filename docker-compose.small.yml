@@ -1,0 +1,116 @@
+# The shop on a 1 GB server. Use it on top of the normal production file:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.small.yml --env-file .env.production up -d
+#
+# (or put COMPOSE_FILE=docker-compose.prod.yml:docker-compose.small.yml in the shell). The services, their images and
+# their APIs are exactly the same. What changes:
+#
+#   * One Postgres server instead of four. Every service still has its own database and its own login, and cannot open
+#     another service's database (docker/postgres/service-databases.sh).
+#   * Grafana, Prometheus, Loki and cAdvisor do not run here. Alloy (profile "cloud") sends the logs and metrics to
+#     Grafana Cloud's free tier instead.
+#   * Smaller memory settings, and limits: when memory runs out, Chromium is given up first and Postgres last.
+#
+# Needs Docker Compose 2.24 or newer (for !override).
+
+x-node: &node
+  # Keeps V8 from growing its heap as if the server had memory to spare.
+  NODE_OPTIONS: --max-old-space-size=128 --max-semi-space-size=2
+
+services:
+  db:
+    command:
+      - postgres
+      - -cshared_buffers=32MB
+      - -cmax_connections=40
+      - -cwork_mem=2MB
+      - -cmaintenance_work_mem=32MB
+      - -ceffective_cache_size=128MB
+      - -cmax_wal_size=256MB
+      - -cjit=off
+      - -cmax_parallel_workers=0
+      - -cmax_worker_processes=2
+      - -cmax_logical_replication_workers=0
+      - -cautovacuum_max_workers=1
+    environment:
+      # Read once, when the database is first created.
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?set API_DB_PASSWORD in .env.production (openssl rand -hex 24)}
+      FILE_DB_PASSWORD: ${FILE_DB_PASSWORD}
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+    volumes:
+      - ./docker/postgres/service-databases.sh:/docker-entrypoint-initdb.d/10-service-databases.sh:ro
+    mem_limit: 200m
+    oom_score_adj: -500
+
+  # Their databases live in `db`.
+  file-db: { profiles: [separate-databases] }
+  report-db: { profiles: [separate-databases] }
+  notification-db: { profiles: [separate-databases] }
+
+  file:
+    environment:
+      <<: *node
+      FILE_DATABASE_URL: postgresql://cambo_file:${FILE_DB_PASSWORD}@db:5432/cambo_files
+    depends_on: !override { db: { condition: service_healthy } }
+    mem_limit: 220m # room for resizing a large photo
+
+  report:
+    environment:
+      <<: *node
+      REPORT_DATABASE_URL: postgresql://cambo_report:${REPORT_DB_PASSWORD}@db:5432/cambo_reports
+      PDF_WORKERS: 1
+      PDF_IDLE_SECONDS: 20
+    depends_on: !override { db: { condition: service_healthy } }
+    mem_limit: 420m
+    oom_score_adj: 500
+
+  notification:
+    environment:
+      <<: *node
+      NOTIFICATION_DATABASE_URL: postgresql://cambo_notification:${NOTIFICATION_DB_PASSWORD}@db:5432/cambo_notifications
+    depends_on: !override { db: { condition: service_healthy } }
+    mem_limit: 160m
+
+  api:
+    environment:
+      <<: *node
+      DATABASE_URL: postgresql://cambo_api:${API_DB_PASSWORD}@db:5432/cambo_supply
+    mem_limit: 260m
+
+  web: { mem_limit: 64m }
+
+  cloudflared:
+    environment: { GOMEMLIMIT: 40MiB }
+    mem_limit: 96m
+
+  # --- monitoring: the programs stay in the normal production file, only Alloy runs here -----------------
+  prometheus: { profiles: [monitoring] }
+  cadvisor: { profiles: [monitoring] }
+  loki: { profiles: [monitoring] }
+  grafana: { profiles: [monitoring] }
+  alloy:
+    profiles: !override [cloud]
+    depends_on: !reset []
+    command: !override
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    environment:
+      GOMEMLIMIT: 90MiB
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL:-}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER:-}
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL:-}
+      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER:-}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN:-}
+    volumes: !override
+      - ./observability/alloy/cloud.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - alloy-data:/var/lib/alloy/data
+    mem_limit: 160m
+    oom_score_adj: 300
