@@ -28,6 +28,7 @@ import type { NotificationClient } from '../integrations/services/notification';
 import { internalRouter } from '../modules/internal/routes';
 import { registerEventMetrics } from '../modules/events/outbox';
 import { registerAppMetrics } from '../lib/app-metrics';
+import type { Cache } from '../lib/cache';
 
 export type AppDeps = {
   config: Config;
@@ -40,6 +41,8 @@ export type AppDeps = {
   notification: NotificationClient;
   metrics: Metrics;
   logger: Logger;
+  /** The catalogue cache; with no store it just runs every loader. */
+  cache: Cache;
 };
 
 export function createApp(deps: AppDeps): express.Express {

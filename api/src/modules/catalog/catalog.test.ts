@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createCategory, createProduct, createTestApp, resetDb } from '../../../test/helpers';
+import { createCategory, createProduct, createTestApp, memoryCache, resetDb } from '../../../test/helpers';
 
 describe('public catalog', () => {
   let ctx: Awaited<ReturnType<typeof createTestApp>>;
@@ -204,5 +204,92 @@ describe('public catalog', () => {
     const left = Object.fromEntries(res.body.items.map((p: { slug: string; lowStock: number | null }) => [p.slug, p.lowStock]));
     expect(left).toEqual({ plenty: null, some: null, last: 1, gone: null });
     expect(res.body.items.find((p: { slug: string }) => p.slug === 'plenty')).not.toHaveProperty('stock');
+  });
+});
+
+describe('catalogue cache', () => {
+  let ctx: Awaited<ReturnType<typeof createTestApp>>;
+  beforeEach(async () => {
+    await resetDb();
+    ctx = await createTestApp({ cache: memoryCache() });
+  });
+  const names = async (query: Record<string, string> = {}) =>
+    (await request(ctx.app).get('/api/v1/products').query(query)).body.items.map((p: { name: string }) => p.name);
+
+  it('serves a repeated product list from the cache', async () => {
+    const p = await createProduct(ctx.prisma, { name: 'Old name' });
+    expect(await names()).toEqual(['Old name']);
+    await ctx.prisma.product.update({ where: { id: p.id }, data: { name: 'New name' } });
+    expect(await names()).toEqual(['Old name']);
+  });
+
+  it('shows the change after the catalogue is invalidated', async () => {
+    const p = await createProduct(ctx.prisma, { name: 'Old name' });
+    await names();
+    await ctx.prisma.product.update({ where: { id: p.id }, data: { name: 'New name' } });
+    await ctx.deps.cache.invalidate('catalog');
+    expect(await names()).toEqual(['New name']);
+  });
+
+  it('keeps different queries apart', async () => {
+    const mice = await createCategory(ctx.prisma, { name: 'Mice', slug: 'mice' });
+    const keys = await createCategory(ctx.prisma, { name: 'Keyboards', slug: 'keyboards' });
+    await createProduct(ctx.prisma, { name: 'Wireless Mouse', categoryId: mice.id, priceCents: 2000, sortOrder: 1 });
+    await createProduct(ctx.prisma, { name: 'Mechanical Keyboard', categoryId: keys.id, priceCents: 9000, sortOrder: 2 });
+    expect(await names({ q: 'mouse' })).toEqual(['Wireless Mouse']);
+    expect(await names({ q: 'keyboard' })).toEqual(['Mechanical Keyboard']);
+    expect(await names({ category: 'keyboards' })).toEqual(['Mechanical Keyboard']);
+    expect(await names({ category: 'mice' })).toEqual(['Wireless Mouse']);
+    expect(await names({ minPrice: '50' })).toEqual(['Mechanical Keyboard']);
+    expect(await names({ pageSize: '1', page: '2' })).toEqual(['Mechanical Keyboard']);
+    expect(await names({ pageSize: '1', page: '1' })).toEqual(['Wireless Mouse']);
+    expect(await names()).toEqual(['Wireless Mouse', 'Mechanical Keyboard']);
+  });
+
+  it('search text with unicode, ":", "*" and spaces is cached under its own key and returns the right products', async () => {
+    await createProduct(ctx.prisma, { name: 'Wireless Mouse' });
+    const odd = ['mouse:*', 'ម៉ៅ wireless', 'wireless  mouse', '*', 'mouse'.padEnd(100, 'x')];
+    for (const q of odd) {
+      const res = await request(ctx.app).get('/api/v1/products').query({ q });
+      expect(res.status).toBe(200);
+      const again = await request(ctx.app).get('/api/v1/products').query({ q });
+      expect(again.body).toEqual(res.body);
+    }
+    expect(await names({ q: 'wireless mouse' })).toEqual(['Wireless Mouse']);
+    expect(await names({ q: 'zzzzqqq' })).toEqual([]);
+  });
+
+  it('caches categories and banners the same way', async () => {
+    const cat = await createCategory(ctx.prisma, { name: 'Mice', slug: 'mice' });
+    const banner = await ctx.prisma.banner.create({ data: { storageKey: 'banners/00000000-0000-4000-8000-000000000009', width: 1400, height: 500 } });
+    const cats = async () => (await request(ctx.app).get('/api/v1/categories')).body.items.map((c: { name: string }) => c.name);
+    const banners = async () => (await request(ctx.app).get('/api/v1/banners')).body.items.length;
+    expect(await cats()).toEqual(['Mice']);
+    expect(await banners()).toBe(1);
+    await ctx.prisma.category.update({ where: { id: cat.id }, data: { name: 'Mouse' } });
+    await ctx.prisma.banner.update({ where: { id: banner.id }, data: { isActive: false } });
+    expect(await cats()).toEqual(['Mice']);
+    expect(await banners()).toBe(1);
+    await ctx.deps.cache.invalidate('catalog');
+    expect(await cats()).toEqual(['Mouse']);
+    expect(await banners()).toBe(0);
+  });
+
+  it('does not cache product detail or by-ids', async () => {
+    const p = await createProduct(ctx.prisma, { name: 'Old name', slug: 'old-name' });
+    const detail = async () => (await request(ctx.app).get('/api/v1/products/old-name')).body.name;
+    const byIds = async () => (await request(ctx.app).get('/api/v1/products/by-ids').query({ ids: p.id })).body.items[0].name;
+    expect(await detail()).toBe('Old name');
+    expect(await byIds()).toBe('Old name');
+    await ctx.prisma.product.update({ where: { id: p.id }, data: { name: 'New name' } });
+    expect(await detail()).toBe('New name');
+    expect(await byIds()).toBe('New name');
+  });
+
+  it('keeps the Cache-Control header on cached responses', async () => {
+    await createProduct(ctx.prisma);
+    await request(ctx.app).get('/api/v1/products');
+    const res = await request(ctx.app).get('/api/v1/products');
+    expect(res.headers['cache-control']).toBe('public, max-age=15, stale-while-revalidate=60');
   });
 });
