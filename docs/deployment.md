@@ -123,6 +123,24 @@ Each service creates its own tables on start. The notification service registers
 Then run the smoke test against the real address from your laptop: `WEB=https://shop.example.com scripts/smoke.sh`
 (the parts that reach into Docker need to run on the server: `scripts/smoke.sh` there).
 
+## 4a. On a 1 GB server
+
+`docker-compose.small.yml` on top of the production file runs the same services on a 1 GB Droplet (about USD 6 per month):
+one Postgres holding four databases with four logins, no Grafana, Prometheus or Loki on the server (Alloy sends logs and
+metrics to Grafana Cloud's free tier), and memory limits. Measured with made-up data: about 330 MB for the shop at rest,
+and no out-of-memory with shoppers, PDFs and a large photo at the same time.
+
+```bash
+ssh root@<server> 'bash -s' < scripts/server-setup.sh      # once: swap, updates, firewall, Docker, deploy user
+scripts/grafana-cloud-setup.sh                             # once, on your computer: saves .env.grafana
+# on the server, as deploy, in /opt/cambo-supply (with API_DB_PASSWORD, REDIS_PASSWORD and the .env.grafana lines in .env.production):
+export COMPOSE_FILE=docker-compose.prod.yml:docker-compose.small.yml COMPOSE_PROFILES=tunnel,cloud
+docker compose --env-file .env.production up -d
+node scripts/grafana-cloud-dashboards.mjs services | pbcopy   # paste into Grafana: Dashboards, New, Import (then: logs)
+```
+
+The firewall allows a few SSH connections per half minute, so scripts should reuse one connection.
+
 ## 4b. Telegram login
 
 Customers and admins log in only with Telegram (no passwords). Three settings in `.env.production` make that work; the

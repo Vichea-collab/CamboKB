@@ -34,7 +34,7 @@ Nothing reads another service's database. 📷 _architecture diagram (docs/archi
 
 TypeScript everywhere, Node.js 22, Express 5; React 19 + Vite + Tailwind for the front end; PostgreSQL 17 with Prisma (api) and
 plain SQL migrations (other services); zod for validation and for the **event contracts shared by all services**; sharp (images),
-jsreport + Chromium (PDFs); Redis (a 30-second cache of the public catalogue and shared rate limits); Telegram Bot API; Bakong KHQR; Vitest + Supertest for tests; Docker and Docker Compose;
+Handlebars + headless Chromium (PDFs); Redis (a 30-second cache of the public catalogue and shared rate limits); Telegram Bot API; Bakong KHQR; Vitest + Supertest for tests; Docker and Docker Compose;
 GitHub Actions and GitHub Container Registry; Prometheus, Grafana, Loki, Grafana Alloy and cAdvisor.
 
 ## 4. Implementation

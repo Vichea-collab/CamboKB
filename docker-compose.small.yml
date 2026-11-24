@@ -43,6 +43,23 @@ services:
     mem_limit: 200m
     oom_score_adj: -500
 
+  # The cache is capped lower here, with room above the cap for Redis itself.
+  redis:
+    command: !override
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.production (docs/deployment.md, Redis)}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-32mb}
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ''
+      - --appendonly
+      - 'no'
+    mem_limit: 64m
+    oom_score_adj: 400
+
   # Their databases live in `db`.
   file-db: { profiles: [separate-databases] }
   report-db: { profiles: [separate-databases] }

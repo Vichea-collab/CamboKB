@@ -18,7 +18,7 @@ the api queues for them. Full picture: [`docs/architecture.md`](docs/architectur
 | `web/` | React 19 + Vite storefront and admin (dark theme, mobile-first), served by nginx | none | 5173 dev / 80 in Docker |
 | `api/` | Accounts, catalog, pricing, orders, KHQR payments, admin. Express 5 + Prisma | `api-db` (Postgres) | 4000 |
 | `file/` | Image uploads: resizes to WebP (400/800/1200 px), stores on disk or S3/R2, serves `/files/*` | `file-db` (asset registry) + blobs | 4100 |
-| `report/` | Sales reports (PDF and CSV), invoice PDFs (jsreport + headless Chrome) | `report-db` (order facts, kept up to date by events) | 4200 |
+| `report/` | Sales reports (PDF and CSV), invoice PDFs (Handlebars + headless Chromium, opened only when needed) | `report-db` (order facts, kept up to date by events) | 4200 |
 | `notification/` | Telegram: message queue with retries, order alerts, the owner's order buttons, the bot webhook | `notification-db` (message queue, handled events) | 4300 |
 | `shared/` | Rules and contracts every service shares: money, phone numbers, delivery fees, event schemas | n/a (a library) | n/a |
 | `service-kit/` | Plumbing every service repeats: logger, metrics, request ids, migrations (a library) | n/a | n/a |
