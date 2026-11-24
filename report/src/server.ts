@@ -13,6 +13,7 @@ if (applied.length) logger.info({ applied }, 'database migrated');
 const invoices = await createInvoiceRenderer({
   chromePath: config.chromePath,
   workers: config.pdfWorkers,
+  idleMs: config.pdfIdleMs,
 });
 const app = createReportApp({ config, pool, invoices, logger });
 const server = app.listen(config.port, () =>

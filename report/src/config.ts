@@ -9,7 +9,10 @@ const envSchema = z
     REPORT_SERVICE_SECRET: z.string().min(1),
     STORE_NAME: z.string().default('Cambo Keyboard Supply'),
     CHROME_PATH: z.string().optional(),
+    /** PDFs made at the same time; more wait their turn. */
     PDF_WORKERS: z.coerce.number().int().min(1).max(8).default(2),
+    /** Chromium is closed after this long without a PDF to make. */
+    PDF_IDLE_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
   })
   .superRefine((e, ctx) => {
     if (e.NODE_ENV === 'production' && (e.REPORT_SERVICE_SECRET.length < 32 || e.REPORT_SERVICE_SECRET.startsWith('dev-'))) {
@@ -17,7 +20,7 @@ const envSchema = z
     }
   });
 
-export type ReportConfig = { port: number; logLevel: string; databaseUrl: string; secret: string; storeName: string; chromePath?: string; pdfWorkers: number };
+export type ReportConfig = { port: number; logLevel: string; databaseUrl: string; secret: string; storeName: string; chromePath?: string; pdfWorkers: number; pdfIdleMs: number };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ReportConfig {
   const parsed = envSchema.safeParse(env);
@@ -33,5 +36,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ReportConfig {
     storeName: e.STORE_NAME,
     chromePath: e.CHROME_PATH,
     pdfWorkers: e.PDF_WORKERS,
+    pdfIdleMs: e.PDF_IDLE_SECONDS * 1000,
   };
 }

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build context: repository root.  docker build -f docker/report.Dockerfile .
-# Debian (not Alpine): jsreport's chrome-pdf needs Chromium, and Noto fonts render
+# Debian (not Alpine) for its headless-only Chromium (smaller than the full browser), and Noto fonts, which render
 # Khmer addresses on invoices.
 
 FROM node:22-bookworm-slim AS build
@@ -19,9 +19,9 @@ RUN npm run build --workspace report \
 
 FROM node:22-bookworm-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends chromium fonts-noto-core fonts-khmeros tini ca-certificates \
+ && apt-get install -y --no-install-recommends chromium-headless-shell fonts-noto-core fonts-khmeros tini ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-ENV NODE_ENV=production PUPPETEER_SKIP_DOWNLOAD=true CHROME_PATH=/usr/bin/chromium
+ENV NODE_ENV=production PUPPETEER_SKIP_DOWNLOAD=true CHROME_PATH=/usr/bin/chromium-headless-shell
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules node_modules
 COPY --from=build --chown=node:node /app/report/package.json report/package.json

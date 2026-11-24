@@ -1,10 +1,9 @@
 import { formatPhone, formatUsd, phnomPenhDate } from '@cambo/shared';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import jsreport from '@jsreport/jsreport-core';
-import chromePdf from '@jsreport/jsreport-chrome-pdf';
-import handlebars from '@jsreport/jsreport-handlebars';
+import Handlebars from 'handlebars';
 import type pg from 'pg';
+import { createPdfPrinter } from './pdf';
 import { salesReportView, type SalesReportData } from './sales-report';
 
 export type InvoiceData = {
@@ -109,99 +108,44 @@ export function invoiceView(d: InvoiceData, store: { name: string }, logo = '') 
   };
 }
 
-/**
- * Start an embedded jsreport (Handlebars + headless Chrome). Start once per process;
- * a small Chrome pool renders invoices concurrently.
- */
+/** The templates (Handlebars, which escapes every value) and the PDF printer. Start once per process. */
 export async function createInvoiceRenderer(
-  opts: { chromePath?: string; workers?: number } = {},
+  opts: { chromePath?: string; workers?: number; idleMs?: number } = {},
 ): Promise<InvoiceRenderer> {
-  const getTemplate = () => readFile(TEMPLATE_PATH, 'utf8');
-  // Inlined: the renderer has no network and the template stays one self-contained document.
+  const compile = async (path: string) => Handlebars.compile(await readFile(path, 'utf8'));
+  const invoice = await compile(TEMPLATE_PATH);
+  const sales = await compile(SALES_TEMPLATE_PATH);
+  // Inlined: the printer has no network and the template stays one self-contained document.
   const logo = `data:image/png;base64,${(await readFile(LOGO_PATH)).toString('base64')}`;
-  const reporter = jsreport({
-    discover: false,
-    logger: { console: { transport: 'console', level: 'error' } },
-    store: { provider: 'memory' },
-    blobStorage: { provider: 'memory' },
-    reportTimeout: 30_000,
-    trustUserCode: false,
-  });
-  reporter.use(handlebars());
-  reporter.use(
-    chromePdf({
-      strategy: 'chrome-pool',
-      numberOfWorkers: opts.workers ?? 2,
-      launchOptions: {
-        executablePath: opts.chromePath || undefined,
-        // Container-friendly flags; Chrome's sandbox needs privileges Docker doesn't grant by default.
-        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-      },
-    }),
-  );
-  await reporter.init();
+  const printer = createPdfPrinter({ chromePath: opts.chromePath, concurrency: opts.workers, idleMs: opts.idleMs });
 
   return {
     async renderHtml(data, store) {
-      const template = await getTemplate();
-      const res = await reporter.render({
-        template: { content: template, engine: 'handlebars', recipe: 'html' },
-        data: invoiceView(data, store, logo),
-      });
-      return res.content.toString('utf8');
+      return invoice(invoiceView(data, store, logo));
     },
     async render(data, store) {
-      const template = await getTemplate();
-      const res = await reporter.render({
-        template: {
-          content: template,
-          engine: 'handlebars',
-          recipe: 'chrome-pdf',
-          chrome: {
-            format: 'A4',
-            printBackground: true,
-            marginTop: '0',
-            marginBottom: '0',
-            marginLeft: '0',
-            marginRight: '0',
-          },
-        },
-        data: invoiceView(data, store, logo),
+      return printer.print(invoice(invoiceView(data, store, logo)), {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0', bottom: '0', left: '0', right: '0' },
       });
-      return res.content;
     },
     async renderSalesHtml(data, store) {
-      const res = await reporter.render({
-        template: { content: await readFile(SALES_TEMPLATE_PATH, 'utf8'), engine: 'handlebars', recipe: 'html' },
-        data: salesReportView(data, store, logo),
-      });
-      return res.content.toString('utf8');
+      return sales(salesReportView(data, store, logo));
     },
     async renderSales(data, store) {
       const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const view = salesReportView(data, store, logo);
-      const res = await reporter.render({
-        template: {
-          content: await readFile(SALES_TEMPLATE_PATH, 'utf8'),
-          engine: 'handlebars',
-          recipe: 'chrome-pdf',
-          chrome: {
-            format: 'A4',
-            printBackground: true,
-            marginTop: '10mm',
-            marginBottom: '16mm',
-            marginLeft: '12mm',
-            marginRight: '12mm',
-            // Every page says what it belongs to and where it is: a report is read page by page.
-            displayHeaderFooter: true,
-            headerTemplate: '<span></span>',
-            footerTemplate: `<div style="width:100%;font-size:7pt;font-family:Arial,sans-serif;color:#4a5260;padding:0 12mm;display:flex;justify-content:space-between;border-top:0.3mm solid #e8b23f;padding-top:1.5mm"><span>${esc(store.name)} · Sales report ${esc(view.period)}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
-          },
-        },
-        data: view,
+      return printer.print(sales(view), {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '10mm', bottom: '16mm', left: '12mm', right: '12mm' },
+        // Every page says what it belongs to and where it is: a report is read page by page.
+        displayHeaderFooter: true,
+        headerTemplate: '<span></span>',
+        footerTemplate: `<div style="width:100%;font-size:7pt;font-family:Arial,sans-serif;color:#4a5260;padding:0 12mm;display:flex;justify-content:space-between;border-top:0.3mm solid #e8b23f;padding-top:1.5mm"><span>${esc(store.name)} · Sales report ${esc(view.period)}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
       });
-      return res.content;
     },
-    close: () => reporter.close(),
+    close: () => printer.close(),
   };
 }
