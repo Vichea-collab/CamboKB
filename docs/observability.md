@@ -25,7 +25,14 @@ Each service exposes `GET /metrics` (Prometheus text format) on its own port; ng
 | Is Node.js struggling? | `nodejs_eventloop_lag_*`, `nodejs_heap_size_used_bytes` | Event loop lag, Heap |
 | Are the services talking? | `service_events_pending`, `service_events_failed`, `service_events_delivered_total`, `service_events_oldest_pending_age_seconds` | Events waiting, deliveries |
 | Is Telegram getting through? | `telegram_messages_total{result}`, `notification_outbox_pending` | Telegram messages |
+| Is the cache working? | `cache_requests_total{cache="catalog",result="hit\|miss\|error"}` | Cache hit ratio, Cache requests by result |
 | Business | `orders_created_total`, `khqr_payments_total`, `report_orders`, `file_assets` | The shop and how the services talk |
+
+**The cache.** The api caches the public catalogue in Redis for 30 seconds and counts every lookup:
+`hit` (answered from Redis), `miss` (read from PostgreSQL and stored) and `error` (Redis failed, so the api read
+PostgreSQL). A healthy shop shows mostly hits; a run of `error` means Redis is down, which slows the shop down a little but
+does not break it. The two panels at the bottom of *Cambo Supply: services* show the hit ratio over 5 minutes and the
+requests by result. Redis itself has no exporter: its health is its container health check and the `error` counter.
 
 Alert rules (`observability/prometheus/alerts.yml`, see Prometheus → Alerts): ServiceDown, HighErrorRate, SlowRequests,
 EventsBacklog, EventsGivenUp, TelegramBacklog, TelegramMessagesFailing, ContainerMemoryHigh.

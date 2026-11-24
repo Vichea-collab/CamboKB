@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -88,78 +89,89 @@ const wordScore = (word: string): Prisma.Sql =>
 /** A word needs at least this much to count as a match (substring hits score 1 or more; spelling guesses 0.45 up). */
 const MATCH_MIN = 0.45;
 
-export function catalogRouter({ prisma, files }: AppDeps): Router {
+export function catalogRouter({ prisma, files, cache }: AppDeps): Router {
   const r = Router();
 
   r.get('/categories', async (_req, res) => {
-    const items = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+    const body = await cache.cached('catalog', 'categories', async () => {
+      const items = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] });
+      return { items: items.map(toCategory) };
+    });
     publicCache(res);
-    res.json({ items: items.map(toCategory) });
+    res.json(body);
   });
 
   r.get('/banners', async (_req, res) => {
-    const items = await prisma.banner.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+    const body = await cache.cached('catalog', 'banners', async () => {
+      const items = await prisma.banner.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+      return { items: items.map((b) => toBanner(b, files)) };
+    });
     publicCache(res);
-    res.json({ items: items.map((b) => toBanner(b, files)) });
+    res.json(body);
   });
 
   r.get('/products', validate({ query: listQuery }), async (req, res) => {
     const { q, category, minPrice, maxPrice, page, pageSize } = req.valid.query as z.infer<
       typeof listQuery
     >;
-    const minCents = minPrice === undefined ? undefined : Math.round(minPrice * 100);
-    const maxCents = maxPrice === undefined ? undefined : Math.round(maxPrice * 100);
-    const words = q ? searchWords(q) : [];
+    // The validated query, in a fixed order, so equal searches share one entry and different ones never do.
+    const key = `products:${createHash('sha1').update(JSON.stringify([q ?? null, category ?? null, minPrice ?? null, maxPrice ?? null, page, pageSize])).digest('hex')}`;
+    const result = await cache.cached('catalog', key, async () => {
+      const minCents = minPrice === undefined ? undefined : Math.round(minPrice * 100);
+      const maxCents = maxPrice === undefined ? undefined : Math.round(maxPrice * 100);
+      const words = q ? searchWords(q) : [];
 
-    let total: number;
-    let items;
-    if (words.length === 0) {
-      const where: Prisma.ProductWhereInput = { isActive: true };
-      if (category) where.category = { slug: category };
-      if (minCents !== undefined || maxCents !== undefined)
-        where.priceCents = { gte: minCents, lte: maxCents };
-      [total, items] = await Promise.all([
-        prisma.product.count({ where }),
-        prisma.product.findMany({
-          where,
+      let total: number;
+      let items;
+      if (words.length === 0) {
+        const where: Prisma.ProductWhereInput = { isActive: true };
+        if (category) where.category = { slug: category };
+        if (minCents !== undefined || maxCents !== undefined)
+          where.priceCents = { gte: minCents, lte: maxCents };
+        [total, items] = await Promise.all([
+          prisma.product.count({ where }),
+          prisma.product.findMany({
+            where,
+            include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }),
+        ]);
+      } else {
+        // A search: every word must match something, and the best match comes first.
+        const scores = words.map(wordScore);
+        const conditions = [
+          Prisma.sql`p."isActive" = true`,
+          ...(category ? [Prisma.sql`c."slug" = ${category}`] : []),
+          ...(minCents !== undefined ? [Prisma.sql`p."priceCents" >= ${minCents}`] : []),
+          ...(maxCents !== undefined ? [Prisma.sql`p."priceCents" <= ${maxCents}`] : []),
+          ...scores.map((s) => Prisma.sql`${s} >= ${MATCH_MIN}`),
+        ];
+        const where = Prisma.join(conditions, ' AND ');
+        const score = Prisma.join(scores, ' + ');
+        const [count, ranked] = await Promise.all([
+          prisma.$queryRaw<
+            { n: bigint }[]
+          >`SELECT count(*) AS n FROM "Product" p JOIN "Category" c ON c."id" = p."categoryId" WHERE ${where}`,
+          prisma.$queryRaw<{ id: string }[]>`
+            SELECT p."id" FROM "Product" p JOIN "Category" c ON c."id" = p."categoryId"
+            WHERE ${where}
+            ORDER BY (${score}) DESC, p."sortOrder" ASC, p."createdAt" ASC
+            LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+        ]);
+        total = Number(count[0]?.n ?? 0);
+        const found = await prisma.product.findMany({
+          where: { id: { in: ranked.map((r) => r.id) } },
           include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
-          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-        }),
-      ]);
-    } else {
-      // A search: every word must match something, and the best match comes first.
-      const scores = words.map(wordScore);
-      const conditions = [
-        Prisma.sql`p."isActive" = true`,
-        ...(category ? [Prisma.sql`c."slug" = ${category}`] : []),
-        ...(minCents !== undefined ? [Prisma.sql`p."priceCents" >= ${minCents}`] : []),
-        ...(maxCents !== undefined ? [Prisma.sql`p."priceCents" <= ${maxCents}`] : []),
-        ...scores.map((s) => Prisma.sql`${s} >= ${MATCH_MIN}`),
-      ];
-      const where = Prisma.join(conditions, ' AND ');
-      const score = Prisma.join(scores, ' + ');
-      const [count, ranked] = await Promise.all([
-        prisma.$queryRaw<
-          { n: bigint }[]
-        >`SELECT count(*) AS n FROM "Product" p JOIN "Category" c ON c."id" = p."categoryId" WHERE ${where}`,
-        prisma.$queryRaw<{ id: string }[]>`
-          SELECT p."id" FROM "Product" p JOIN "Category" c ON c."id" = p."categoryId"
-          WHERE ${where}
-          ORDER BY (${score}) DESC, p."sortOrder" ASC, p."createdAt" ASC
-          LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
-      ]);
-      total = Number(count[0]?.n ?? 0);
-      const found = await prisma.product.findMany({
-        where: { id: { in: ranked.map((r) => r.id) } },
-        include: { category: true, images: { orderBy: { sortOrder: 'asc' } } },
-      });
-      const byId = new Map(found.map((p) => [p.id, p]));
-      items = ranked.flatMap((r) => byId.get(r.id) ?? []);
-    }
+        });
+        const byId = new Map(found.map((p) => [p.id, p]));
+        items = ranked.flatMap((r) => byId.get(r.id) ?? []);
+      }
+      return { items: items.map((p) => toProductCard(p, files)), total, page, pageSize };
+    });
     publicCache(res);
-    res.json({ items: items.map((p) => toProductCard(p, files)), total, page, pageSize });
+    res.json(result);
   });
 
   r.get('/products/by-ids', validate({ query: idsQuery }), async (req, res) => {

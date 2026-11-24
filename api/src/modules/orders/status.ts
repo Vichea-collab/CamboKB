@@ -83,6 +83,8 @@ export async function changeOrderStatus(
     await announceStatusChanged(tx, id);
     return { number: order.number, from: order.status, paidOnDelivery };
   });
+  // A cancellation gave stock back.
+  if (status === 'CANCELLED') await deps.cache.invalidate('catalog');
   kickEvents(deps);
   void publishOrderUpdate(deps, id);
   if (result.paidOnDelivery) void publishOrderUpdate(deps, id, 'payment');

@@ -30,7 +30,7 @@ export function paymentRouter(deps: AppDeps): Router {
     res.set('Cache-Control', 'no-store').json(paymentView(payment));
   });
 
-  r.post('/orders/:number/payment/khqr', requireAuth, limiter(10, 10 * 60_000), validate({ params: numberParams }), async (req, res) => {
+  r.post('/orders/:number/payment/khqr', requireAuth, limiter(deps, 10, 10 * 60_000, { name: 'khqr' }), validate({ params: numberParams }), async (req, res) => {
     const { number } = req.valid.params as { number: string };
     const { order, payment } = await load(number, req.user!.id);
     if (payment.method !== 'KHQR' || payment.status !== 'PENDING') {

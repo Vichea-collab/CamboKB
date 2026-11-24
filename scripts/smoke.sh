@@ -57,6 +57,19 @@ wait_for "notification -> api over the private network" 30 svc_node notification
 svc_node notification "fetch('http://api:4000/internal/telegram/updates',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))" \
   && pass "the api's internal routes refuse calls without the secret" || fail "the api's internal routes are open"
 
+section "Cache (Redis)"
+wait_for "Redis answers PING" 30 bash -c "$(printf '%q ' "${COMPOSE[@]}") exec -T redis redis-cli ping | grep -q PONG"
+# How many catalogue lookups the api has answered from the cache so far.
+cache_hits() { svc_node api 'fetch("http://127.0.0.1:4000/metrics").then(r=>r.text()).then(t=>{const m=t.match(/cache_requests_total\{[^}]*result="hit"[^}]*\} (\d+)/);console.log(m?m[1]:0)})' | tr -d '\r\n'; }
+hits_before="$(cache_hits)"
+curl -fsS "$WEB/api/v1/products?pageSize=7" >/dev/null && curl -fsS "$WEB/api/v1/products?pageSize=7" >/dev/null
+hits_after="$(cache_hits)"
+if [ "${hits_after:-0}" -gt "${hits_before:-0}" ] 2>/dev/null; then pass "a repeated catalogue request is answered from the cache"; else fail "the cache did not answer a repeated request (hits $hits_before -> $hits_after)"; fi
+"${COMPOSE[@]}" stop redis >/dev/null 2>&1
+curl -fsS "$WEB/api/v1/products?pageSize=7" >/dev/null 2>&1 && pass "the shop still answers with Redis stopped" || fail "the shop stopped answering when Redis stopped"
+"${COMPOSE[@]}" start redis >/dev/null 2>&1
+wait_for "Redis is back" 30 bash -c "$(printf '%q ' "${COMPOSE[@]}") exec -T redis redis-cli ping | grep -q PONG"
+
 section "A report event and a notification event are accepted"
 order_id="5b0f1c4e-6f0d-4d52-9a6e-$(date +%s | awk '{printf "%012d", $1}')"
 snapshot="{\"id\":\"$order_id\",\"number\":\"CS-SMOKE-$(date +%s)\",\"status\":\"PENDING\",\"createdAt\":\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\",\"contactName\":\"Smoke\",\"contactPhone\":\"+85512000000\",\"region\":\"PHNOM_PENH\",\"deliveryService\":\"VET\",\"addressLine\":\"Smoke test\",\"lat\":null,\"lng\":null,\"distanceKm\":null,\"note\":null,\"subtotalCents\":100,\"deliveryFeeCents\":0,\"discountCents\":0,\"totalCents\":100,\"promoCode\":null,\"payment\":{\"method\":\"COD\",\"status\":\"UNPAID\"},\"items\":[{\"productId\":\"8d7a0b3e-3c5a-4e0b-8f6a-0d9a8f1e2b34\",\"name\":\"Smoke item\",\"quantity\":1,\"priceCents\":100,\"lineTotalCents\":100}]}"
@@ -95,6 +108,7 @@ wait_for "log lines carry a level label (error/warn/info can be filtered)" 60 ba
 section "Dashboards (Grafana)"
 wait_for "Grafana is healthy" 90 curl -fsS "$GRAFANA/api/health"
 wait_for "both Cambo Supply dashboards are provisioned" 60 bash -c "[ \"\$(curl -fsS -u '$GRAFANA_AUTH' '$GRAFANA/api/search?query=Cambo' | grep -o '\"uid\":\"cambo-[a-z]*\"' | wc -l)\" -ge 2 ]"
+wait_for "the services dashboard shows the cache hit ratio" 60 bash -c "curl -fsS -u '$GRAFANA_AUTH' '$GRAFANA/api/dashboards/uid/cambo-services' | grep -q 'Cache hit ratio'"
 wait_for "Grafana can query Prometheus and Loki" 60 bash -c "curl -fsS -u '$GRAFANA_AUTH' '$GRAFANA/api/datasources' | grep -q prometheus && curl -fsS -u '$GRAFANA_AUTH' '$GRAFANA/api/datasources' | grep -q loki"
 
 printf '\n'

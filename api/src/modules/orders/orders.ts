@@ -187,6 +187,8 @@ export async function createOrder(
     throw err;
   }
 
+  // Stock just went down: the public lists must show it (sold out, "only 3 left") on the next request.
+  await deps.cache.invalidate('catalog');
   kickEvents(deps);
   appMetrics(deps).ordersCreated.inc({ payment_method: order.payment?.method ?? 'unknown' });
   publishAdminEvent({

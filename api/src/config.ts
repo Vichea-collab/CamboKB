@@ -36,6 +36,12 @@ const envSchema = z
     PUBLIC_FILES_URL: z.url().optional(),
     REPORT_SERVICE_URL: z.url().default('http://localhost:4200'),
     REPORT_SERVICE_SECRET: z.string().default('dev-report-secret-change-me-0123456789'),
+    // Optional. Unset: no cache and an in-memory rate limiter (a single api instance). Set: the catalogue cache and the
+    // rate limits live in Redis.
+    REDIS_URL: z
+      .string()
+      .regex(/^rediss?:\/\//, 'Use a redis:// or rediss:// URL')
+      .optional(),
     RATE_LIMIT_WINDOW_MS: z.coerce
       .number()
       .int()
@@ -110,6 +116,8 @@ export type Config = {
     reportUrl: string;
     reportSecret: string;
   };
+  /** Redis for the catalogue cache and the rate limits; undefined means neither is used. */
+  redisUrl?: string;
   rateLimit: { windowMs: number };
   serveWeb?: string;
   bakong: {
@@ -162,6 +170,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       reportUrl: e.REPORT_SERVICE_URL.replace(/\/$/, ''),
       reportSecret: e.REPORT_SERVICE_SECRET,
     },
+    redisUrl: e.REDIS_URL,
     rateLimit: { windowMs: e.RATE_LIMIT_WINDOW_MS },
     serveWeb: e.SERVE_WEB_DIR,
     bakong: {

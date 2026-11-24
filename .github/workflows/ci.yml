@@ -30,6 +30,14 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-retries 10
+      # The cache and rate-limiter tests that need a real Redis run against this one.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-retries 10
     env:
       # One database per service, as in production. The tests create the extra ones themselves.
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/cambo_supply_test
@@ -37,6 +45,7 @@ jobs:
       REPORT_DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/cambo_report_test
       NOTIFICATION_DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/cambo_notification_test
       DATABASE_URL_TEST_KIT: postgresql://postgres:postgres@localhost:5432/cambo_kit_test
+      REDIS_URL_TEST: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -5,6 +5,7 @@ import {
   BakongError,
   createProduct,
   createTestApp,
+  memoryCache,
   resetDb,
   signedInAgent,
   testConfig,
@@ -31,7 +32,7 @@ describe('KHQR payments with Bakong', () => {
 
   beforeEach(async () => {
     await resetDb();
-    ctx = await createTestApp();
+    ctx = await createTestApp({ cache: memoryCache() });
     ({ agent: customer } = await signedInAgent(ctx.app, ctx.prisma, {
       name: 'Dara',
       telegramUserId: TG,
@@ -214,6 +215,20 @@ describe('KHQR payments with Bakong', () => {
       .post(`/api/v1/orders/${o.number}/payment/khqr`)
       .set('Origin', WEB_ORIGIN);
     expect(new Date(res.body.khqr.expiresAt).getTime()).toBeLessThanOrEqual(windowEnd.getTime());
+  });
+
+  it('shows the stock back in the public list when an unpaid order expires', async () => {
+    const soldOut = async () => (await request(ctx.app).get('/api/v1/products')).body.items[0].isSoldOut;
+    expect(await soldOut()).toBe(false);
+    const res = await order({ items: [{ productId: product.id, quantity: 5 }] });
+    expect(res.status).toBe(201);
+    expect(await soldOut()).toBe(true);
+    await ctx.prisma.payment.updateMany({
+      where: { orderId: res.body.id },
+      data: { expiresAt: new Date(Date.now() - 3 * MIN) },
+    });
+    expect((await sweepKhqrPayments(ctx.deps)).expired).toBe(1);
+    expect(await soldOut()).toBe(false);
   });
 
   it('cancels an unpaid order after the window, gives the stock back and tells the customer', async () => {

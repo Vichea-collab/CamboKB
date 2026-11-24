@@ -16,6 +16,7 @@ import type { NotificationClient } from '../src/integrations/services/notificati
 import { createMetrics } from '@cambo/service-kit';
 import type { EventData, EventEnvelope, EventTarget, EventType } from '@cambo/shared';
 import { eventsIdle } from '../src/modules/events/outbox';
+import { createCache, MemoryCacheStore, type Cache, type CacheStore } from '../src/lib/cache';
 import { DEFAULT_DELIVERY_SETTINGS } from '@cambo/shared';
 
 export const WEB_ORIGIN = 'http://localhost:5173';
@@ -169,6 +170,24 @@ export async function resetDb(db: PrismaClient = testPrisma()) {
   await db.storeSetting.create({ data: { id: 1, delivery: DEFAULT_DELIVERY_SETTINGS } });
 }
 
+/** A cache store whose every call fails, like a Redis that is down. */
+export class FailingCacheStore implements CacheStore {
+  async get(): Promise<string | null> {
+    throw new Error('redis down');
+  }
+  async set(): Promise<void> {
+    throw new Error('redis down');
+  }
+  async incr(): Promise<number> {
+    throw new Error('redis down');
+  }
+}
+
+/** A cache kept in this process's memory, for tests that check what is cached and when it is cleared. */
+export function memoryCache(): Cache {
+  return createCache({ store: new MemoryCacheStore(), metrics: createMetrics('api'), logger: createLogger('silent') });
+}
+
 export async function createTestApp(
   overrides: Partial<AppDeps> = {},
 ): Promise<{
@@ -186,6 +205,8 @@ export async function createTestApp(
   const files = new FakeFileClient();
   const reports = new FakeReportClient();
   const bakong = new FakeBakongClient();
+  const metrics = createMetrics('api');
+  const logger = createLogger('silent');
   const deps: AppDeps = {
     config: testConfig(),
     prisma: testPrisma(),
@@ -194,8 +215,10 @@ export async function createTestApp(
     bakong,
     events,
     notification,
-    metrics: createMetrics('api'),
-    logger: createLogger('silent'),
+    metrics,
+    logger,
+    // Off by default, so route tests see the database directly; pass memoryCache() to test caching.
+    cache: createCache({ store: null, metrics, logger }),
     ...overrides,
   };
   return {

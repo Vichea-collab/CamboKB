@@ -34,7 +34,7 @@ Nothing reads another service's database. 📷 _architecture diagram (docs/archi
 
 TypeScript everywhere, Node.js 22, Express 5; React 19 + Vite + Tailwind for the front end; PostgreSQL 17 with Prisma (api) and
 plain SQL migrations (other services); zod for validation and for the **event contracts shared by all services**; sharp (images),
-jsreport + Chromium (PDFs); Telegram Bot API; Bakong KHQR; Vitest + Supertest for tests; Docker and Docker Compose;
+jsreport + Chromium (PDFs); Redis (a 30-second cache of the public catalogue and shared rate limits); Telegram Bot API; Bakong KHQR; Vitest + Supertest for tests; Docker and Docker Compose;
 GitHub Actions and GitHub Container Registry; Prometheus, Grafana, Loki, Grafana Alloy and cAdvisor.
 
 ## 4. Implementation
@@ -84,7 +84,7 @@ The step-by-step is in `docs/deployment.md`. _Add the URL here once deployed._
 histogram per route, CPU, memory, event-loop lag, plus business and communication metrics (orders, KHQR outcomes, events
 waiting per target, Telegram messages by result, orders held by the report service). Grafana's *Services* dashboard shows
 them; alert rules cover a service being down, error rate, slow responses, a backlog of undelivered events and failing
-Telegram messages. 📷 _services dashboard_
+Telegram messages; a *cache hit ratio* panel shows how much of the catalogue Redis answers. 📷 _services dashboard_
 
 **Centralized logging.** Every service logs one JSON line per event with its name, level and a request id that follows the
 request across services. Grafana Alloy collects every container's logs into Loki; the *Logs* dashboard shows errors from all
@@ -100,8 +100,8 @@ backlog alert covers it, and the fix is one command. A second demonstration stop
 
 - A shared database would have been simpler, but then the services would not be independent; events with an outbox gave
   independence without losing data.
-- The in-process live-update stream for admins means one api instance; scaling out would need Postgres `LISTEN/NOTIFY` or
-  Redis.
+- Redis now keeps the catalogue cache and the rate-limit counters, so those no longer tie the api to one process. The
+  in-process live-update stream for admins still does: scaling out would also need Postgres `LISTEN/NOTIFY` or Redis pub/sub.
 - Splitting payments out of the api was considered and rejected for now: order creation takes the payment inside one
   transaction.
 

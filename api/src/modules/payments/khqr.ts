@@ -276,6 +276,8 @@ async function expirePayment(deps: AppDeps, paymentId: string): Promise<boolean>
     return order.id;
   });
   if (cancelledOrderId) {
+    // The unpaid order's stock went back.
+    await deps.cache.invalidate('catalog');
     kickEvents(deps);
     appMetrics(deps).khqrPayments.inc({ result: 'expired' });
     void publishOrderUpdate(deps, cancelledOrderId);

@@ -100,3 +100,28 @@ describe('loadConfig', () => {
     ).toBe(false);
   });
 });
+
+describe('loadConfig: REDIS_URL', () => {
+  const base = { DATABASE_URL: 'postgresql://x@localhost/db' };
+
+  it('redisUrl is undefined when REDIS_URL is unset', () => {
+    expect(loadConfig(base).redisUrl).toBeUndefined();
+  });
+
+  it('redisUrl is undefined when REDIS_URL is an empty string (Compose passes unset variables that way)', () => {
+    expect(loadConfig({ ...base, REDIS_URL: '' }).redisUrl).toBeUndefined();
+  });
+
+  it('redisUrl is read when REDIS_URL=redis://redis:6379', () => {
+    expect(loadConfig({ ...base, REDIS_URL: 'redis://redis:6379' }).redisUrl).toBe('redis://redis:6379');
+  });
+
+  it('accepts a password in the URL and the rediss:// scheme', () => {
+    expect(loadConfig({ ...base, REDIS_URL: 'redis://:s3cret@redis:6379' }).redisUrl).toBe('redis://:s3cret@redis:6379');
+    expect(loadConfig({ ...base, REDIS_URL: 'rediss://redis:6380' }).redisUrl).toBe('rediss://redis:6380');
+  });
+
+  it('throws for REDIS_URL=http://x', () => {
+    expect(() => loadConfig({ ...base, REDIS_URL: 'http://x' })).toThrow(/REDIS_URL/);
+  });
+});

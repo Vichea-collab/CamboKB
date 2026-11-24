@@ -1,7 +1,9 @@
 import { createMetrics } from '@cambo/service-kit';
 import { createApp } from './http/app';
 import { loadConfig } from './config';
+import { createCache, RedisCacheStore } from './lib/cache';
 import { createLogger } from './lib/logger';
+import { createRedis, waitUntilReady } from './lib/redis';
 import { createPrisma } from './db/prisma';
 import { HttpBakongClient } from './integrations/bakong/client';
 import { HttpFileClient } from './integrations/files/client';
@@ -33,6 +35,13 @@ async function main() {
     config.services.notificationUrl,
     config.services.notificationSecret,
   );
+  const metrics = createMetrics('api');
+  // Optional: without REDIS_URL there is no cache and the rate limits stay in this process's memory.
+  const redis = config.redisUrl ? createRedis(config.redisUrl, logger) : null;
+  if (redis && !(await waitUntilReady(redis, 3000)))
+    logger.warn('Redis is not reachable yet; starting without it, and using it as soon as it is');
+  const cache = createCache({ store: redis ? new RedisCacheStore(redis) : null, redis, metrics, logger });
+  logger.info(redis ? 'Redis cache on' : 'Redis off (set REDIS_URL to cache the catalogue and share rate limits)');
   const deps = {
     config,
     prisma,
@@ -41,8 +50,9 @@ async function main() {
     bakong,
     events,
     notification,
-    metrics: createMetrics('api'),
+    metrics,
     logger,
+    cache,
   };
 
   const app = createApp(deps);
@@ -59,6 +69,7 @@ async function main() {
     stopSweeper();
     server.close(async () => {
       await prisma.$disconnect();
+      redis?.disconnect();
       process.exit(0);
     });
     setTimeout(() => process.exit(1), 10_000).unref();
