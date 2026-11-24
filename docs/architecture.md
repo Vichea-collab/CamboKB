@@ -25,6 +25,7 @@ flowchart LR
     reportdb[(report-db)]
     notifdb[(notification-db)]
     blobs[("blobs: disk or S3")]
+    redis[("redis<br/>cache + rate limits")]
   end
 
   web -->|/api| api
@@ -32,6 +33,7 @@ flowchart LR
   web -->|/telegram/webhook| notification
 
   api --- apidb
+  api -.->|"cache, rate limits (optional)"| redis
   file --- filedb
   file --- blobs
   report --- reportdb
@@ -155,5 +157,6 @@ therefore be followed through nginx, the api, the report service and the notific
 | `notification` is down | The api keeps the events (`service_events_pending{target="notification"}` climbs) and delivers them when it is back |
 | `report` is down | Orders and payments are unaffected; its events wait; reports and invoices say "unavailable" until it is back |
 | `file` is down | Product photos can't be uploaded; the shop keeps selling (images already stored are served by nginx → file; a CDN in front hides this) |
+| Redis is down | The shop keeps working and reads PostgreSQL instead (a little slower); rate limits are not enforced until it is back. Nothing is lost: Redis holds only copies |
 | `api-db` is down | The api reports not ready and the shop is unavailable (it is the source of truth) |
 | A bad deploy of one service | The others keep running; each has its own health check and rollback by image tag |

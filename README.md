@@ -23,6 +23,10 @@ the api queues for them. Full picture: [`docs/architecture.md`](docs/architectur
 | `shared/` | Rules and contracts every service shares: money, phone numbers, delivery fees, event schemas | n/a (a library) | n/a |
 | `service-kit/` | Plumbing every service repeats: logger, metrics, request ids, migrations (a library) | n/a | n/a |
 
+The stack also has an optional **Redis** container, used by the api only: a 30-second cache of the public catalogue (categories, banners, the
+product list and search) and the rate-limit counters. It is a cache, not a store: nothing is saved to disk, and the shop keeps working
+(a little slower) if it stops. Set `REDIS_URL` to use it; leave it unset and the api behaves as if it did not exist.
+
 ```
 browser ─► web (nginx) ─┬─ /api/*            ─► api ──► api-db
                         ├─ /files/*          ─► file ─► file-db  + blobs
@@ -31,6 +35,7 @@ browser ─► web (nginx) ─┬─ /api/*            ─► api ──► api-
 api ──REST /internal──► file             store and delete images
 api ──events──────────► report           order snapshots  ─► report-db   (+ REST for PDFs and reports)
 api ──events──────────► notification     order placed, status changed, paid, alerts
+api ──────────────────► redis            30 s catalogue cache + shared rate limits (optional)
 notification ──REST──► api               chat messages that need shop data; order buttons
 
 Prometheus ─► every service's /metrics        Alloy ─► Loki (logs of every container)       Grafana shows both
