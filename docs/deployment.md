@@ -92,9 +92,20 @@ cp .env.production.example .env.production
 openssl rand -base64 36        # run once per secret / password
 ```
 
-Fill in `.env.production`: `PUBLIC_ORIGIN`, `IMAGE_REPO`, the four database passwords, the four service secrets, the
+Fill in `.env.production`: `PUBLIC_ORIGIN`, `IMAGE_REPO`, the four database passwords, `REDIS_PASSWORD` (see "Redis" below), the four service secrets, the
 Telegram bot token, username, webhook secret, `TELEGRAM_WEBAPP_KEY` (see "Telegram login" below) and your chat id, `GRAFANA_ADMIN_PASSWORD`, the Cloudflare Tunnel settings,
 and (optionally) the Bakong account and token and the R2 settings. The services refuse to start with short or placeholder secrets.
+
+### Redis
+
+The api uses a Redis container for two things: a 30-second cache of the public catalogue (categories, banners, the
+product list and search) and the rate-limit counters, which then hold across several api copies. It is only a cache:
+nothing is saved to disk, the oldest entries are evicted at `REDIS_MAXMEMORY` (default `64mb`; a 1 GB server may use
+`32mb`), and the shop keeps working, just a little slower, if Redis stops. Set `REDIS_PASSWORD` to letters and digits
+only (`openssl rand -hex 24`), because it is put in the api's `REDIS_URL`. Redis has no published port.
+
+Adding it to a stack that is already running: add the two variables to `.env.production`, then
+`docker compose -f docker-compose.prod.yml --env-file .env.production up -d redis api`.
 
 ## 4. First start
 

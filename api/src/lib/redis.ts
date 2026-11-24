@@ -31,3 +31,21 @@ export function createRedis(url: string, logger: Logger): Redis {
   });
   return redis;
 }
+
+/**
+ * Waits until the client is connected, or gives up after `timeoutMs`. Used once at start-up: the rate limiters load a
+ * script into Redis when they are built, which fails (noisily) if the connection is not up yet.
+ */
+export function waitUntilReady(redis: Redis, timeoutMs: number): Promise<boolean> {
+  if (redis.status === 'ready') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onReady = () => done(true);
+    const timer = setTimeout(() => done(false), timeoutMs);
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      redis.off('ready', onReady);
+      resolve(ok);
+    };
+    redis.once('ready', onReady);
+  });
+}

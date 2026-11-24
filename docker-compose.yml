@@ -43,6 +43,14 @@ services:
     volumes: [notification-db-data:/var/lib/postgresql/data]
     healthcheck: { test: ['CMD-SHELL', 'pg_isready -U cambo -d cambo_notifications'], interval: 5s, retries: 10 }
 
+  # A cache only: nothing is saved to disk, old entries are evicted at the memory limit, and the api works
+  # without it. Not published on a port; only the api (and the rate limiter) use it.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--maxmemory', '${REDIS_MAXMEMORY:-64mb}', '--maxmemory-policy', 'allkeys-lru', '--save', '', '--appendonly', 'no']
+    healthcheck: { test: ['CMD', 'redis-cli', 'ping'], interval: 5s, retries: 10 }
+
   # --- services ---------------------------------------------------------------
   file:
     build: { context: ., dockerfile: docker/file.Dockerfile }
@@ -98,6 +106,8 @@ services:
       API_INTERNAL_SECRET: local-compose-api-internal-secret-3c8f20a9d6
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       ADMIN_SESSION_TTL_DAYS: ${ADMIN_SESSION_TTL_DAYS:-1}
+      # Optional: the catalogue cache and the shared rate limits. Remove this line and the api runs without Redis.
+      REDIS_URL: redis://redis:6379
       # The containers run in production mode, where the api needs a 64-hex key to start. This default is a placeholder for
       # the local stack only (it is public, so Mini App signatures are not really checked here). For real Mini App tests,
       # set TELEGRAM_WEBAPP_KEY (see api/.env.example). Never use this value in production.
@@ -107,6 +117,7 @@ services:
       file: { condition: service_started }
       report: { condition: service_started }
       notification: { condition: service_started }
+      redis: { condition: service_started } # a cache: the api starts and works even if Redis is slow or down
 
   web:
     build:
