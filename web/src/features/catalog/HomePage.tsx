@@ -7,8 +7,8 @@ import { EmptyState, ErrorState } from '../../shared/ui/Page';
 import { useDocumentTitle } from '../../shared/lib/useDocumentTitle';
 import { useAddToCart } from '../cart/useAddToCart';
 import { useBanners, useCategories, useProducts } from './api';
-import { BannerCarousel } from './BannerCarousel';
-import { FilterBar, type SortKey } from './FilterBar';
+import { BannerCarousel, BannerSkeleton } from './BannerCarousel';
+import { FilterBar, FilterBarSkeleton, type SortKey } from './FilterBar';
 import { cleanDollars } from './PriceFilter';
 import { ProductCard, ProductCardSkeleton } from './ProductCard';
 import { ProductGrid } from './ProductGrid';
@@ -86,9 +86,10 @@ export default function Home() {
         )}
       </label>
 
-      {!q && !category && banners.data && <BannerCarousel banners={banners.data} />}
+      {!q && !category && (banners.isPending ? <BannerSkeleton /> : banners.data && <BannerCarousel banners={banners.data} />)}
 
       <div>
+        {categories.isPending && <FilterBarSkeleton />}
         {categories.data && (
           <FilterBar
             categories={categories.data}

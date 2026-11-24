@@ -49,7 +49,7 @@ export default function PayPage() {
         <ErrorState message={(payment.error as Error).message} onRetry={() => payment.refetch()} />
       </div>
     );
-  if (!p) return <LoadingState />;
+  if (!p) return <LoadingState shape="pay" />;
 
   if (p.status === 'EXPIRED' || p.status === 'FAILED') {
     return (

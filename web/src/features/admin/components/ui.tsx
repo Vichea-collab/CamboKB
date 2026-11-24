@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EmptyState, LoadingState } from '../../../shared/ui/Page';
+import type { SkeletonShape } from '../../../shared/ui/Skeleton';
 export { formatDateTime as fmtDate } from '../../../shared/lib/format';
 
 export { PageHeader } from '../../../shared/ui/Page';
@@ -9,8 +10,9 @@ export function Empty({ children }: { children: ReactNode }) {
   return <EmptyState title={children} />;
 }
 
-export function Loading() {
-  return <LoadingState />;
+/** Admin shorthand: what shows while something loads. */
+export function Loading({ shape }: { shape: SkeletonShape }) {
+  return <LoadingState shape={shape} />;
 }
 
 /** `compact` tables are narrow enough for a phone (few short columns); others scroll sideways inside their box. */

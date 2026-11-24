@@ -22,7 +22,7 @@ export default function OrdersPage() {
       {orders.isError ? (
         <ErrorState onRetry={() => orders.refetch()} />
       ) : !orders.data ? (
-        <LoadingState />
+        <LoadingState shape="list" />
       ) : orders.data.items.length === 0 ? (
         <EmptyState
           icon={Receipt}

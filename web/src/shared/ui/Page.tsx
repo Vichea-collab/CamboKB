@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { t } from '../lib/strings';
 
+export { LoadingState } from './Skeleton';
+
 /**
  * The building blocks every page uses, in the shop and in the admin, so they look and behave
  * the same: one title style, one back link, one way to show "loading", "nothing here" and "failed".
@@ -87,18 +89,6 @@ export function Spinner({ className = 'size-6' }: { className?: string }) {
       className={`inline-block animate-spin rounded-full border-[3px] border-raised border-t-yellow motion-reduce:animate-none ${className}`}
       aria-hidden
     />
-  );
-}
-
-export function LoadingState({ label = t.common.loading }: { label?: string }) {
-  return (
-    <div
-      className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-muted"
-      role="status"
-    >
-      <Spinner />
-      {label}
-    </div>
   );
 }
 

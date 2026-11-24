@@ -53,7 +53,7 @@ export default function Dashboard() {
     retry: false,
     staleTime: 60_000,
   });
-  if (!stats.data) return <Loading />;
+  if (!stats.data) return <Loading shape="dashboard" />;
   const s = stats.data;
   const attention = s.pendingCount > 0 || s.khqrWaitingCount > 0 || s.lowStock.length > 0 || (s.refundsDue?.length ?? 0) > 0;
 

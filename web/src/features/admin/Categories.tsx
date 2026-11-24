@@ -37,7 +37,7 @@ export default function Categories() {
     onSettled: done,
   });
 
-  if (!cats.data) return <Loading />;
+  if (!cats.data) return <Loading shape="tablePage" />;
   const move = (i: number, d: -1 | 1) => {
     const ids = cats.data.map((c) => c.id);
     const [id] = ids.splice(i, 1);

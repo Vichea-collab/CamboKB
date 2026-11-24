@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Banner } from '../../shared/lib/types';
 import { t } from '../../shared/lib/strings';
+import { Bone } from '../../shared/ui/Skeleton';
 
 /** Auto-advancing banners (5 s), swipeable, pauses on hover/focus and for reduced motion. */
 export function BannerCarousel({ banners }: { banners: Banner[] }) {
@@ -94,4 +95,9 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
       )}
     </section>
   );
+}
+
+/** Stands in the banner's place (about 2:1, like the banners) so the products below do not move when it arrives. */
+export function BannerSkeleton() {
+  return <Bone className="aspect-[1.9] w-full rounded-2xl" />;
 }

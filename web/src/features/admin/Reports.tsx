@@ -196,7 +196,7 @@ export default function Reports() {
       {summary.error ? (
         <ErrorState message={(summary.error as Error).message} onRetry={() => summary.refetch()} />
       ) : !data ? (
-        <Loading />
+        <Loading shape="tiles" />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

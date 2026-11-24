@@ -10,7 +10,7 @@ export default function Delivery() {
   return (
     <InfoPage title={t.info.delivery.title} intro={t.info.delivery.intro}>
       {!d ? (
-        <LoadingState />
+        <LoadingState shape="rows" />
       ) : (
         <>
           <Section title={t.info.delivery.phnomPenh}>

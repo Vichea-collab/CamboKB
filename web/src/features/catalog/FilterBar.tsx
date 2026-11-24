@@ -5,6 +5,7 @@ import { Select } from '../../shared/ui/Select';
 import type { Category } from '../../shared/lib/types';
 import { categoryName, t } from '../../shared/lib/strings';
 import { PriceFilter } from './PriceFilter';
+import { Bone } from '../../shared/ui/Skeleton';
 
 export type SortKey = 'featured' | 'price-asc' | 'price-desc';
 
@@ -107,6 +108,17 @@ export function FilterBar({
           })}
         </div>
       </Drawer>
+    </div>
+  );
+}
+
+/** The category buttons' place, while the categories load. */
+export function FilterBarSkeleton() {
+  return (
+    <div className="-mx-4 flex gap-2 overflow-hidden border-b border-line/60 px-4 py-2.5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" aria-hidden>
+      {['w-14', 'w-28', 'w-20', 'w-28', 'w-32'].map((w, i) => (
+        <Bone key={i} className={`h-11 shrink-0 rounded-full ${w}`} />
+      ))}
     </div>
   );
 }

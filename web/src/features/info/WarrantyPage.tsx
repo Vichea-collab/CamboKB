@@ -9,7 +9,7 @@ export default function Warranty() {
   return (
     <InfoPage title={t.info.warranty.title} intro={t.info.warranty.intro}>
       {store.isPending ? (
-        <LoadingState />
+        <LoadingState shape="text" />
       ) : custom ? (
         <div className="space-y-4">
           {custom.split(/\n{2,}/).map((p, i) => (

@@ -31,7 +31,7 @@ export function SaveBar({
   message?: string;
 }) {
   return (
-    <div className="no-print fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur lg:sticky lg:bottom-0 lg:mt-6 lg:rounded-2xl lg:border lg:px-5">
+    <div className="no-print fixed inset-x-0 bottom-[calc(3.5rem+var(--bar-safe))] z-20 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur lg:sticky lg:bottom-0 lg:mt-6 lg:rounded-2xl lg:border lg:px-5">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3">
         <p className={`text-sm font-semibold ${dirty ? 'text-yellow' : 'text-muted'}`} aria-live="polite">
           {message ?? (dirty ? 'You have unsaved changes' : 'All changes saved')}

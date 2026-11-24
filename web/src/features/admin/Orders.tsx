@@ -173,7 +173,7 @@ export default function Orders() {
       </div>
 
       {!orders.data ? (
-        <Loading />
+        <Loading shape="table" />
       ) : orders.data.items.length === 0 ? (
         <EmptyState icon={Receipt} title="No orders match these filters">
           Try another status or payment, or clear the search and dates.

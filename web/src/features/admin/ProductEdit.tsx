@@ -163,7 +163,7 @@ export default function ProductEdit() {
     onError: (err) => showToast((err as Error).message),
   });
 
-  if (!isNew && !product.data) return <Loading />;
+  if (!isNew && !product.data) return <Loading shape="form" />;
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     save.mutate();

@@ -31,7 +31,7 @@ export default function ProfilePage() {
   const me = useMe();
 
   if (profile.isError) return <ErrorState onRetry={() => profile.refetch()} />;
-  if (!profile.data) return <LoadingState />;
+  if (!profile.data) return <LoadingState shape="profile" />;
   return (
     <div>
       <PageHeader title={t.account.profile} back={{ to: '/', label: t.product.backToShop }} />

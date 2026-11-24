@@ -7,6 +7,7 @@ import { SaveBar, useUnsavedGuard } from './components/SaveBar';
 import { TelegramStatus } from './components/TelegramStatus';
 import { Plus, Trash2 } from 'lucide-react';
 import { Section } from '../../shared/ui/Page';
+import { Bone } from '../../shared/ui/Skeleton';
 import { dollars, Loading, PageHeader, toCents, Toggle } from './components/ui';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
@@ -59,7 +60,7 @@ export default function SettingsPage() {
     },
   });
 
-  if (!s) return <Loading />;
+  if (!s) return <Loading shape="form" />;
   const d = s.delivery;
   const setD = (patch: Partial<Settings['delivery']>) =>
     edit({ ...s, delivery: { ...d, ...patch } });
@@ -255,7 +256,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="label">Store location (distances are measured from here)</p>
-              <Suspense fallback={<div className="h-56 animate-pulse rounded-xl bg-raised/50" />}>
+              <Suspense fallback={<Bone className="h-56 w-full rounded-xl" />}>
                 <MapPicker
                   value={d.store}
                   fallback={d.store}

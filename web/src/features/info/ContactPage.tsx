@@ -53,7 +53,7 @@ export default function Contact() {
   return (
     <InfoPage title={t.info.contact.title} intro={t.info.contact.intro}>
       {store.isPending ? (
-        <LoadingState />
+        <LoadingState shape="rows" />
       ) : rows.length === 0 ? (
         <EmptyState title={t.info.contact.soon}>{t.info.contact.soonBody}</EmptyState>
       ) : (

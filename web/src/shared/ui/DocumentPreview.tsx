@@ -134,7 +134,7 @@ export function DocumentPreview({
       {page.isError ? (
         <ErrorState message={(page.error as Error).message} onRetry={() => page.refetch()} />
       ) : !page.data ? (
-        <LoadingState />
+        <LoadingState shape="sheet" />
       ) : (
         <div ref={fitRef} className="w-full">
           {/* Pinch with two fingers to zoom the sheet, then pan sideways; swiping up and down still scrolls the page.

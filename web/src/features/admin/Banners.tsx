@@ -46,7 +46,7 @@ export default function Banners() {
     onSettled: done,
   });
 
-  if (!banners.data) return <Loading />;
+  if (!banners.data) return <Loading shape="form" />;
   const move = (i: number, d: -1 | 1) => {
     const ids = banners.data.map((b) => b.id);
     const [id] = ids.splice(i, 1);

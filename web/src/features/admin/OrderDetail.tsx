@@ -48,7 +48,7 @@ export default function OrderDetail() {
     onSuccess: onDone,
   });
 
-  if (!order.data) return <Loading />;
+  if (!order.data) return <Loading shape="order" />;
   const o = order.data;
   const closed = o.status === 'DELIVERED' || o.status === 'CANCELLED';
   return (

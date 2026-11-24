@@ -125,7 +125,7 @@ export default function Products() {
       </div>
 
       {!products.data ? (
-        <Loading />
+        <Loading shape="table" />
       ) : items.length === 0 ? (
         <EmptyState
           icon={Package}

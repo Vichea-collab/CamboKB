@@ -23,7 +23,7 @@ export default function OrderDetailPage() {
         <ErrorState message={(order.error as Error).message} onRetry={() => order.refetch()} />
       </div>
     );
-  if (!order.data) return <LoadingState />;
+  if (!order.data) return <LoadingState shape="order" />;
   const o = order.data;
   const awaitingPayment =
     o.payment?.method === 'KHQR' && o.payment.status === 'PENDING' && o.status === 'PENDING';

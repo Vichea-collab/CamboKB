@@ -28,6 +28,7 @@ import { useCart } from '../cart/cart-store';
 import { ShopPerks } from '../info/ShopPerks';
 import { useStore } from '../info/store-api';
 import { Select } from '../../shared/ui/Select';
+import { Bone } from '../../shared/ui/Skeleton';
 
 const MapPicker = lazy(() => import('../../shared/ui/MapPicker'));
 
@@ -330,7 +331,7 @@ export default function Checkout() {
                   </p>
                 )}
                 <Suspense
-                  fallback={<div className="h-56 animate-pulse rounded-xl bg-raised/50 sm:h-64" />}
+                  fallback={<Bone className="h-56 w-full rounded-xl sm:h-64" />}
                 >
                   <MapPicker
                     value={pin}
@@ -485,7 +486,7 @@ export default function Checkout() {
                     ? (quote.error as Error).message
                     : undefined)}
               </FormError>
-              <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0">
+              <div className="bottom-bar [--bar-pad:0.75rem] fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:static lg:after:hidden lg:border-0 lg:bg-transparent lg:p-0">
                 <button type="submit" className="btn-primary w-full" disabled={!canSubmit}>
                   {placing ? t.checkout.placing : t.checkout.confirm}
                 </button>

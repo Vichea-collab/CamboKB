@@ -4,6 +4,7 @@ import { categoryName, t } from '../../shared/lib/strings';
 import type { ProductCardData } from '../../shared/lib/types';
 import { Price } from '../../shared/ui/Price';
 import { QtyStepper } from '../../shared/ui/QtyStepper';
+import { Bone } from '../../shared/ui/Skeleton';
 import { useCart } from '../cart/cart-store';
 import { WishlistButton } from '../wishlist/WishlistButton';
 
@@ -89,14 +90,14 @@ export function ProductCard({
 export function ProductCardSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line" aria-hidden>
-      <div className="aspect-square animate-pulse bg-raised/60 motion-reduce:animate-none" />
+      <Bone className="aspect-square rounded-none" />
       <div className="space-y-2 p-3">
-        <div className="h-3 w-1/3 animate-pulse rounded bg-raised/70" />
-        <div className="h-4 w-4/5 animate-pulse rounded bg-raised" />
-        <div className="h-3 w-3/5 animate-pulse rounded bg-raised/70" />
+        <Bone className="h-3 w-1/3" />
+        <Bone className="h-4 w-4/5" />
+        <Bone className="h-3 w-3/5" />
         <div className="flex items-center justify-between pt-2">
-          <div className="h-6 w-14 animate-pulse rounded bg-raised" />
-          <div className="h-10 w-20 animate-pulse rounded-xl bg-raised/60" />
+          <Bone className="h-6 w-14" />
+          <Bone className="h-10 w-20 rounded-xl" />
         </div>
       </div>
     </div>

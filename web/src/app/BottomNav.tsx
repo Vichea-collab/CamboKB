@@ -25,7 +25,7 @@ function Glyph({ icon: Icon, active }: { icon: LucideIcon; active: boolean }) {
   );
 }
 
-const Label = ({ children }: { children: ReactNode }) => <span className="max-w-full truncate px-0.5 leading-none">{children}</span>;
+const Label = ({ children }: { children: ReactNode }) => <span className="max-w-full truncate px-0.5 leading-[1.3]">{children}</span>;
 
 function Tab({ to, end, icon, label }: { to: string; end?: boolean; icon: LucideIcon; label: string }) {
   return (
@@ -53,7 +53,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label={t.nav.main}
-      className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="no-print bottom-bar fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 backdrop-blur md:hidden"
     >
       <Tab to="/" end icon={Home} label={t.nav.home} />
       <Tab to="/contact" icon={Headset} label={t.nav.contact} />

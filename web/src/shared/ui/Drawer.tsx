@@ -84,7 +84,7 @@ export function Drawer({ open, onClose, title, children, footer, wide, sheet }: 
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
         {footer && (
-          <div className="border-t border-line px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="border-t border-line px-5 py-4 pb-[calc(1rem+var(--bar-safe))]">
             {footer}
           </div>
         )}

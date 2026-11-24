@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { api } from '../../shared/lib/api';
-import { t } from '../../shared/lib/strings';
 import { telegramInitData } from '../../shared/lib/telegram';
+import { LoadingState } from '../../shared/ui/Skeleton';
 
 export const ME_KEY = ['me'] as const;
 
@@ -69,22 +69,21 @@ export function useLogout() {
   });
 }
 
-function FullPageLoading() {
-  return <div className="grid min-h-[50dvh] place-items-center text-muted">{t.common.loading}</div>;
-}
+/** `loading` is the skeleton of the page behind the guard. */
+type GuardProps = { children: ReactNode; loading?: ReactNode };
 
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({ children, loading = <LoadingState /> }: GuardProps) {
   const me = useMe();
   const location = useLocation();
-  if (me.isPending) return <FullPageLoading />;
+  if (me.isPending) return <>{loading}</>;
   if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   return <>{children}</>;
 }
 
-export function RequireAdmin({ children }: { children: ReactNode }) {
+export function RequireAdmin({ children, loading = <LoadingState /> }: GuardProps) {
   const me = useMe();
   const location = useLocation();
-  if (me.isPending) return <FullPageLoading />;
+  if (me.isPending) return <>{loading}</>;
   if (!me.data) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   if (me.data.role !== 'ADMIN') return <Navigate to="/" replace />;
   return <>{children}</>;

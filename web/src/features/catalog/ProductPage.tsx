@@ -26,7 +26,7 @@ export default function ProductDetail() {
   useDocumentTitle(product.data?.name);
   const related = useProducts({ category: product.data?.category.slug });
 
-  if (product.isPending) return <LoadingState />;
+  if (product.isPending) return <LoadingState shape="product" />;
   if (product.isError) {
     return (
       <div className="mx-auto max-w-md py-6">
@@ -94,7 +94,7 @@ export default function ProductDetail() {
             <WishlistButton product={p} variant="page" className="sm:ml-auto" />
           </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <div className="bottom-bar [--bar-pad:0.75rem] [--bar-under:var(--color-bg)] fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur md:static md:after:hidden md:mt-6 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
             {!p.isSoldOut && (
               <QtyStepper
                 value={qty}

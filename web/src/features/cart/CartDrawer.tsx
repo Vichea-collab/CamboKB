@@ -50,7 +50,7 @@ function CartContents({ onClose }: { onClose: () => void }) {
       }
     >
       {isLoading ? (
-        <LoadingState />
+        <LoadingState shape="cart" />
       ) : lines.length === 0 ? (
         <EmptyState
           icon={ShoppingBag}

@@ -18,6 +18,7 @@ import { Link, NavLink, useLocation } from 'react-router';
 import { api } from '../../shared/lib/api';
 import { Drawer } from '../../shared/ui/Drawer';
 import { Toast } from '../../shared/ui/Toast';
+import { brandParts } from '../../shared/ui/Wordmark';
 import { useMe } from '../auth/auth';
 import { useAdminLive } from './useAdminLive';
 
@@ -149,7 +150,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Phone tab bar */}
       <nav
-        className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="no-print bottom-bar fixed inset-x-0 bottom-0 z-30 grid grid-cols-[repeat(5,minmax(0,1fr))] border-t border-line bg-surface/95 backdrop-blur lg:hidden"
         aria-label="Admin"
       >
         {TABS.map((i) => (
@@ -169,7 +170,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                     </span>
                   )}
                 </span>
-                <span className="max-w-full truncate px-0.5 leading-none">{i.label}</span>
+                <span className="max-w-full truncate px-0.5 leading-[1.3]">{i.label}</span>
               </>
             )}
           </NavLink>
@@ -178,7 +179,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <span className={pill()}>
             <Ellipsis className="size-6" strokeWidth={moreActive ? 2.4 : 1.9} aria-hidden />
           </span>
-          <span className="max-w-full truncate px-0.5 leading-none">More</span>
+          <span className="max-w-full truncate px-0.5 leading-[1.3]">More</span>
         </button>
       </nav>
 
@@ -193,12 +194,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 }
 
 function Brand() {
+  const { first, last } = brandParts();
   return (
     <Link to="/admin" className="flex items-center gap-2.5 px-1">
       <img src="/logo.png" alt="" className="size-9 rounded-xl border border-line" />
-      <span className="font-display text-lg font-extrabold leading-none tracking-[-0.02em]">
-        Cambo<span className="text-yellow">Supply</span>
-        <span className="mt-0.5 block text-xs font-semibold tracking-normal text-muted">Admin</span>
+      <span className="font-display text-base font-extrabold leading-[1.12] tracking-[-0.02em]">
+        <span className="block">{first} </span>
+        <span className="text-yellow">{last}</span>{' '}
+        <span className="text-xs font-semibold tracking-normal text-muted">Admin</span>
       </span>
     </Link>
   );

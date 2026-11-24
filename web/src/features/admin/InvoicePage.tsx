@@ -8,6 +8,6 @@ import type { AdminOrder } from './types';
 export default function AdminInvoicePage() {
   const { id = '' } = useParams();
   const order = useQuery({ queryKey: ['admin', 'order', id], queryFn: () => api<AdminOrder>(`/admin/orders/${id}`) });
-  if (!order.data) return <LoadingState />;
+  if (!order.data) return <LoadingState shape="sheetPage" />;
   return <InvoiceView number={order.data.number} htmlPath={`/admin/orders/${id}/invoice.html`} pdfPath={`/admin/orders/${id}/invoice.pdf`} back={{ to: `/admin/orders/${id}`, label: order.data.number }} />;
 }

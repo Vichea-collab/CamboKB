@@ -43,6 +43,11 @@ describe('shop bottom navigation (phones)', () => {
     expect(await screen.findByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
   });
 
+  it('keeps clear of the iPhone browser’s floating buttons', () => {
+    show('/');
+    expect(screen.getByRole('navigation', { name: 'Main' })).toHaveClass('bottom-bar');
+  });
+
   it('marks Contact as the current page on the contact page', () => {
     show('/contact');
     expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute('aria-current', 'page');

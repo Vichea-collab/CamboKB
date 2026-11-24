@@ -59,7 +59,7 @@ export default function CustomerDetail() {
       showToast('Telegram unlinked');
     },
   });
-  if (!c.data) return <Loading />;
+  if (!c.data) return <Loading shape="profile" />;
   const u = c.data;
   const linked = u.telegramLinked ?? !!u.telegramUsername;
   return (

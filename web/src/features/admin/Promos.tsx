@@ -190,7 +190,7 @@ export default function Promos() {
         </div>
       </form>
       {!promos.data ? (
-        <Loading />
+        <Loading shape="table" />
       ) : promos.data.length === 0 ? (
         <EmptyState icon={Ticket} title="No promo codes yet">
           Create one above. Customers type it at checkout.

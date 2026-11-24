@@ -285,7 +285,7 @@ export function Lightbox({
       </div>
 
       {many && (
-        <div className="flex justify-center gap-2 overflow-x-auto px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 [scrollbar-width:none] [@media(max-height:480px)]:hidden">
+        <div className="flex justify-center gap-2 overflow-x-auto px-3 pb-[calc(0.75rem+var(--bar-safe))] pt-2 [scrollbar-width:none] [@media(max-height:480px)]:hidden">
           {photos.map((p, i) => (
             <button
               key={p.id}

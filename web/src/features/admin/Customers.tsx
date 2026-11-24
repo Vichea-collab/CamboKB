@@ -61,7 +61,7 @@ export default function Customers() {
         />
       </form>
       {!list.data ? (
-        <Loading />
+        <Loading shape="table" />
       ) : list.data.items.length === 0 ? (
         <EmptyState
           icon={Users}
