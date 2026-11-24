@@ -1,19 +1,14 @@
 name: Deploy
 
-# Runs by itself after CI passes on a push to main: it deploys exactly the commit CI just tested, using that
-# commit's image tag (sha-1a2b3c4). It does nothing until the repository variable DEPLOY_PATH is set, so a repo
-# without a server never sees a failed deploy. To hold deploys for your approval, add "Required reviewers" to
-# the `production` environment (Settings -> Environments).
-# It can also be started by hand (Actions -> Deploy -> Run workflow) for any tag, e.g. to roll back.
+# Runs by itself after CI passes on a push to main: the server updates itself to exactly the commit CI just tested,
+# checks the shop, and goes back to the previous version if a check fails (scripts/server-deploy.sh does the work on the
+# server). It does nothing until the repository variable DEPLOY_ENABLED is `true`. Start it by hand (Actions -> Deploy
+# -> Run workflow) to deploy or go back to any commit of main.
 #
-# What it needs, once:
-#   - a server with Docker + the Compose plugin, and a folder (DEPLOY_PATH) containing a filled-in
-#     `.env.production` (see .env.production.example). Secrets stay on the server, never in GitHub.
-#   - repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key; add its public key on the server)
-#   - repository variables: DEPLOY_PATH (e.g. /opt/cambo-supply), PUBLIC_HOST (e.g. shop.example.com),
-#     and optionally COMPOSE_PROFILES (`tunnel` when Cloudflare reaches the shop through a Tunnel)
-#   - the images published by CI (push to main or a v* tag), readable from the server (public package,
-#     or `docker login ghcr.io` once on the server with a read:packages token).
+# What it needs, once (docs/deployment.md, "Automatic deploys"):
+#   - repository variable  DEPLOY_ENABLED = true, PUBLIC_HOST = the shop's host name (for the notice)
+#   - repository secrets   DEPLOY_HOST (the server), DEPLOY_KNOWN_HOSTS (its SSH identity), DEPLOY_SSH_KEY (a key
+#     that the server accepts for nothing but "deploy <commit>")
 
 on:
   workflow_run:
@@ -22,10 +17,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Image tag to run (latest, sha-1a2b3c4, 1.0.0)'
-        required: true
-        default: latest
+      commit:
+        description: 'Full commit id of main to run (40 characters). Empty: the newest commit of main'
+        required: false
+        default: ''
 
 concurrency:
   group: deploy-production
@@ -38,67 +33,37 @@ jobs:
       ${{ github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      vars.DEPLOY_PATH != '') }}
+      vars.DEPLOY_ENABLED == 'true') }}
     runs-on: ubuntu-latest
     environment: production
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
-    permissions:
-      contents: read
-    env:
-      HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-      PUBLIC_HOST: ${{ vars.PUBLIC_HOST }}
-      # e.g. `tunnel` to also run the Cloudflare Tunnel container
-      PROFILES: ${{ vars.COMPOSE_PROFILES }}
+    # Nothing of this repository is needed here: the server fetches the commit itself.
+    permissions: {}
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # The compose file and monitoring config of the commit being deployed, not whatever main is now.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - name: Work out the image tag
+      - name: Which commit
         id: tag
-        # By hand: the tag typed in. After CI: the image CI built for that exact commit (sha- + 7 characters).
         env:
-          TYPED: ${{ inputs.tag }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          TYPED: ${{ inputs.commit }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          tag="${TYPED:-sha-${SHA:0:7}}"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "TAG=$tag" >> "$GITHUB_ENV"
-      - name: Check the inputs
-        run: |
-          case "$TAG" in *[!A-Za-z0-9._-]*|'') echo "Bad tag"; exit 1;; esac
-          case "$PROFILES" in *[!A-Za-z0-9,_-]*) echo "Bad COMPOSE_PROFILES"; exit 1;; esac
-          for v in HOST DEPLOY_USER DEPLOY_PATH PUBLIC_HOST; do
-            [ -n "${!v}" ] || { echo "Missing $v: see the comments at the top of this workflow"; exit 1; }
-          done
-      - name: SSH setup
+          sha="${TYPED:-$SHA}"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Not a full commit id"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${sha:0:7}" >> "$GITHUB_OUTPUT"
+      - name: Ask the server to update itself
         env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          COMMIT: ${{ steps.tag.outputs.sha }}
         run: |
+          [ -n "$HOST" ] && [ -n "$KNOWN_HOSTS" ] && [ -n "$KEY" ] || { echo "Missing a secret: see the top of this workflow"; exit 1; }
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
-      - name: Upload the Compose file and the monitoring configuration
-        run: |
-          rsync -az --delete docker-compose.prod.yml observability "$DEPLOY_USER@$HOST:$DEPLOY_PATH/"
-      - name: Pull the images and restart
-        run: |
-          ssh "$DEPLOY_USER@$HOST" "cd '$DEPLOY_PATH' \
-            && export IMAGE_TAG='$TAG' COMPOSE_PROFILES='$PROFILES' \
-            && docker compose -f docker-compose.prod.yml --env-file .env.production pull \
-            && docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans \
-            && docker image prune -f"
-      - name: Check the site answers
-        run: |
-          for i in $(seq 1 30); do
-            curl -fsS "https://$PUBLIC_HOST/healthz" && curl -fsS "https://$PUBLIC_HOST/api/v1/products?pageSize=1" >/dev/null && exit 0
-            sleep 5
-          done
-          echo "The site did not come up in time"; exit 1
+          (umask 077; printf '%s\n' "$KEY" > ~/.ssh/deploy; printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts)
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=30 -o ServerAliveInterval=20 "deploy@$HOST" "deploy $COMMIT"
 
   notify:
     name: Telegram notice

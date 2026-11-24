@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Back up all four databases (api, file, report, notification) into backups/<timestamp>/*.sql.gz and delete
+# Back up all four databases (api, file, report, notification) and the photos into backups/<timestamp>/ and delete
 # backups older than KEEP_DAYS (default 14). Run it on the server, from cron, e.g. every night at 03:00:
 #
 #   0 3 * * *  cd /opt/cambo-supply && scripts/backup.sh >> backups/backup.log 2>&1
@@ -40,6 +40,13 @@ for pair in $PAIRS; do
   gzip -t "$OUT/$name.sql.gz"
   [ "$(gunzip -c "$OUT/$name.sql.gz" | wc -c)" -gt 200 ] || { echo "backup of $name looks empty"; exit 1; }
 done
+# The product photos, when they are kept on this server (with S3 or R2 the bucket holds them).
+if [ "$(grep -E '^STORAGE_DRIVER=' .env.production 2>/dev/null | cut -d= -f2-)" != s3 ]; then
+  echo "backing up the photos"
+  # shellcheck disable=SC2086
+  $COMPOSE_CMD exec -T file tar -C /data/uploads -cf - . < /dev/null | gzip > "$OUT/uploads.tar.gz"
+  gzip -t "$OUT/uploads.tar.gz"
+fi
 echo "backup written to $OUT"
 
 if [ -n "${BACKUP_UPLOAD_CMD:-}" ]; then

@@ -18,7 +18,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && npm run test:scripts",
-    "test:scripts": "node --test scripts/pipeline-notify.test.mjs",
+    "test:scripts": "node --test scripts/pipeline-notify.test.mjs scripts/server-deploy.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",

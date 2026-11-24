@@ -208,10 +208,14 @@ with the new Telegram account. Admin sessions last `ADMIN_SESSION_TTL_DAYS` days
 ## 5. Later deploys
 
 - By hand: `IMAGE_TAG=sha-1a2b3c4 docker compose -f docker-compose.prod.yml --env-file .env.production pull && … up -d`.
-- From GitHub: set the repository secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` and variables `DEPLOY_PATH`,
-  `PUBLIC_HOST`, create an environment named `production` (add required reviewers if you want an approval step), then
-  Actions → Deploy → Run workflow with the tag to run.
-- Roll back by deploying the previous tag.
+- **Automatic deploys.** With the repository variable `DEPLOY_ENABLED` = `true`, every push to `main` that passes CI goes
+  live: `deploy.yml` asks the server to update itself to that commit. `scripts/server-deploy.sh` (installed there as
+  `/usr/local/bin/cambo-deploy`) makes sure the commit is part of `main`, pulls its images, backs up, switches, checks the
+  home page, products, a photo, every service, Telegram's route and the public address, and goes back by itself if a
+  check fails. GitHub's key can do nothing else on the server: in `~deploy/.ssh/authorized_keys` it is
+  `restrict,command="/usr/local/bin/cambo-deploy" ssh-ed25519 ...`. Secrets: `DEPLOY_HOST`, `DEPLOY_KNOWN_HOSTS`,
+  `DEPLOY_SSH_KEY`. Install a changed script by hand, as root. To pause: set `DEPLOY_ENABLED` to `false`.
+- Roll back: Actions → Deploy → Run workflow with an older commit of `main` (a database migration is not undone).
 
 ## 6. Backups
 
