@@ -1,3 +1,10 @@
+# A container that is restarted or updated may come back with another address. Left alone, nginx looks a name up once,
+# when it starts, and keeps calling the old address; "resolve" makes it ask Docker's own DNS again and again.
+resolver 127.0.0.11 valid=5s ipv6=off;
+upstream api_service          { zone api_service 64k;          server api:4000 resolve; }
+upstream file_service         { zone file_service 64k;         server file:4100 resolve; }
+upstream notification_service { zone notification_service 64k; server notification:4300 resolve; }
+
 # Link-preview bots and search crawlers don't run JavaScript. They get a plain
 # HTML page with the product's title, photo and price (served by the api).
 # People always get the app.
@@ -27,7 +34,7 @@ server {
   # Buffering would hold events back until a buffer fills, so it is off.
   location = /api/v1/admin/events {
     include /etc/nginx/conf.d/security-headers.inc;
-    proxy_pass http://api:4000;
+    proxy_pass http://api_service;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
     proxy_set_header Host $host;
@@ -43,7 +50,7 @@ server {
   # Telegram delivers bot messages here (webhook mode). The notification service checks the secret header.
   location = /telegram/webhook {
     limit_except POST { deny all; }
-    proxy_pass http://notification:4300/webhook;
+    proxy_pass http://notification_service/webhook;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Request-Id $request_id;
@@ -53,7 +60,7 @@ server {
   # API (the only service the browser calls for data).
   location /api/ {
     include /etc/nginx/conf.d/security-headers.inc;
-    proxy_pass http://api:4000;
+    proxy_pass http://api_service;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -64,14 +71,14 @@ server {
   # Search engines: sitemap and robots come from the api (they list the live catalogue).
   location ~ ^/(robots\.txt|sitemap\.xml)$ {
     include /etc/nginx/conf.d/security-headers.inc;
-    proxy_pass http://api:4000;
+    proxy_pass http://api_service;
     proxy_set_header Host $host;
   }
 
   # Product and banner images, and 1200x630 link-preview images.
   location /files/ {
     include /etc/nginx/conf.d/security-headers.inc;
-    proxy_pass http://file:4100;
+    proxy_pass http://file_service;
     proxy_set_header Host $host;
     add_header Cache-Control "public, max-age=31536000, immutable";
   }
@@ -96,7 +103,7 @@ server {
 
   location @crawler {
     rewrite ^/products/(.*)$ /seo/products/$1 break;
-    proxy_pass http://api:4000;
+    proxy_pass http://api_service;
     proxy_set_header Host $host;
   }
 

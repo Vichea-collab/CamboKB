@@ -1,0 +1,20 @@
+[
+  { "uid": "cambo-service-down", "title": "ServiceDown", "for": "2m", "severity": "critical", "op": "lt", "value": 1, "noData": "Alerting",
+    "expr": "up{job=~\"api|file|report|notification\"}", "summary": "{{ $labels.job }} is down, or the server sends nothing" },
+  { "uid": "cambo-high-error-rate", "title": "HighErrorRate", "for": "5m", "severity": "warning", "op": "gt", "value": 0.05,
+    "expr": "sum by (service) (rate(http_requests_total{status=~\"5..\"}[5m])) / sum by (service) (rate(http_requests_total[5m]))", "summary": "{{ $labels.service }}: more than 5% of requests fail" },
+  { "uid": "cambo-slow-requests", "title": "SlowRequests", "for": "10m", "severity": "warning", "op": "gt", "value": 1,
+    "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{service!=\"report\",route!~\".*/admin/events\"}[5m])))", "summary": "{{ $labels.service }}: 95% of requests take longer than 1 second" },
+  { "uid": "cambo-events-backlog", "title": "EventsBacklog", "for": "2m", "severity": "warning", "op": "gt", "value": 300,
+    "expr": "service_events_oldest_pending_age_seconds", "summary": "The api cannot deliver events to {{ $labels.target }}. Nothing is lost: it is retried until it works." },
+  { "uid": "cambo-events-given-up", "title": "EventsGivenUp", "for": "1m", "severity": "critical", "op": "gt", "value": 0,
+    "expr": "service_events_failed", "summary": "Events for {{ $labels.target }} were given up on. Fix the cause, then run: node dist/events.js retry-failed (in the api container)." },
+  { "uid": "cambo-telegram-backlog", "title": "TelegramBacklog", "for": "2m", "severity": "warning", "op": "gt", "value": 300,
+    "expr": "notification_outbox_oldest_pending_age_seconds", "summary": "Telegram messages have been waiting more than 5 minutes" },
+  { "uid": "cambo-telegram-failing", "title": "TelegramMessagesFailing", "for": "1m", "severity": "warning", "op": "gt", "value": 0,
+    "expr": "notification_outbox_failed", "summary": "Some Telegram messages were given up on (blocked users, bad chat id?)" },
+  { "uid": "cambo-server-memory", "title": "ServerMemoryHigh", "for": "5m", "severity": "warning", "op": "gt", "value": 0.9,
+    "expr": "1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes", "summary": "The server uses more than 90% of its memory" },
+  { "uid": "cambo-nginx-errors", "title": "NginxErrors", "for": "1m", "severity": "critical", "op": "gt", "value": 5, "source": "grafanacloud-logs",
+    "expr": "sum(count_over_time({service=\"web\"} |~ `\" 5[0-9][0-9] ` [5m]))", "summary": "Visitors are getting server errors from nginx (more than 5 in 5 minutes). A service may be unreachable from it." }
+]
