@@ -32,7 +32,6 @@ export const updateProfileSchema = z.object({
     .nullish(),
 });
 
-export type CartItemInput = z.infer<typeof cartItemSchema>;
 export type QuoteInput = z.infer<typeof quoteSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

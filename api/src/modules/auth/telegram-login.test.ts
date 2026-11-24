@@ -106,7 +106,7 @@ describe('Continue with Telegram (login by deep link)', () => {
       const { agent, requestId, token, res } = await startLogin(ctx);
 
       await sendStart(ctx, 777, token);
-      expect(lastText()).toContain('Log in to Cambo Supply as Dara Sok?');
+      expect(lastText()).toContain('Log in to Cambo Keyboard Supply as Dara Sok?');
       expect(lastText()).toContain('Chrome on Android');
       expect(lastText()).toContain(`Code: ${res.body.matchCode}`);
       expect(lastText()).toContain('Only tap if you are doing this right now');

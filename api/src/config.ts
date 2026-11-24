@@ -36,7 +36,6 @@ const envSchema = z
     PUBLIC_FILES_URL: z.url().optional(),
     REPORT_SERVICE_URL: z.url().default('http://localhost:4200'),
     REPORT_SERVICE_SECRET: z.string().default('dev-report-secret-change-me-0123456789'),
-    RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce
       .number()
       .int()
@@ -51,7 +50,7 @@ const envSchema = z
       .optional(),
     BAKONG_TOKEN: z.string().optional(),
     BAKONG_API_URL: z.url().default('https://api-bakong.nbc.gov.kh'),
-    BAKONG_MERCHANT_NAME: z.string().trim().min(1).max(25).default('Cambo Supply'),
+    BAKONG_MERCHANT_NAME: z.string().trim().min(1).max(25).default('Cambo Keyboard Supply'),
     BAKONG_MERCHANT_CITY: z.string().trim().min(1).max(15).default('Phnom Penh'),
     KHQR_QR_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
     KHQR_ORDER_HOLD_MINUTES: z.coerce
@@ -111,7 +110,7 @@ export type Config = {
     reportUrl: string;
     reportSecret: string;
   };
-  rateLimit: { loginMax: number; windowMs: number };
+  rateLimit: { windowMs: number };
   serveWeb?: string;
   bakong: {
     enabled: boolean;
@@ -163,7 +162,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       reportUrl: e.REPORT_SERVICE_URL.replace(/\/$/, ''),
       reportSecret: e.REPORT_SERVICE_SECRET,
     },
-    rateLimit: { loginMax: e.RATE_LIMIT_LOGIN_MAX, windowMs: e.RATE_LIMIT_WINDOW_MS },
+    rateLimit: { windowMs: e.RATE_LIMIT_WINDOW_MS },
     serveWeb: e.SERVE_WEB_DIR,
     bakong: {
       enabled: Boolean(e.BAKONG_ACCOUNT_ID && e.BAKONG_TOKEN),

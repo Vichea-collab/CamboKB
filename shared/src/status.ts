@@ -10,7 +10,3 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   const j = FLOW.indexOf(to);
   return i !== -1 && j !== -1 && j > i;
 }
-
-export function nextStatuses(from: OrderStatus): OrderStatus[] {
-  return ORDER_STATUSES.filter((to) => canTransition(from, to));
-}

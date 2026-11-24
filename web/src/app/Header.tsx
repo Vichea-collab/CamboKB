@@ -14,6 +14,10 @@ import { LanguageToggle } from './LanguageToggle';
  * only the logo is shown. Otherwise the buttons would be drawn over the name.
  */
 export function BrandMark({ tagline = true, compact = false }: { tagline?: boolean; compact?: boolean }) {
+  // "Cambo Keyboard" in white and the last word, "Supply", in yellow.
+  const words = t.brand.name.split(' ');
+  const brandLast = words.pop();
+  const brandFirst = words.join(' ');
   return (
     <Link
       to="/"
@@ -26,8 +30,9 @@ export function BrandMark({ tagline = true, compact = false }: { tagline?: boole
         className="size-10 rounded-xl border border-line shadow-pop sm:size-11"
       />
       <span className={`flex flex-col ${compact ? 'max-[429px]:sr-only' : 'max-[339px]:sr-only'}`}>
-        <span className="font-display text-[1.35rem] font-extrabold leading-none tracking-[-0.03em] sm:text-[1.5rem]">
-          Cambo<span className="text-yellow">Supply</span>
+        <span className="font-display text-[1.05rem] font-extrabold leading-[1.08] tracking-[-0.02em] sm:text-[1.5rem] sm:leading-none sm:tracking-[-0.03em]">
+          <span className="block sm:inline">{brandFirst} </span>
+          <span className="block text-yellow sm:inline">{brandLast}</span>
         </span>
         {tagline && (
           <span className="mt-1 hidden text-[0.72rem] font-semibold text-muted sm:block">

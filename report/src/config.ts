@@ -7,7 +7,7 @@ const envSchema = z
     LOG_LEVEL: z.string().optional(),
     REPORT_DATABASE_URL: z.string().min(1),
     REPORT_SERVICE_SECRET: z.string().min(1),
-    STORE_NAME: z.string().default('Cambo Supply'),
+    STORE_NAME: z.string().default('Cambo Keyboard Supply'),
     CHROME_PATH: z.string().optional(),
     PDF_WORKERS: z.coerce.number().int().min(1).max(8).default(2),
   })

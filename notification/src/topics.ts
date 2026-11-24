@@ -15,7 +15,6 @@ export const TOPICS = {
 } as const;
 export type TopicKey = keyof typeof TOPICS;
 export const TOPIC_KEYS = Object.keys(TOPICS) as TopicKey[];
-export const isTopicKey = (v: unknown): v is TopicKey => typeof v === 'string' && v in TOPICS;
 
 /** A chat that refused topics (not a forum, or the bot may not manage them) is left alone for this long. */
 const UNSUPPORTED_MS = 10 * 60 * 1000;

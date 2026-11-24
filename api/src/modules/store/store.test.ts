@@ -13,7 +13,7 @@ describe('store information', () => {
     const res = await request(ctx.app).get('/api/v1/store');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
-      storeName: 'Cambo Supply',
+      storeName: 'Cambo Supply', // the database column default, which a new install gets until it is renamed in Admin
       info: { phone: '', telegram: '', facebook: '', address: '', hours: '', warranty: '' },
       delivery: { provinceFeeCents: 200, phnomPenhStandardFeeCents: 150, grabBeyondFeeCents: 250 },
     });

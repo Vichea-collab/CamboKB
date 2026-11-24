@@ -14,31 +14,31 @@ import {
 import type { TgMessage, TgUpdate } from '../../integrations/telegram/types';
 
 export const BOT_TEXT = {
-  askContact: 'Tap the button below to share your phone number with Cambo Supply.',
+  askContact: 'Tap the button below to share your phone number with Cambo Keyboard Supply.',
   shareButton: '📱 Share my phone number',
   expired: 'This link has expired. Please start again on the website.',
   ownNumber: 'Please share your own phone number using the button.',
   alreadyRegistered:
     'This number already has an account. On the website, tap Continue with Telegram to log in.',
   welcomeNew:
-    'Welcome to Cambo Supply! 👋\n\nTo create your account, tap the button below to share your phone number. Then we send you a link that logs you in.',
+    'Welcome to Cambo Keyboard Supply! 👋\n\nTo create your account, tap the button below to share your phone number. Then we send you a link that logs you in.',
   cannotVerify:
     "We couldn't verify this account. Please check the number and try again on the website.",
   phoneInUse: 'This number is already used by another account.',
   verified: '✅ Verified! Go back to the website to continue.',
-  verifiedOpenLink: '✅ Verified! Tap the button to open Cambo Supply. You will be logged in.',
+  verifiedOpenLink: '✅ Verified! Tap the button to open Cambo Keyboard Supply. You will be logged in.',
   loginDone: '✅ Done! Go back to the website: you are logged in.',
   loginAskConfirm: 'Tap ✅ Log me in on the message above to continue.',
   loginDeclined: 'Okay, nobody was logged in. If this was not you, you can ignore it.',
   loginExpired: 'This login request has expired. Please start again on the website.',
   loginNotYours: 'This login request is for a different Telegram account.',
   loginAskPhone:
-    'Share your phone number with the button below to link this Telegram to Cambo Supply and log in.',
+    'Share your phone number with the button below to link this Telegram to Cambo Keyboard Supply and log in.',
   phoneLinkedElsewhere:
     'That phone number belongs to an account linked to a different Telegram account. Please contact the shop.',
   logInButton: '✅ Log me in',
   notMeButton: '🚫 Not me',
-  noPending: 'Please open the sign-up link from the Cambo Supply website first.',
+  noPending: 'Please open the sign-up link from the Cambo Keyboard Supply website first.',
   unknownMessage:
     'I only understand commands. Try /shop to open the store, /orders for your latest orders, or /help.',
   invalidPhone: "That phone number doesn't look valid.",
@@ -51,9 +51,9 @@ export const BOT_TEXT = {
   backToCheckout: 'Tap the button to go back to checkout. Your location is already there.',
   backToCheckoutButton: '🛒 Back to checkout',
   locationNotYours:
-    'This link is for a different Cambo Supply account. Open checkout on the website and try again.',
+    'This link is for a different Cambo Keyboard Supply account. Open checkout on the website and try again.',
   noLocationRequest:
-    'Open checkout on the Cambo Supply website and tap “Share location in Telegram” first.',
+    'Open checkout on the Cambo Keyboard Supply website and tap “Share location in Telegram” first.',
 } as const;
 
 const removeKeyboard = { remove_keyboard: true };
@@ -157,7 +157,7 @@ async function sendWelcome(deps: AppDeps, msg: TgMessage, say: Say) {
     msg.chat.id,
     text,
     secure
-      ? { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }]] } }
+      ? { replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Keyboard Supply', web_app: { url } }]] } }
       : undefined,
   );
 }
@@ -166,7 +166,7 @@ function handleHelp(msg: TgMessage, say: Say) {
   say(
     msg.chat.id,
     [
-      'Cambo Supply bot',
+      'Cambo Keyboard Supply bot',
       '',
       ...COMMANDS.map((c) => `/${c.command} — ${c.description}`),
       '',
@@ -180,7 +180,7 @@ function handleShop(deps: AppDeps, msg: TgMessage, say: Say) {
   // Telegram only opens Mini Apps from https links.
   if (url.startsWith('https://')) {
     say(msg.chat.id, 'Tap below to open the store.', {
-      replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', web_app: { url } }]] },
+      replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Keyboard Supply', web_app: { url } }]] },
     });
   } else {
     say(msg.chat.id, `Shop at ${url}`);
@@ -348,7 +348,7 @@ async function handleContact(deps: AppDeps, msg: TgMessage, say: Say) {
     const { url } = await issueLoginLink(deps, { from, chatId: msg.chat.id, phone, userId: created.id });
     if (url.startsWith('https://')) {
       say(msg.chat.id, BOT_TEXT.verifiedOpenLink, {
-        replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Supply', url }]] },
+        replyMarkup: { inline_keyboard: [[{ text: '🛒 Open Cambo Keyboard Supply', url }]] },
       });
     } else {
       say(msg.chat.id, `${BOT_TEXT.verifiedOpenLink}\n${url}`, {
@@ -417,7 +417,7 @@ async function handleLoginStart(
   say(
     msg.chat.id,
     [
-      `Log in to Cambo Supply as ${linked.name}?`,
+      `Log in to Cambo Keyboard Supply as ${linked.name}?`,
       '',
       loginContext(bound),
       '',

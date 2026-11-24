@@ -1,4 +1,4 @@
-# Cambo Supply
+# Cambo Keyboard Supply
 
 Online store for mechanical keyboards, mice, mousepads and desk accessories in
 Cambodia. Customers sign up by sharing their phone number with the store's

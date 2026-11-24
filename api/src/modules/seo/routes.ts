@@ -20,7 +20,7 @@ const dollars = (cents: number) => (cents / 100).toFixed(2);
 export function seoRouter({ prisma, config, files }: AppDeps): Router {
   const r = Router();
   const site = () => (config.webOrigin[0] ?? '').replace(/\/$/, '');
-  const storeName = async () => (await prisma.storeSetting.findUnique({ where: { id: 1 } }))?.storeName ?? 'Cambo Supply';
+  const storeName = async () => (await prisma.storeSetting.findUnique({ where: { id: 1 } }))?.storeName ?? 'Cambo Keyboard Supply';
 
   r.get('/robots.txt', (_req, res) => {
     res.type('text/plain').set('Cache-Control', 'public, max-age=3600').send(

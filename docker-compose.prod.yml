@@ -85,7 +85,7 @@ services:
       NODE_ENV: production
       REPORT_DATABASE_URL: postgresql://${POSTGRES_USER}:${REPORT_DB_PASSWORD}@report-db:5432/cambo_reports
       REPORT_SERVICE_SECRET: ${REPORT_SERVICE_SECRET}
-      STORE_NAME: ${STORE_NAME:-Cambo Supply}
+      STORE_NAME: ${STORE_NAME:-Cambo Keyboard Supply}
     depends_on: { report-db: { condition: service_healthy } }
 
   notification:
@@ -135,7 +135,7 @@ services:
       BAKONG_ACCOUNT_ID: ${BAKONG_ACCOUNT_ID:-}
       BAKONG_TOKEN: ${BAKONG_TOKEN:-}
       BAKONG_API_URL: ${BAKONG_API_URL:-https://api-bakong.nbc.gov.kh}
-      BAKONG_MERCHANT_NAME: ${STORE_NAME:-Cambo Supply}
+      BAKONG_MERCHANT_NAME: ${STORE_NAME:-Cambo Keyboard Supply}
     depends_on:
       db: { condition: service_healthy }
       file: { condition: service_started }

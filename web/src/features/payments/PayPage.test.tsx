@@ -55,7 +55,7 @@ describe('KHQR payment page', () => {
   });
 
   it('offers a new QR when the current one has expired', async () => {
-    vi.mocked(api).mockImplementation(async (path: string, init?: { method?: string }) =>
+    vi.mocked(api).mockImplementation(async (_path: string, init?: { method?: string }) =>
       init?.method === 'POST' ? view() : view({ khqr: null }),
     );
     renderPay();

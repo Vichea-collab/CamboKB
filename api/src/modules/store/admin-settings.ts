@@ -9,7 +9,7 @@ export function adminSettingsRouter({ prisma }: AppDeps): Router {
   const view = async () => {
     const row = await prisma.storeSetting.findUnique({ where: { id: 1 } });
     return {
-      storeName: row?.storeName ?? 'Cambo Supply',
+      storeName: row?.storeName ?? 'Cambo Keyboard Supply',
       telegramNotify: row?.telegramNotify ?? true,
       delivery: await getDeliverySettings(prisma),
       info: storeInfoSchema.catch(EMPTY_STORE_INFO).parse(row?.info ?? {}),

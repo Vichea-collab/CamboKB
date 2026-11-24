@@ -91,12 +91,3 @@ export function FormError({ children }: { children?: ReactNode }) {
     </p>
   );
 }
-
-export function FieldError({ id, children }: { id: string; children?: ReactNode }) {
-  if (!children) return null;
-  return (
-    <p id={id} className="mt-1.5 text-sm text-danger">
-      {children}
-    </p>
-  );
-}

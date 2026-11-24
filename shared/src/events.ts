@@ -139,10 +139,6 @@ export function parseEvent<T extends EventType>(
   return { envelope, data: eventDataSchemas[type].parse(envelope.data) as EventData<T> };
 }
 
-export function isEventType(type: string): type is EventType {
-  return type in eventDataSchemas;
-}
-
 // ---------------------------------------------------------------------------
 // notification -> api
 

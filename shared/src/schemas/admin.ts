@@ -100,4 +100,3 @@ export type ProductPatch = z.infer<typeof productPatchSchema>;
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 export type PromoInput = z.infer<typeof promoInputSchema>;
 export type SettingsInput = z.infer<typeof settingsInputSchema>;
-export type SpecRow = z.infer<typeof specRowSchema>;

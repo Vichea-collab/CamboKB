@@ -7,7 +7,7 @@ import { currentLang } from './i18n';
  */
 const en = {
   invoice: { title: 'Invoice', download: 'Download PDF', backToOrder: 'Order' },
-  brand: { name: 'Cambo Supply', tagline: 'Keyboards · mice · desk setup' },
+  brand: { name: 'Cambo Keyboard Supply', tagline: 'Keyboards · mice · desk setup' },
   lang: { switchLabel: 'Switch language to Khmer', button: 'ខ្មែរ' },
   nav: {
     cart: 'Cart',
@@ -81,7 +81,6 @@ const en = {
     soldOut: 'Sold out',
     specs: 'Specifications',
     noSpecs: 'No specifications listed yet.',
-    photos: (n: number) => `📷 ${n}`,
     photosLabel: (n: number) => `${n} photos`,
     photoGo: (i: number) => `Show photo ${i}`,
     photoAlt: (name: string, i: number) => `${name}, photo ${i}`,
@@ -381,7 +380,6 @@ const en = {
   common: {
     loading: 'Loading…',
     close: 'Close',
-    back: 'Back',
     error: 'Something went wrong. Try again.',
     pageNotFound: "This page doesn't exist.",
     oops: 'Oops',
@@ -392,7 +390,7 @@ export type Strings = typeof en;
 
 const km: Strings = {
   invoice: { title: 'វិក្កយប័ត្រ', download: 'ទាញយក PDF', backToOrder: 'ការបញ្ជាទិញ' },
-  brand: { name: 'Cambo Supply', tagline: 'ក្ដារចុច · កណ្ដុរ · ឧបករណ៍តុកុំព្យូទ័រ' },
+  brand: { name: 'Cambo Keyboard Supply', tagline: 'ក្ដារចុច · កណ្ដុរ · ឧបករណ៍តុកុំព្យូទ័រ' },
   lang: { switchLabel: 'ប្តូរភាសាទៅជាអង់គ្លេស', button: 'EN' },
   nav: {
     cart: 'កន្ត្រក',
@@ -465,7 +463,6 @@ const km: Strings = {
     soldOut: 'អស់ស្តុក',
     specs: 'លក្ខណៈពិសេស',
     noSpecs: 'មិនទាន់មានបញ្ជីលក្ខណៈពិសេសនៅឡើយទេ។',
-    photos: (n) => `📷 ${n}`,
     photosLabel: (n) => `${n} រូបថត`,
     photoGo: (i) => `បង្ហាញរូបថតទី ${i}`,
     photoAlt: (name, i) => `${name} រូបថតទី ${i}`,
@@ -769,7 +766,6 @@ const km: Strings = {
   common: {
     loading: 'កំពុងផ្ទុក…',
     close: 'បិទ',
-    back: 'ត្រឡប់ក្រោយ',
     error: 'មានបញ្ហាអ្វីមួយ។ សូមព្យាយាមម្ដងទៀត។',
     pageNotFound: 'ទំព័រនេះមិនមានទេ។',
     oops: 'មានបញ្ហា',

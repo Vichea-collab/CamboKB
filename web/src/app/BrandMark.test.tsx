@@ -24,6 +24,6 @@ describe('brand mark in a crowded phone header', () => {
     );
     expect(wordmark().className).toContain('max-[429px]:sr-only');
     // Still a labelled link for screen readers, and the name stays in the page for them.
-    expect(screen.getByRole('link', { name: 'Cambo Supply home' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Cambo Keyboard Supply home' })).toHaveAttribute('href', '/');
   });
 });

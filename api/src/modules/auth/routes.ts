@@ -165,7 +165,7 @@ export function authRouter(deps: AppDeps): Router {
     if (!who) throw new AppError(401, 'TELEGRAM_INITDATA_INVALID', 'Telegram could not confirm who you are. Please use Continue with Telegram.');
     const user = await prisma.user.findUnique({ where: { telegramUserId: BigInt(who.telegramUserId) } });
     if (!user || user.disabledAt) {
-      throw new AppError(401, 'TELEGRAM_NOT_LINKED', 'This Telegram account has no Cambo Supply account yet. Please use Continue with Telegram.');
+      throw new AppError(401, 'TELEGRAM_NOT_LINKED', 'This Telegram account has no Cambo Keyboard Supply account yet. Please use Continue with Telegram.');
     }
     try {
       await prisma.telegramWebAppHash.create({

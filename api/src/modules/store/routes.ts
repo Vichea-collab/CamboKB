@@ -10,7 +10,7 @@ export function storeRouter({ prisma, config }: AppDeps): Router {
     const [row, delivery] = await Promise.all([prisma.storeSetting.findUnique({ where: { id: 1 } }), getDeliverySettings(prisma)]);
     const { store: _store, ...rates } = delivery;
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300').json({
-      storeName: row?.storeName ?? 'Cambo Supply',
+      storeName: row?.storeName ?? 'Cambo Keyboard Supply',
       info: storeInfoSchema.catch(EMPTY_STORE_INFO).parse(row?.info ?? {}),
       delivery: rates,
       payments: { cod: true, khqr: config.bakong.enabled },

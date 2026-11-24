@@ -134,7 +134,7 @@ export function createNotificationApp(deps: NotificationDeps) {
       );
     await outbox.enqueue({
       chatId,
-      text: '✅ Test message from Cambo Supply. Telegram alerts are working.',
+      text: '✅ Test message from Cambo Keyboard Supply. Telegram alerts are working.',
       requestId: currentRequestId(),
     });
     // One line in every topic: a new group gets its topics, and the owner sees where each alert will land.
