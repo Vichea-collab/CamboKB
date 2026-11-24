@@ -31,7 +31,7 @@ export function checkoutRouter(deps: AppDeps): Router {
     res.json(quoteDto(await buildQuote(prisma, req.valid.body as QuoteInput, req.user!.id)));
   });
 
-  r.post('/orders', requireAuth, limiter(20, 10 * 60 * 1000), validate({ body: createOrderSchema }), async (req, res) => {
+  r.post('/orders', requireAuth, limiter(deps, 20, 10 * 60 * 1000, { name: 'orders' }), validate({ body: createOrderSchema }), async (req, res) => {
     const key = req.get('idempotency-key')?.trim();
     if (key && key.length > 100) throw new AppError(400, 'VALIDATION_ERROR', 'Idempotency-Key is too long');
     const { order, created } = await createOrder(deps, req.user!.id, req.valid.body as CreateOrderInput, key || undefined);

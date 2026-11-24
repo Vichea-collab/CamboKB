@@ -72,8 +72,8 @@ export function authRouter(deps: AppDeps): Router {
 
   // Sharing a delivery location is something a signed-in customer retries at checkout, so it has its own,
   // larger allowance and never uses up (or is blocked by) the sign-up / reset budget.
-  const startLimit = limiter(10, 15 * 60 * 1000);
-  const locationStartLimit = limiter(30, 15 * 60 * 1000);
+  const startLimit = limiter(deps, 10, 15 * 60 * 1000, { name: 'login-start' });
+  const locationStartLimit = limiter(deps, 30, 15 * 60 * 1000, { name: 'login-location' });
   const startLimiter: RequestHandler = (req, res, next) =>
     (req.body?.purpose === 'SHARE_LOCATION' ? locationStartLimit : startLimit)(req, res, next);
   r.post('/telegram/start', startLimiter, validate({ body: telegramStartSchema }), async (req, res) => {
@@ -92,7 +92,7 @@ export function authRouter(deps: AppDeps): Router {
   // The website end of a sign-up that started in the bot: the link carries a one-time token. Claiming it
   // ties the verified login request to this browser (then /login/complete starts the session), and the token
   // stops working so a forwarded link is useless.
-  r.post('/telegram/claim', limiter(20, 15 * 60 * 1000), validate({ body: z.object({ token: z.string().min(20).max(128) }) }), async (req, res) => {
+  r.post('/telegram/claim', limiter(deps, 20, 15 * 60 * 1000, { name: 'claim' }), validate({ body: z.object({ token: z.string().min(20).max(128) }) }), async (req, res) => {
     const { token } = req.valid.body as { token: string };
     const notVerified = new AppError(409, 'TELEGRAM_NOT_VERIFIED', 'This link has expired or was already used. Please start again.');
     const found = await prisma.telegramAuthRequest.findUnique({ where: { tokenHash: sha256(token) } });
@@ -135,7 +135,7 @@ export function authRouter(deps: AppDeps): Router {
   // The website end of "Continue with Telegram": the person tapped "Log me in" in the bot, so the request is
   // VERIFIED and names the account. It is used once, only by the browser that asked (cookie), and the account
   // must still be linked to the very Telegram user who confirmed. Admins go through exactly the same checks.
-  r.post('/login/complete', limiter(30, 15 * 60 * 1000), validate({ body: loginCompleteSchema }), async (req, res) => {
+  r.post('/login/complete', limiter(deps, 30, 15 * 60 * 1000, { name: 'login-complete' }), validate({ body: loginCompleteSchema }), async (req, res) => {
     const { requestId } = req.valid.body as LoginCompleteInput;
     const user = await prisma.$transaction(async (tx) => {
       const verified = await consumeVerifiedRequest(tx, req, requestId, 'LOGIN');
@@ -157,7 +157,7 @@ export function authRouter(deps: AppDeps): Router {
 
   // Inside Telegram the store opens as a Mini App and Telegram already says who is looking, signed with the
   // bot's key. Check the signature, accept each one once, and log in the account linked to that Telegram user.
-  r.post('/telegram/webapp', limiter(30, 15 * 60 * 1000), validate({ body: telegramWebAppSchema }), async (req, res) => {
+  r.post('/telegram/webapp', limiter(deps, 30, 15 * 60 * 1000, { name: 'webapp' }), validate({ body: telegramWebAppSchema }), async (req, res) => {
     const { initData } = req.valid.body as TelegramWebAppInput;
     const key = config.telegram.webAppKey;
     if (!key) throw new AppError(503, 'TELEGRAM_WEBAPP_NOT_CONFIGURED', 'Telegram sign-in is not available here');
