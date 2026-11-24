@@ -86,10 +86,18 @@ describe('service event outbox', () => {
     expect(after.events.data('admin.alert')).toEqual([{ text: 'order CS-1', adminAlerts: true }]);
   });
 
+  it('is due the moment it is queued, every time', async () => {
+    // The database rounds its own clock up to the next millisecond, so a due time it chose could lie just ahead of ours.
+    for (let i = 1; i <= 60; i++) {
+      await alert(ctx, `message ${i}`);
+      expect(await drainEvents(ctx.deps)).toBe(1);
+    }
+  });
+
   it("doesn't let a dead service hold up a healthy one", async () => {
     await alert(ctx, 'to notification');
     const snapshotLike = await ctx.prisma.serviceEvent.create({
-      data: { target: 'report', type: 'order.snapshot', payload: {} },
+      data: { target: 'report', type: 'order.snapshot', payload: {}, nextAttemptAt: new Date() },
     });
     ctx.events.send = async (target, envelope) => {
       if (target === 'notification') throw new EventDeliveryError('notification down', true);

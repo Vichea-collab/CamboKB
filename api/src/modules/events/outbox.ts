@@ -39,6 +39,7 @@ export async function publishEvent<T extends EventType>(
   data: EventData<T>,
   opts: { dedupeKey?: string } = {},
 ): Promise<void> {
+  const now = new Date();
   await db.serviceEvent.createMany({
     data: [
       {
@@ -48,7 +49,10 @@ export async function publishEvent<T extends EventType>(
         requestId: currentRequestId() ?? null,
         dedupeKey: opts.dedupeKey ?? null,
         // Taken here, after the order row is locked, so a newer change always has a newer time.
-        emittedAt: new Date(),
+        emittedAt: now,
+        // By this clock, the one `drainEvents` compares with: the database's own is rounded up to the next
+        // millisecond, which made an event look not due yet to the delivery that follows at once.
+        nextAttemptAt: now,
       },
     ],
     skipDuplicates: true, // the same event queued twice is ignored (inside a transaction, too)
