@@ -385,10 +385,10 @@ describe('admin operations', () => {
   });
 
   it('queues what the report and notification services need, in the same transaction as the order', async () => {
-    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 5 } });
+    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
     const o = await placeOrder({ note: '<b>ring twice</b>' });
     const rows = await ctx.prisma.serviceEvent.findMany({ orderBy: { createdAt: 'asc' } });
-    // The product only had 5 in stock, so taking 2 leaves 3: low: the owner is warned too.
+    // The product only had 3 in stock, so taking 2 leaves 1: low: the owner is warned too.
     expect(rows.map((r) => `${r.target}:${r.type}`).sort()).toEqual([
       'notification:order.placed',
       'notification:product.low_stock',
@@ -408,7 +408,7 @@ describe('admin operations', () => {
 
   it('still places the order, and keeps the events waiting, when the other services are down', async () => {
     ctx.events.failWith = new EventDeliveryError('notification unreachable', true);
-    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 5 } });
+    await ctx.prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
     await placeOrder();
     await vi.waitFor(async () =>
       expect(

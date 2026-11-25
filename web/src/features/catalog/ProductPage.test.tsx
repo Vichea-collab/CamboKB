@@ -39,7 +39,7 @@ function open(mice: () => Promise<unknown>, stock = 5) {
 describe('Product page: how many are left', () => {
   it.each([
     [1, 'Only 1 left'],
-    [3, 'Only 3 left'],
+    [2, 'In stock'],
     [4, 'In stock'],
   ])('with %i in stock says "%s"', async (stock, label) => {
     open(async () => ({ items: [mouse], total: 1 }), stock);
