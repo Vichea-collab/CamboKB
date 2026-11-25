@@ -198,6 +198,60 @@ describe('workflow run', () => {
   });
 });
 
+describe('time', () => {
+  // 22:20:30 on 25 November 2026 in Phnom Penh.
+  const now = new Date('2026-11-25T15:20:30Z');
+  const ago = (s) => new Date(now.getTime() - s * 1000);
+  const WHEN = '🕒 25 Nov 2026, 22:20 (Phnom Penh)';
+  const run = (over = {}) =>
+    renderRun({ title: 'CI', results: { test: { result: 'success' } }, env: { GITHUB_REPOSITORY: 'acme/shop' }, now, ...over }).text;
+  const last = (text) => text.split('\n').at(-1);
+
+  it('says when a push and a pull request happened', () => {
+    const push = renderEvent('push', { ref: 'refs/heads/main', repository, commits: [], sender: { login: 'v' } }, now);
+    assert.equal(last(push.text), WHEN);
+    const pr = { number: 1, title: 'x', head: { ref: 'a' }, base: { ref: 'main' }, user: { login: 'v' } };
+    for (const p of [{ action: 'opened' }, { action: 'closed', merged: true }])
+      assert.equal(last(renderEvent('pull_request', { action: p.action, repository, pull_request: { ...pr, merged: p.merged } }, now).text), WHEN);
+    assert.equal(last(renderEvent('push', { ref: 'refs/heads/x', deleted: true, repository }, now).text), WHEN);
+    assert.equal(last(renderEvent('push', { ref: 'refs/tags/v1', repository, commits: [] }, now).text), WHEN);
+  });
+
+  it('says how long CI took, from the push', () => {
+    const pushed_at = ago(392).getTime() / 1000; // GitHub gives seconds here
+    assert.equal(last(run({ payload: { repository: { pushed_at } } })), `${WHEN} · took 6 min 32 s`);
+  });
+
+  it('says how long a deploy took, and how long after the push the shop was live', () => {
+    const payload = { workflow_run: { run_started_at: ago(508).toISOString(), updated_at: ago(74).toISOString() } };
+    const text = run({ title: 'Deploy', payload });
+    assert.ok(text.includes(`${WHEN} · took 1 min 14 s`));
+    assert.equal(last(text), '🚀 Live 8 min 28 s after the push');
+  });
+
+  it('a failed deploy is not called live', () => {
+    const payload = { workflow_run: { run_started_at: ago(508).toISOString(), updated_at: ago(16).toISOString() } };
+    const text = run({ title: 'Deploy', payload, results: { deploy: { result: 'failure' } } });
+    assert.equal(last(text), `${WHEN} · took 16 s`);
+    assert.ok(!text.includes('Live'));
+  });
+
+  it('gives only the time when the start is not known, makes no sense, or the run was repeated by hand', () => {
+    const pushed_at = ago(60).getTime() / 1000;
+    assert.equal(last(run()), WHEN);
+    assert.equal(last(run({ payload: { repository: { pushed_at: '2026-11-25T15:00:00Z' } }, env: { GITHUB_RUN_ATTEMPT: '1' } })), `${WHEN} · took 20 min 30 s`);
+    assert.equal(last(run({ payload: { repository: { pushed_at: 'soon' } } })), WHEN);
+    assert.equal(last(run({ payload: { repository: { pushed_at: now.getTime() / 1000 + 500 } } })), WHEN);
+    assert.equal(last(run({ payload: { repository: { pushed_at } }, env: { GITHUB_RUN_ATTEMPT: '2' } })), WHEN);
+    assert.equal(last(run({ payload: { repository: { pushed_at: ago(3 * 86400).getTime() / 1000 } } })), WHEN);
+  });
+
+  it('a pull request run counts from when the pull request was updated', () => {
+    const payload = { pull_request: { number: 7, title: 'x', head: { ref: 'a', sha: 'abc' }, updated_at: ago(200).toISOString() }, repository: { pushed_at: ago(9000).toISOString() } };
+    assert.equal(last(run({ payload })), `${WHEN} · took 3 min 20 s`);
+  });
+});
+
 describe('telegram message', () => {
   it('goes to the topic and carries a link button', () => {
     const body = toTelegram(

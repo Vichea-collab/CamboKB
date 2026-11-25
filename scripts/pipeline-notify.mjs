@@ -41,6 +41,23 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const link = (url, label) => (url ? `<a href="${esc(url)}">${esc(label)}</a>` : esc(label));
 const ZERO = /^0+$/;
 
+/** "25 Nov 2026, 22:20 (Phnom Penh)". Cambodia is UTC+7 all year. */
+function when(date) {
+  const local = new Date(date.getTime() + 7 * 3_600_000);
+  const day = local.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return `🕒 ${day}, ${local.toISOString().slice(11, 16)} (Phnom Penh)`;
+}
+
+/** "6 min 32 s" between a start (a date, or GitHub's seconds) and now; nothing when that is not a sensible answer. */
+function since(start, now) {
+  const from = typeof start === 'number' ? start * 1000 : Date.parse(start ?? '');
+  const s = Math.round((now.getTime() - from) / 1000);
+  if (!Number.isFinite(s) || s < 0 || s > 86_400) return null;
+  const h = Math.floor(s / 3600);
+  const min = Math.floor((s % 3600) / 60);
+  return [h && `${h} h`, min && `${min} min`, !h && (s % 60 || !min) && `${s % 60} s`].filter(Boolean).join(' ');
+}
+
 function pushMessage(p) {
   const repo = p.repository?.full_name ?? '';
   const who = p.sender?.login ?? p.pusher?.name ?? 'someone';
@@ -133,11 +150,15 @@ function pullRequestMessage(p) {
   };
 }
 
-export function renderEvent(eventName, payload) {
+export function renderEvent(eventName, payload, now = new Date()) {
   if (!payload) return null;
-  if (eventName === 'push') return pushMessage(payload);
-  if (eventName === 'pull_request') return pullRequestMessage(payload);
-  return null;
+  const msg =
+    eventName === 'push'
+      ? pushMessage(payload)
+      : eventName === 'pull_request'
+        ? pullRequestMessage(payload)
+        : null;
+  return msg && { ...msg, text: `${msg.text}\n\n${when(now)}` };
 }
 
 const ICON = { success: '✅', failure: '❌' };
@@ -147,7 +168,7 @@ const ICON = { success: '✅', failure: '❌' };
  * { jobId: { result: 'success' | 'failure' | 'cancelled' | 'skipped' } }.
  * A run that was only cancelled (a newer push replaced it) says nothing.
  */
-export function renderRun({ title, results, env, payload, note }) {
+export function renderRun({ title, results, env, payload, note, now = new Date() }) {
   const jobs = Object.entries(results ?? {}).map(([id, v]) => ({
     id,
     result: v?.result ?? 'unknown',
@@ -176,6 +197,14 @@ export function renderRun({ title, results, env, payload, note }) {
   if (failed.length) lines.push('', `Failed: ${failed.map((j) => esc(j.id)).join(', ')}`);
   if (note) lines.push('', esc(note));
   if (env.GITHUB_ACTOR) lines.push(`by ${esc(env.GITHUB_ACTOR)}`);
+
+  // Deploy starts when CI ends; CI starts with the push. A run repeated by hand has another start, which we don't know.
+  const ci = payload?.workflow_run;
+  const first = Number(env.GITHUB_RUN_ATTEMPT ?? 1) === 1;
+  const took = first && since(ci ? ci.updated_at : (pr?.updated_at ?? payload?.repository?.pushed_at), now);
+  lines.push('', `${when(now)}${took ? ` · took ${took}` : ''}`);
+  const live = first && ci && overall === 'success' && since(ci.run_started_at, now);
+  if (live) lines.push(`🚀 Live ${live} after the push`);
   return { text: lines.join('\n'), url: runUrl, button: 'Open run' };
 }
 
