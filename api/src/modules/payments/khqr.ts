@@ -15,6 +15,7 @@ import {
 } from '../events/snapshot';
 import { publishOrderUpdate } from '../orders/status';
 import { cancelOrder } from '../orders/orders';
+import { BakongHealth } from './bakong-health';
 
 /** Customer polling asks Bakong at most this often per payment. */
 const CHECK_EVERY_MS = 5_000;
@@ -80,10 +81,13 @@ export function paymentView(p: Payment & { khqrCodes: KhqrCode[] }) {
 }
 
 // Per-app memory for alerts we don't want to repeat every few seconds.
-const alertState = new WeakMap<object, { tokenAlertAt: number; mismatches: Set<string> }>();
+const alertState = new WeakMap<
+  object,
+  { tokenAlertAt: number; mismatches: Set<string>; health: BakongHealth }
+>();
 const alerts = (deps: AppDeps) => {
   let s = alertState.get(deps.config);
-  if (!s) alertState.set(deps.config, (s = { tokenAlertAt: 0, mismatches: new Set() }));
+  if (!s) alertState.set(deps.config, (s = { tokenAlertAt: 0, mismatches: new Set(), health: new BakongHealth() }));
   return s;
 };
 
@@ -107,8 +111,18 @@ function onBakongError(deps: AppDeps, err: unknown) {
         '⚠️ Bakong token was rejected, so KHQR payments cannot be confirmed. Renew the token at api-bakong.nbc.gov.kh and update BAKONG_TOKEN.',
       );
     }
+  } else if (alerts(deps).health.failed(Date.now()) === 'down') {
+    void tellOwner(
+      deps,
+      '⚠️ Bakong has not been answering for 5 minutes, so KHQR payments cannot be confirmed. Customers may have paid: their orders keep waiting and are confirmed when it works again. Check your bank app before sending anything.',
+    );
   }
   deps.logger.warn({ err }, 'Bakong check failed');
+}
+
+function onBakongAnswer(deps: AppDeps) {
+  if (alerts(deps).health.ok() === 'recovered')
+    void tellOwner(deps, '✅ Bakong is answering again. Waiting KHQR payments are being checked now.');
 }
 
 /**
@@ -157,6 +171,7 @@ export async function checkKhqrPayment(
       onBakongError(deps, err);
       return 'error';
     }
+    onBakongAnswer(deps);
     if (result.found) return markPaid(deps, paymentId, code.md5, result);
   }
   return 'unpaid';

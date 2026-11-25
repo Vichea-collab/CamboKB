@@ -383,6 +383,33 @@ describe('KHQR payments with Bakong', () => {
     );
   });
 
+  it('tells the admin when Bakong stops answering for 5 minutes, and when it works again; the order keeps waiting', async () => {
+    const o = await placeKhqr();
+    const about = async () => (await alerts()).filter((text) => text.includes('Bakong'));
+    const clock = vi.spyOn(Date, 'now');
+    const start = new Date().getTime();
+    try {
+      ctx.bakong.failWith = new BakongError('UNAVAILABLE', 'Bakong unreachable: TimeoutError');
+      for (let minute = 0; minute <= 12; minute++) {
+        clock.mockReturnValue(start + minute * MIN);
+        await sweepKhqrPayments(ctx.deps);
+        if (minute === 4) expect(await about()).toEqual([]);
+      }
+      await vi.waitFor(async () => expect(await about()).toHaveLength(1));
+      expect((await about())[0]).toContain('has not been answering for 5 minutes');
+      // Past its 10 minutes, but it may have been paid: never cancelled while Bakong can't be asked.
+      expect((await ctx.prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe('PENDING');
+
+      ctx.bakong.failWith = null;
+      clock.mockReturnValue(start + 13 * MIN);
+      await sweepKhqrPayments(ctx.deps);
+      await vi.waitFor(async () => expect(await about()).toHaveLength(2));
+      expect((await about()).some((text) => text.startsWith('✅ Bakong'))).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("hides other customers' payments", async () => {
     const o = await placeKhqr();
     const { agent: other } = await signedInAgent(ctx.app, ctx.prisma);
