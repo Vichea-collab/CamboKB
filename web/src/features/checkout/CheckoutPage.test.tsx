@@ -80,6 +80,40 @@ describe('Checkout', () => {
     );
   });
 
+  it('shows grey blocks for the amounts until they are known, then the amounts', async () => {
+    mockServer();
+    const server = vi.mocked(api).getMockImplementation()!;
+    let answer = () => {};
+    const held = new Promise<void>((r) => (answer = r));
+    vi.mocked(api).mockImplementation(async (path: string, ...rest) => {
+      if (path === '/checkout/quote') await held;
+      return server(path, ...rest);
+    });
+    const { container } = renderCheckout();
+    await screen.findByRole('heading', { name: 'Checkout' });
+    const totals = container.querySelector('dl[aria-live]')!;
+    // Subtotal, delivery and total, and the total in the phone's folded summary.
+    expect(totals.querySelectorAll('dd .bone')).toHaveLength(3);
+    expect(container.querySelectorAll('summary .bone')).toHaveLength(1);
+    expect(totals).not.toHaveTextContent('—');
+    answer();
+    await waitFor(() => expect(totals.querySelectorAll('.bone')).toHaveLength(0));
+    expect(totals).toHaveTextContent('$21.00');
+    expect(container.querySelectorAll('summary .bone')).toHaveLength(0);
+  });
+
+  it('does not keep the grey blocks when the amounts cannot be worked out', async () => {
+    mockServer();
+    const server = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path: string, ...rest) => {
+      if (path === '/checkout/quote') throw new ApiError(503, 'DOWN', 'Please try again');
+      return server(path, ...rest);
+    });
+    const { container } = renderCheckout();
+    expect(await screen.findByText('Please try again')).toBeInTheDocument();
+    expect(container.querySelectorAll('dl[aria-live] .bone')).toHaveLength(0);
+  });
+
   it('offers a back link to return to the shop', async () => {
     mockServer();
     renderCheckout();

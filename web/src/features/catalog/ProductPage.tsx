@@ -13,7 +13,7 @@ import { WishlistButton } from '../wishlist/WishlistButton';
 import { useAddToCart } from '../cart/useAddToCart';
 import { useProduct, useProducts } from './api';
 import { ImageGallery } from './ImageGallery';
-import { ProductCard } from './ProductCard';
+import { ProductCard, ProductCardSkeleton } from './ProductCard';
 
 const SPECS_PREVIEW = 6;
 
@@ -46,7 +46,9 @@ export default function ProductDetail() {
   const p = product.data;
   const max = Math.min(MAX_QTY, Math.max(1, p.stock));
   const specs = allSpecs ? p.specs : p.specs.slice(0, SPECS_PREVIEW);
-  const more = (related.data?.items ?? []).filter((x) => x.id !== p.id).slice(0, 4);
+  // Until this category has answered, what is there belongs to another list (keepPreviousData).
+  const moreLoading = related.isPending || related.isPlaceholderData;
+  const more = moreLoading ? [] : (related.data?.items ?? []).filter((x) => x.id !== p.id).slice(0, 4);
   const lowStock = !p.isSoldOut && p.stock <= LOW_STOCK_THRESHOLD;
 
   return (
@@ -149,18 +151,18 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {more.length > 0 && (
+      {(moreLoading || more.length > 0) && (
         <section className="mt-14" aria-labelledby="more-heading">
           <h2 id="more-heading" className="title-section mb-4">
             {t.product.moreIn(categoryName(p.category.slug, p.category.name))}
           </h2>
           <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
-            {more.map((x) => (
+            {(moreLoading ? [0, 1, 2, 3].map((id) => ({ id })) : more).map((x) => (
               <div
                 key={x.id}
                 className="w-[44vw] max-w-[220px] shrink-0 snap-start sm:w-auto sm:max-w-none [&>article]:h-full"
               >
-                <ProductCard product={x} onAdd={addToCart} />
+                {'slug' in x ? <ProductCard product={x} onAdd={addToCart} /> : <ProductCardSkeleton />}
               </div>
             ))}
           </div>

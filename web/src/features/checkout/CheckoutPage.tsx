@@ -171,6 +171,15 @@ export default function Checkout() {
     address.trim() &&
     !placing &&
     (payment === 'COD' ? codAvailable : khqrAvailable);
+  /** An amount, a grey block while it is being worked out, or a dash when it could not be. */
+  const amount = (cents: number | undefined, width = 'w-16') =>
+    cents !== undefined ? (
+      formatUsdExact(cents)
+    ) : quote.isError ? (
+      '—'
+    ) : (
+      <Bone className={`bone-text ${width}`} />
+    );
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -199,7 +208,7 @@ export default function Checkout() {
             />
           </span>
           <span className="font-display text-lg font-extrabold tabular-nums">
-            {quote.data ? formatUsdExact(quote.data.totalCents) : '—'}
+            {amount(quote.data?.totalCents, 'w-20')}
           </span>
         </summary>
         <ul className="divide-y divide-line border-t border-line px-4">
@@ -457,11 +466,11 @@ export default function Checkout() {
             <dl className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm" aria-live="polite">
               <Line
                 label={t.checkout.subtotal}
-                value={quote.data ? formatUsdExact(quote.data.subtotalCents) : '—'}
+                value={amount(quote.data?.subtotalCents)}
               />
               <Line
                 label={t.checkout.deliveryFee}
-                value={quote.data ? formatUsdExact(quote.data.deliveryFeeCents) : '—'}
+                value={amount(quote.data?.deliveryFeeCents)}
               />
               {quote.data && quote.data.discountCents > 0 && (
                 <Line
@@ -474,7 +483,7 @@ export default function Checkout() {
                 <dd
                   className={`font-display text-2xl font-bold tabular-nums ${quote.isFetching ? 'opacity-60' : ''}`}
                 >
-                  {quote.data ? formatUsdExact(quote.data.totalCents) : '—'}
+                  {amount(quote.data?.totalCents, 'w-24')}
                 </dd>
               </div>
             </dl>
@@ -594,7 +603,7 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function Line({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between text-muted">
       <dt>{label}</dt>

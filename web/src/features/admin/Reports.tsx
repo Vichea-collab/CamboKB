@@ -19,6 +19,7 @@ import { RevenueChart } from './components/RevenueChart';
 import { StatTile } from './components/StatTile';
 import { Loading, PageHeader } from './components/ui';
 import { DatePicker } from '../../shared/ui/DatePicker';
+import { Bone } from '../../shared/ui/Skeleton';
 
 type Totals = { orders: number; units: number; revenueCents: number; averageOrderCents: number };
 type Summary = {
@@ -306,12 +307,14 @@ export default function Reports() {
           description="Ranked by revenue. The bar shows each product's share of the leader."
           className="min-w-0"
         >
-          {top.data && top.data.items.length === 0 ? (
+          {!top.data ? (
+            <CardWait error={top.error} onRetry={() => top.refetch()} rows={6} />
+          ) : top.data.items.length === 0 ? (
             <p className="text-sm text-muted">No sales in these dates.</p>
           ) : (
             <ol className="space-y-3.5">
-              {top.data?.items.map((p, i) => {
-                const lead = Math.max(...top.data!.items.map((x) => x.revenueCents), 1);
+              {top.data.items.map((p, i) => {
+                const lead = Math.max(...top.data.items.map((x) => x.revenueCents), 1);
                 return (
                   <li
                     key={p.productId}
@@ -340,8 +343,10 @@ export default function Reports() {
                 key: r.method,
                 label: t.payment[r.method] ?? r.method,
                 ...r,
-              })) ?? []
+              }))
             }
+            error={split.error}
+            onRetry={() => split.refetch()}
           />
           <Split
             title="Where orders went"
@@ -350,8 +355,10 @@ export default function Reports() {
                 key: r.region,
                 label: t.region[r.region] ?? r.region,
                 ...r,
-              })) ?? []
+              }))
             }
+            error={split.error}
+            onRetry={() => split.refetch()}
           />
         </div>
       </div>
@@ -403,17 +410,66 @@ function Bar({ share, className = '' }: { share: number; className?: string }) {
   );
 }
 
+/** A card without its numbers: grey rows while they load, or what went wrong. */
+function CardWait({
+  error,
+  onRetry,
+  rows,
+  caption = false,
+}: {
+  error: Error | null;
+  onRetry: () => void;
+  rows: number;
+  /** Each row has a line of small text under its bar. */
+  caption?: boolean;
+}) {
+  if (error) {
+    return (
+      <div role="alert" className="space-y-3 text-sm">
+        <p className="text-danger">{error.message}</p>
+        <button type="button" className="btn-ghost btn-sm" onClick={onRetry}>
+          {t.home.retry}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div role="status">
+      <span className="sr-only">{t.common.loading}</span>
+      <div aria-hidden="true" className="skeleton-in space-y-4">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i}>
+            <div className="flex justify-between gap-6">
+              <Bone className="h-5 w-2/5" />
+              <Bone className="h-5 w-16" />
+            </div>
+            <Bone className="my-1.5 h-1.5 w-full rounded-full" />
+            {caption && <Bone className="h-4 w-24" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Split({
   title,
   rows,
+  error,
+  onRetry,
 }: {
   title: string;
-  rows: { key: string; label: string; orders: number; revenueCents: number }[];
+  /** Not there yet, or it could not load: that is not the same as no sales. */
+  rows?: { key: string; label: string; orders: number; revenueCents: number }[];
+  error: Error | null;
+  onRetry: () => void;
 }) {
-  const total = rows.reduce((sum, r) => sum + r.revenueCents, 0);
+  const total = (rows ?? []).reduce((sum, r) => sum + r.revenueCents, 0);
   return (
     <Section title={title}>
-      {rows.length === 0 ? (
+      {!rows ? (
+        <CardWait error={error} onRetry={onRetry} rows={2} caption />
+      ) : rows.length === 0 ? (
         <p className="text-sm text-muted">No sales in these dates.</p>
       ) : (
         <ul className="space-y-4 text-sm">

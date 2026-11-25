@@ -33,9 +33,49 @@
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Noto+Sans+Khmer:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+
+    <!-- What shows until the app has started. Its look is here so that it needs nothing else; the app replaces it. -->
+    <style>
+      body { margin: 0; background: #12151a; }
+      .boot { color: #f5f6f8; font: 800 1.05rem/1.08 'Bricolage Grotesque', 'Plus Jakarta Sans', system-ui, sans-serif; letter-spacing: -0.02em; overflow: hidden; height: 100vh; height: 100dvh; }
+      .boot-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      .boot-bar { border-bottom: 1px solid rgb(255 255 255 / 0.05); }
+      .boot-in { box-sizing: border-box; max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+      .boot-bar .boot-in { display: flex; align-items: center; gap: 10px; height: 56px; }
+      .boot img { width: 40px; height: 40px; border-radius: 12px; }
+      .boot b { display: block; color: #ffb703; font-weight: 800; }
+      .boot-bone { display: block; border-radius: 16px; background: #343a44; animation: boot 1.6s ease-in-out infinite; }
+      .boot-search { height: 50px; margin-top: 16px; }
+      .boot-wide { aspect-ratio: 1.9; max-height: 55vh; width: 100%; margin-top: 16px; }
+      .boot-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 24px; }
+      .boot-grid .boot-bone { aspect-ratio: 1; }
+      @keyframes boot { 50% { opacity: 0.6; } }
+      @media (min-width: 640px) {
+        .boot { font-size: 1.5rem; letter-spacing: -0.03em; }
+        .boot-in { padding: 0 24px; }
+        .boot-bar .boot-in { height: 64px; }
+        .boot img { width: 44px; height: 44px; }
+        .boot b { display: inline; }
+        .boot-grid { grid-template-columns: repeat(4, 1fr); }
+      }
+      @media (min-width: 1024px) { .boot-in { padding: 0 32px; } }
+      @media (prefers-reduced-motion: reduce) { .boot-bone { animation: none; } }
+    </style>
+    <noscript><style>.boot { display: none; }</style></noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- The deploy check on the server looks for the opening tag below exactly as it is written. -->
+    <div id="root"><div class="boot">
+      <div role="status" class="boot-word">Loading…</div>
+      <div aria-hidden="true">
+        <div class="boot-bar"><div class="boot-in"><img src="/logo.png" alt="" /><span>Cambo Keyboard <b>Supply</b></span></div></div>
+        <div class="boot-in">
+          <span class="boot-bone boot-search"></span>
+          <span class="boot-bone boot-wide"></span>
+          <div class="boot-grid"><span class="boot-bone"></span><span class="boot-bone"></span><span class="boot-bone"></span><span class="boot-bone"></span></div>
+        </div>
+      </div>
+    </div></div>
     <noscript>Cambo Keyboard Supply needs JavaScript to run. Please turn it on in your browser.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

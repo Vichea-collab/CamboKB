@@ -313,6 +313,10 @@ select.field option {
     background: color-mix(in srgb, var(--color-raised) 92%, white);
     animation: bone 1.6s ease-in-out infinite;
   }
+  /* Stands for text: an invisible character gives it that text's height and baseline. */
+  .bone-text::before {
+    content: '\200b';
+  }
 }
 @keyframes bone {
   50% {

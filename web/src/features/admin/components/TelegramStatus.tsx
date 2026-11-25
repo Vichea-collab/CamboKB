@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../shared/lib/api';
 import { useUi } from '../../../shared/lib/ui-store';
+import { Bone } from '../../../shared/ui/Skeleton';
 
 type Status = {
   /** False when the api cannot reach the notification service at all. */
@@ -36,6 +37,15 @@ export function TelegramStatus() {
     },
   });
   const s = status.data;
+  if (status.isPending) {
+    return (
+      <div aria-hidden="true" className="skeleton-in rounded-xl bg-raised p-3.5 ring-1 ring-line">
+        <Bone className="h-5 w-48" />
+        <Bone className="mt-1 h-4 w-56 max-w-full" />
+        <Bone className="mt-3 h-9 w-40 rounded-xl" />
+      </div>
+    );
+  }
   if (!s) return null;
 
   const problem = !s.serviceReachable

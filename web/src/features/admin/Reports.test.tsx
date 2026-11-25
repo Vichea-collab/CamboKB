@@ -87,6 +87,50 @@ describe('previousRange', () => {
   });
 });
 
+describe('Admin reports, while the cards load', () => {
+  beforeEach(() => {
+    vi.mocked(api).mockReset();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+  });
+  const open = (cards: () => Promise<unknown>) => {
+    mockServer();
+    const server = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((path: string, ...rest) =>
+      /top-products|breakdown/.test(path) ? cards() : server(path, ...rest),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={['/admin/reports']}>
+          <Reports />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  };
+  const CARDS = ['Top products', 'How customers paid', 'Where orders went'];
+  const card = async (title: string) => (await screen.findByRole('heading', { name: title })).closest('section')!;
+
+  it.each(CARDS)('%s: shows a skeleton and does not claim there were no sales', async (title) => {
+    open(() => new Promise(() => {}));
+    const box = await card(title);
+    expect(box.querySelector('.bone')).not.toBeNull();
+    expect(within(box).queryByText('No sales in these dates.')).toBeNull();
+  });
+
+  it.each(CARDS)('%s: says so when it could not load, instead of "no sales"', async (title) => {
+    open(() => Promise.reject(new Error('The report service is not answering')));
+    const box = await card(title);
+    expect(await within(box).findByRole('alert')).toHaveTextContent('The report service is not answering');
+    expect(within(box).queryByText('No sales in these dates.')).toBeNull();
+    expect(box.querySelector('.bone')).toBeNull();
+  });
+});
+
 describe('Admin reports', () => {
   beforeEach(() => {
     vi.mocked(api).mockReset();
