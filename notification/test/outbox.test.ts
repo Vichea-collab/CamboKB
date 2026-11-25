@@ -153,6 +153,75 @@ describe('telegram outbox', () => {
     expect((await rows()).map((r) => r.text).sort()).toEqual(['new sent', 'old pending']);
   });
 
+  describe('updating a message sent earlier', () => {
+    const KEY = 'order:1:admin:new';
+    const first = { chatId: 42, text: 'waiting', dedupeKey: KEY };
+    const edit = (text: string, at = new Date()) => ({ chatId: 42, text, edits: KEY, editAt: at.toISOString() });
+
+    it('remembers the message and replaces it', async () => {
+      const { outbox, telegram } = newOutbox();
+      await outbox.enqueue(first);
+      await Outbox.idle();
+      await outbox.enqueue(edit('paid'));
+      await Outbox.idle();
+      expect(telegram.sent).toHaveLength(1);
+      expect(telegram.updated).toMatchObject([{ messageId: 1001, text: 'paid' }]);
+    });
+
+    it('waits when the message itself has not been sent yet', async () => {
+      const { outbox, telegram } = newOutbox();
+      telegram.failSends = true;
+      await outbox.enqueue(first);
+      await Outbox.idle();
+      await outbox.enqueue(edit('paid'));
+      await Outbox.idle();
+      expect(telegram.updated).toHaveLength(0);
+      telegram.failSends = false;
+      await pool.query('UPDATE messages SET next_attempt_at = now()');
+      await outbox.drain();
+      expect(telegram.sent.map((m) => m.text)).toEqual(['waiting']);
+      expect(telegram.updated.map((u) => u.text)).toEqual(['paid']);
+    });
+
+    it.each([
+      'Bad Request: message is not modified',
+      'Bad Request: message to edit not found',
+      "Bad Request: message can't be edited",
+    ])('treats "%s" as done: there is nothing left to correct', async (reason) => {
+      const { outbox, telegram } = newOutbox();
+      await outbox.enqueue(first);
+      await Outbox.idle();
+      telegram.failEdits = new TelegramError(`Telegram editMessageText failed: ${reason}`, 400);
+      await outbox.enqueue(edit('paid'));
+      await Outbox.idle();
+      expect((await rows()).map((r) => r.status)).toEqual(['SENT', 'SENT']);
+    });
+
+    it('tries again when Telegram is down', async () => {
+      const { outbox, telegram } = newOutbox();
+      await outbox.enqueue(first);
+      await Outbox.idle();
+      telegram.failEdits = new TelegramError('Telegram editMessageText unreachable: TimeoutError', 0);
+      await outbox.enqueue(edit('paid'));
+      await Outbox.idle();
+      telegram.failEdits = null;
+      await pool.query('UPDATE messages SET next_attempt_at = now()');
+      await outbox.drain();
+      expect(telegram.updated.map((u) => u.text)).toEqual(['paid']);
+    });
+
+    it('leaves a message sent before message numbers were kept', async () => {
+      const { outbox, telegram } = newOutbox();
+      await outbox.enqueue(first);
+      await Outbox.idle();
+      await pool.query('UPDATE messages SET telegram_message_id = NULL');
+      await outbox.enqueue(edit('paid'));
+      await Outbox.idle();
+      expect(telegram.updated).toHaveLength(0);
+      expect((await rows()).every((r) => r.status === 'SENT')).toBe(true);
+    });
+  });
+
   describe('forum topics in the owner group', () => {
     const GROUP = -1004305607479;
     const sent = (t: FakeTelegramClient) => t.sent.map((m) => ({ text: m.text, thread: m.opts?.threadId }));

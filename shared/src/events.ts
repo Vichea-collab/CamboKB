@@ -61,7 +61,12 @@ export const eventDataSchemas = {
     adminAlerts: z.boolean(),
     holdMinutes: z.number().int().positive(),
   }),
-  'order.status_changed': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
+  'order.status_changed': z.object({
+    order: orderSnapshotSchema,
+    customerChatId: chat,
+    /** Whether the owner's group is told (a cancellation). Older queued events lack it. */
+    adminAlerts: z.boolean().default(false),
+  }),
   'order.tracking_set': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
   'payment.confirmed': z.object({
     order: orderSnapshotSchema,
@@ -69,7 +74,11 @@ export const eventDataSchemas = {
     adminAlerts: z.boolean(),
   }),
   /** The shop sent a paid-then-cancelled order's money back (marked refunded by hand). */
-  'payment.refunded': z.object({ order: orderSnapshotSchema, customerChatId: chat }),
+  'payment.refunded': z.object({
+    order: orderSnapshotSchema,
+    customerChatId: chat,
+    adminAlerts: z.boolean().default(false),
+  }),
   'payment.reminder': z.object({
     order: orderSnapshotSchema,
     customerChatId: chat,
@@ -80,6 +89,20 @@ export const eventDataSchemas = {
     order: orderSnapshotSchema,
     customerChatId: chat,
     holdMinutes: z.number().int().positive(),
+    adminAlerts: z.boolean().default(false),
+  }),
+  /** Yesterday's numbers and what waits to be done, sent to the owner each morning. */
+  'shop.daily_summary': z.object({
+    /** The day, in Phnom Penh. */
+    date: z.iso.date(),
+    orders: z.number().int().min(0),
+    revenueCents: z.number().int().min(0),
+    cancelled: z.number().int().min(0),
+    newCustomers: z.number().int().min(0),
+    pending: z.number().int().min(0),
+    lowStock: z.number().int().min(0),
+    refundsDue: z.number().int().min(0),
+    adminAlerts: z.boolean(),
   }),
   'product.low_stock': z.object({
     productId: z.uuid(),
@@ -115,6 +138,7 @@ export const EVENT_TARGETS = {
   'payment.reminder': 'notification',
   'product.low_stock': 'notification',
   'customer.signed_up': 'notification',
+  'shop.daily_summary': 'notification',
   'admin.alert': 'notification',
 } as const satisfies Record<EventType, 'report' | 'notification'>;
 export type EventTarget = (typeof EVENT_TARGETS)[EventType];

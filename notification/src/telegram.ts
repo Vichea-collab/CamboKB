@@ -55,7 +55,10 @@ export type SendOptions = {
 };
 
 export interface TelegramClient {
-  sendMessage(chatId: number | string, text: string, opts?: SendOptions): Promise<void>;
+  /** Returns Telegram's number for the message, which is needed to edit it later. */
+  sendMessage(chatId: number | string, text: string, opts?: SendOptions): Promise<number>;
+  /** Replace the text and the buttons of a message we sent earlier. */
+  editMessage(chatId: number | string, messageId: number, text: string, opts?: SendOptions): Promise<void>;
   /** Create a topic in a group that has Topics on. Returns its thread id. */
   createForumTopic(chatId: number | string, name: string, iconColor?: number): Promise<number>;
   /** Tap feedback on an inline button (a small toast, or an alert when `alert` is set). */
@@ -119,13 +122,25 @@ export class HttpTelegramClient implements TelegramClient {
   }
 
   async sendMessage(chatId: number | string, text: string, opts: SendOptions = {}) {
-    await this.call('sendMessage', {
+    const sent = await this.call<{ message_id: number }>('sendMessage', {
       chat_id: chatId,
       text,
       parse_mode: opts.parseMode,
       reply_markup: opts.replyMarkup,
       message_thread_id: opts.threadId,
       disable_web_page_preview: true,
+    });
+    return sent.message_id;
+  }
+
+  async editMessage(chatId: number | string, messageId: number, text: string, opts: SendOptions = {}) {
+    await this.call('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: opts.parseMode,
+      link_preview_options: { is_disabled: true },
+      reply_markup: opts.replyMarkup,
     });
   }
 
@@ -200,7 +215,9 @@ export class NoopTelegramClient implements TelegramClient {
   constructor(private readonly log: (msg: string) => void = () => {}) {}
   async sendMessage(chatId: number | string, text: string) {
     this.log(`[telegram:off] to ${chatId}: ${text}`);
+    return 0;
   }
+  async editMessage() {}
   async createForumTopic() {
     return 0;
   }

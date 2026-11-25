@@ -12,6 +12,7 @@ export const TOPICS = {
   attention: { name: '⚠️ Needs attention', color: 16478047 },
   stock: { name: '📦 Stock', color: 13338331 },
   customers: { name: '👤 Customers', color: 7322096 },
+  summary: { name: '📊 Daily summary', color: 16749490 },
 } as const;
 export type TopicKey = keyof typeof TOPICS;
 export const TOPIC_KEYS = Object.keys(TOPICS) as TopicKey[];

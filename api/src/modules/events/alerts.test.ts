@@ -55,5 +55,7 @@ describe('owner alerts: stock', () => {
     await admin.post(`/api/v1/admin/orders/${o.id}/status`).set('Origin', WEB_ORIGIN).send({ status: 'CANCELLED' });
     await eventsIdle();
     expect(stockEvents()).toEqual([1]);
+    // The owner's group is told about the cancellation.
+    expect(ctx.events.data('order.status_changed').at(-1)).toMatchObject({ order: { status: 'CANCELLED' }, adminAlerts: true });
   });
 });

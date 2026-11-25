@@ -10,12 +10,17 @@ import { orderKeyboard } from './buttons';
 import type { NotificationConfig } from './config';
 import { NotificationError } from './errors';
 import {
+  cancelledAlert,
   customerKeyboard,
   customerMessage,
+  dailySummary,
+  expiredAlert,
   lowStockAlert,
   newCustomerAlert,
   newOrderAlert,
   paymentReceivedAlert,
+  paymentReceivedUpdate,
+  refundedAlert,
   type CustomerKind,
 } from './render';
 import type { Outbox, OutboxMessage } from './outbox';
@@ -33,6 +38,7 @@ const NOTIFICATION_EVENTS = [
   'product.low_stock',
   'customer.signed_up',
   'payment.expired',
+  'shop.daily_summary',
   'admin.alert',
 ] as const;
 type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
@@ -46,6 +52,7 @@ export function messagesFor<T extends NotificationEvent>(
   type: T,
   data: EventData<T>,
   config: Pick<NotificationConfig, 'webOrigin'> & { adminChatId?: string },
+  emittedAt = new Date().toISOString(),
 ): Messages {
   const out: Messages = [];
   const customer = (
@@ -68,6 +75,24 @@ export function messagesFor<T extends NotificationEvent>(
   };
   const awaiting = (o: OrderSnapshot) =>
     o.status === 'PENDING' && o.payment?.method === 'KHQR' && o.payment.status === 'PENDING';
+  const buttons = (o: OrderSnapshot) =>
+    orderKeyboard({ id: o.id, status: o.status, awaitingPayment: awaiting(o) }, false, config.webOrigin);
+  /** Bring what the group already shows about this order up to date. Adds no message, so it ignores the alert switch. */
+  const correct = (o: OrderSnapshot) => {
+    if (!config.adminChatId) return;
+    const edit = (key: 'new' | 'paid', text: string, parseMode?: 'HTML') =>
+      out.push({
+        chatId: config.adminChatId!,
+        text,
+        parseMode,
+        replyMarkup: buttons(o),
+        edits: `order:${o.id}:admin:${key}`,
+        editAt: emittedAt,
+        dedupeKey: `order:${o.id}:admin:${key}:now:${type}:${o.status}`,
+      });
+    edit('new', newOrderAlert(o, config.webOrigin), 'HTML');
+    if (type !== 'payment.confirmed') edit('paid', paymentReceivedUpdate(o));
+  };
 
   switch (type) {
     case 'order.placed': {
@@ -77,11 +102,7 @@ export function messagesFor<T extends NotificationEvent>(
         {
           text: newOrderAlert(d.order, config.webOrigin),
           parseMode: 'HTML',
-          replyMarkup: orderKeyboard({
-            id: d.order.id,
-            status: d.order.status,
-            awaitingPayment: awaiting(d.order),
-          }, false, config.webOrigin),
+          replyMarkup: buttons(d.order),
           dedupeKey: `order:${d.order.id}:admin:new`,
         },
         d.adminAlerts,
@@ -92,6 +113,13 @@ export function messagesFor<T extends NotificationEvent>(
     case 'order.status_changed': {
       const d = data as EventData<'order.status_changed'>;
       customer(d.customerChatId, d.order, 'status');
+      correct(d.order);
+      if (d.order.status === 'CANCELLED')
+        admin(
+          { text: cancelledAlert(d.order), dedupeKey: `order:${d.order.id}:admin:cancelled` },
+          d.adminAlerts,
+          d.order.payment?.status === 'PAID' ? 'attention' : 'orders',
+        );
       break;
     }
     case 'order.tracking_set': {
@@ -105,12 +133,13 @@ export function messagesFor<T extends NotificationEvent>(
       admin(
         {
           text: paymentReceivedAlert(d.order),
-          replyMarkup: orderKeyboard({ id: d.order.id, status: d.order.status }, false, config.webOrigin),
+          replyMarkup: buttons(d.order),
           dedupeKey: `order:${d.order.id}:admin:paid`,
         },
         d.adminAlerts,
         'payments',
       );
+      correct(d.order);
       break;
     }
     case 'payment.reminder': {
@@ -121,11 +150,27 @@ export function messagesFor<T extends NotificationEvent>(
     case 'payment.refunded': {
       const d = data as EventData<'payment.refunded'>;
       customer(d.customerChatId, d.order, 'refunded');
+      admin(
+        { text: refundedAlert(d.order), dedupeKey: `order:${d.order.id}:admin:refunded` },
+        d.adminAlerts,
+        'payments',
+      );
       break;
     }
     case 'payment.expired': {
       const d = data as EventData<'payment.expired'>;
       customer(d.customerChatId, d.order, 'expired', d.holdMinutes);
+      correct(d.order);
+      admin(
+        { text: expiredAlert(d.order, d.holdMinutes), dedupeKey: `order:${d.order.id}:admin:expired` },
+        d.adminAlerts,
+        'orders',
+      );
+      break;
+    }
+    case 'shop.daily_summary': {
+      const d = data as EventData<'shop.daily_summary'>;
+      admin({ text: dailySummary(d), dedupeKey: `summary:${d.date}` }, d.adminAlerts, 'summary');
       break;
     }
     case 'product.low_stock': {
@@ -157,7 +202,7 @@ export async function handleEvent(
 ): Promise<EventResult> {
   const envelope = eventEnvelopeSchema.safeParse(raw);
   if (!envelope.success) throw new NotificationError(400, 'INVALID_EVENT', 'Not an event');
-  const { id, type, requestId, dedupeKey, data } = envelope.data;
+  const { id, type, emittedAt, requestId, dedupeKey, data } = envelope.data;
   if (!handles(type))
     throw new NotificationError(
       422,
@@ -175,7 +220,7 @@ export async function handleEvent(
   const messages = messagesFor(type, parsed.data as never, {
     webOrigin: deps.config.webOrigin,
     adminChatId: deps.config.telegram.adminChatId,
-  });
+  }, emittedAt);
   const db = await deps.pool.connect();
   try {
     await db.query('BEGIN');

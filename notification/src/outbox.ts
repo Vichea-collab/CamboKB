@@ -10,7 +10,8 @@ import { Topics, type TopicKey } from './topics';
  *    or while Telegram is down;
  *  - they are sent right away (a "kick" after saving);
  *  - a worker retries the ones that failed, with backoff, honouring Telegram's rate limit;
- *  - a message can't be queued twice for the same notification (dedupe_key).
+ *  - a message can't be queued twice for the same notification (dedupe_key);
+ *  - a message can replace one sent earlier (`edits`), so an order alert never shows an old status.
  */
 
 export type OutboxMessage = {
@@ -22,9 +23,26 @@ export type OutboxMessage = {
   topic?: TopicKey;
   /** e.g. `order:<id>:customer:CONFIRMED`. A second message with the same key is ignored. */
   dedupeKey?: string;
+  /** Replace the message that has this dedupe key instead of sending a new one. */
+  edits?: string;
+  /** When the change behind an edit happened (ISO): the newest change wins, in whatever order they arrive. */
+  editAt?: string;
   requestId?: string;
   sourceEventId?: string;
 };
+
+type Row = {
+  id: string;
+  chat_id: string;
+  text: string;
+  parse_mode: string | null;
+  reply_markup: unknown;
+  topic: TopicKey | null;
+  edits: string | null;
+};
+
+/** Telegram has nothing left to change: the text is already this, or the message is gone or too old. */
+const NOTHING_TO_EDIT = /message is not modified|message to edit not found|message can't be edited/i;
 
 const MAX_ATTEMPTS = 8;
 const LOCK_SECONDS = 60;
@@ -104,8 +122,8 @@ export class Outbox {
   async save(msg: OutboxMessage, db: Queryable = this.pool): Promise<boolean> {
     const text = msg.text.length > TEXT_LIMIT ? `${msg.text.slice(0, TEXT_LIMIT - 1)}…` : msg.text;
     const r = await db.query(
-      `INSERT INTO messages (chat_id, text, parse_mode, reply_markup, dedupe_key, request_id, source_event_id, topic)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (dedupe_key) DO NOTHING`,
+      `INSERT INTO messages (chat_id, text, parse_mode, reply_markup, dedupe_key, request_id, source_event_id, topic, edits, edit_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (dedupe_key) DO NOTHING`,
       [
         String(msg.chatId),
         text,
@@ -115,6 +133,8 @@ export class Outbox {
         msg.requestId ?? null,
         msg.sourceEventId ?? null,
         msg.topic ?? null,
+        msg.edits ?? null,
+        msg.editAt ?? null,
       ],
     );
     return (r.rowCount ?? 0) > 0;
@@ -157,7 +177,7 @@ export class Outbox {
   /** Claim and send due messages, oldest first. Returns how many were sent. */
   async drain(): Promise<number> {
     const { rows: due } = await this.pool.query(
-      `SELECT id, chat_id, text, parse_mode, reply_markup, attempts, request_id, topic FROM messages
+      `SELECT id, chat_id, text, parse_mode, reply_markup, attempts, request_id, topic, edits FROM messages
        WHERE status = 'PENDING' AND next_attempt_at <= now() AND (locked_until IS NULL OR locked_until < now())
        ORDER BY created_at LIMIT $1`,
       [BATCH],
@@ -173,10 +193,10 @@ export class Outbox {
       if (claim.rowCount !== 1) continue;
       const attempts = row.attempts + 1;
       try {
-        await this.deliver(row);
+        const messageId = row.edits ? await this.edit(row) : await this.deliver(row);
         await this.pool.query(
-          "UPDATE messages SET status = 'SENT', sent_at = now(), locked_until = NULL, last_error = NULL WHERE id = $1",
-          [row.id],
+          "UPDATE messages SET status = 'SENT', sent_at = now(), locked_until = NULL, last_error = NULL, telegram_message_id = $2 WHERE id = $1",
+          [row.id, messageId || null],
         );
         this.sentCounter.inc({ result: 'sent' });
         sent++;
@@ -220,13 +240,7 @@ export class Outbox {
   }
 
   /** Send one row, into its forum topic when it has one. A topic deleted in Telegram is recreated once. */
-  private async deliver(row: {
-    chat_id: string;
-    text: string;
-    parse_mode: string | null;
-    reply_markup: unknown;
-    topic: TopicKey | null;
-  }): Promise<void> {
+  private async deliver(row: Row): Promise<number> {
     const send = (threadId?: number) =>
       this.telegram.sendMessage(Number(row.chat_id), row.text, {
         parseMode: row.parse_mode === 'HTML' ? 'HTML' : undefined,
@@ -235,13 +249,37 @@ export class Outbox {
       });
     const threadId = row.topic ? await this.topics.resolve(row.chat_id, row.topic) : undefined;
     try {
-      await send(threadId);
+      return await send(threadId);
     } catch (err) {
       const gone = threadId !== undefined && err instanceof TelegramError && /thread not found/i.test(err.message);
       if (!gone || !row.topic) throw err;
       await this.topics.forget(row.chat_id, row.topic);
-      await send(await this.topics.resolve(row.chat_id, row.topic));
+      return send(await this.topics.resolve(row.chat_id, row.topic));
     }
+  }
+
+  /** Replace an earlier message. Done when there is nothing to replace; waits while that message is still on its way. */
+  private async edit(row: Row): Promise<null> {
+    const { rows } = await this.pool.query(
+      `SELECT t.chat_id, t.status, t.telegram_message_id,
+              EXISTS (SELECT 1 FROM messages n, messages me
+                      WHERE me.id = $2 AND n.edits = me.edits AND n.edit_at > me.edit_at) AS superseded
+       FROM messages t WHERE t.dedupe_key = $1`,
+      [row.edits, row.id],
+    );
+    const target = rows[0];
+    if (!target || target.superseded) return null;
+    if (target.status === 'PENDING') throw new Error('the message to correct has not been sent yet');
+    if (target.status !== 'SENT' || !target.telegram_message_id) return null;
+    try {
+      await this.telegram.editMessage(Number(target.chat_id), Number(target.telegram_message_id), row.text, {
+        parseMode: row.parse_mode === 'HTML' ? 'HTML' : undefined,
+        replyMarkup: row.reply_markup ?? undefined,
+      });
+    } catch (err) {
+      if (!(err instanceof TelegramError && NOTHING_TO_EDIT.test(err.message))) throw err;
+    }
+    return null;
   }
 
   /** Delete old rows so the tables stay small. */

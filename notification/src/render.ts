@@ -1,4 +1,4 @@
-import { formatPhone, formatUsd, type OrderSnapshot } from '@cambo/shared';
+import { formatPhone, formatUsd, type EventData, type OrderSnapshot } from '@cambo/shared';
 import { openOrderUrl, statusLine } from './buttons';
 
 /** What the messages say. Pure functions of the event data: easy to read, easy to test. */
@@ -46,6 +46,46 @@ export function newOrderAlert(o: OrderSnapshot, webOrigin: string): string {
 
 export const paymentReceivedAlert = (o: OrderSnapshot) =>
   `💰 Payment received: order ${o.number}, ${formatUsd(o.totalCents)} via KHQR. The order is confirmed.`;
+
+/** The same message once the order has moved on: with where the order is now. */
+export const paymentReceivedUpdate = (o: OrderSnapshot) =>
+  `${paymentReceivedAlert(o)}\n${statusLine(o.status)}`;
+
+/** An order was cancelled. Money that already came in has to go back. */
+export const cancelledAlert = (o: OrderSnapshot) =>
+  o.payment?.status === 'PAID'
+    ? `⚠️ Order ${o.number} was cancelled, but ${formatUsd(o.totalCents)} was already paid via ${PAYMENT[o.payment.method]}: please refund the customer.`
+    : `❌ Order ${o.number} (${formatUsd(o.totalCents)}) was cancelled.`;
+
+export const expiredAlert = (o: OrderSnapshot, holdMinutes: number) =>
+  `⏰ Order ${o.number} (${formatUsd(o.totalCents)}) was not paid within ${holdMinutes} minutes. It is cancelled and its stock is back on sale.`;
+
+export const refundedAlert = (o: OrderSnapshot) => `💸 Order ${o.number}: ${formatUsd(o.totalCents)} marked as refunded.`;
+
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Yesterday in a few lines, then what is waiting to be done. Lines that would say 0 are left out. */
+export function dailySummary(d: EventData<'shop.daily_summary'>): string {
+  const day = new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
+  const todo = [
+    ...(d.pending ? [`• ${count(d.pending, 'order', 'orders')} waiting`] : []),
+    ...(d.refundsDue ? [`• ${count(d.refundsDue, 'refund', 'refunds')} to send`] : []),
+    ...(d.lowStock ? [`• ${count(d.lowStock, 'product', 'products')} low or sold out`] : []),
+  ];
+  return [
+    `📊 ${day.replace(',', '')}`,
+    '',
+    d.orders ? `🛒 ${count(d.orders, 'order', 'orders')} · ${formatUsd(d.revenueCents)}` : 'No orders.',
+    ...(d.cancelled ? [`❌ ${d.cancelled} cancelled`] : []),
+    ...(d.newCustomers ? [`👤 ${count(d.newCustomers, 'new customer', 'new customers')}`] : []),
+    ...(todo.length ? ['', 'To do now:', ...todo] : []),
+  ].join('\n');
+}
 
 /** Stock running low, or gone: the owner can open the product to restock. */
 export function lowStockAlert(p: { productId: string; name: string; stock: number }, webOrigin: string): string {

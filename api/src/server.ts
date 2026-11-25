@@ -10,6 +10,7 @@ import { HttpFileClient } from './integrations/files/client';
 import { HttpReportClient } from './integrations/reports/client';
 import { HttpEventSender } from './integrations/services/events';
 import { HttpNotificationClient } from './integrations/services/notification';
+import { startDailySummary } from './modules/events/daily-summary';
 import { startEventWorker } from './modules/events/outbox';
 import { startKhqrSweeper } from './modules/payments/khqr';
 
@@ -59,6 +60,7 @@ async function main() {
   const server = app.listen(config.port, () => logger.info(`API listening on :${config.port}`));
   // Delivers what the other services have not received yet, and retries what failed.
   const stopEvents = startEventWorker(deps);
+  const stopSummary = startDailySummary(deps);
   const stopSweeper = config.bakong.enabled ? startKhqrSweeper(deps) : () => {};
   if (!config.bakong.enabled)
     logger.info('KHQR payments off (set BAKONG_ACCOUNT_ID and BAKONG_TOKEN to turn them on)');
@@ -66,6 +68,7 @@ async function main() {
   const shutdown = (signal: string) => {
     logger.info(`${signal} received, shutting down`);
     stopEvents();
+    stopSummary();
     stopSweeper();
     server.close(async () => {
       await prisma.$disconnect();

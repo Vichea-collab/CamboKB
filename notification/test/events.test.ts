@@ -144,7 +144,8 @@ describe('events from the api become Telegram messages', () => {
     expect(msg!.text.toLowerCase()).toContain(phrase);
     expect(msg!.text).toContain(o.number);
     expect(msg!.text).not.toContain('leave at the gate');
-    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0); // the owner made the change, no need to tell them
+    // The owner's group hears about a cancellation only (see "the owner's group stays true").
+    expect(ctx.telegram.to(ADMIN_CHAT)).toHaveLength(0);
   });
 
   it('tells the customer and the owner about a payment, and offers the owner the next step', async () => {
@@ -409,8 +410,8 @@ describe('events from the api become Telegram messages', () => {
     await flush();
     expect(ctx.telegram.to(ADMIN_CHAT)[0]!.text).toContain('Test message');
     // One test line in every topic, so a new group is set up and the owner can see where each alert will land.
-    expect(ctx.telegram.topicsCreated.map((t) => t.name)).toEqual(['🛒 New orders', '💳 Payments', '⚠️ Needs attention', '📦 Stock', '👤 Customers']);
-    expect(ctx.telegram.to(ADMIN_CHAT).map((m) => m.opts?.threadId)).toEqual([undefined, 100, 101, 102, 103, 104]);
+    expect(ctx.telegram.topicsCreated.map((t) => t.name)).toEqual(['🛒 New orders', '💳 Payments', '⚠️ Needs attention', '📦 Stock', '👤 Customers', '📊 Daily summary']);
+    expect(ctx.telegram.to(ADMIN_CHAT).map((m) => m.opts?.threadId)).toEqual([undefined, 100, 101, 102, 103, 104, 105]);
   });
 
   it('explains when there is no owner chat or the bot is off', async () => {
@@ -422,6 +423,162 @@ describe('events from the api become Telegram messages', () => {
     expect((await request(off.app).post('/internal/test').set(AUTH)).body.error.code).toBe(
       'TELEGRAM_OFF',
     );
+  });
+});
+
+describe("the owner's group stays true", () => {
+  let ctx: Ctx;
+  const send = (type: string, data: object, over: Record<string, unknown> = {}) =>
+    request(ctx.app)
+      .post('/internal/events')
+      .set(AUTH)
+      .send(event(type, data, over) as object)
+      .then((res) => {
+        expect(res.body).toEqual({ result: 'applied' });
+        return Outbox.idle();
+      });
+  const khqr = (over: object = {}) => order({ payment: { method: 'KHQR', status: 'PENDING' }, ...over });
+  const placed = (o: object) => send('order.placed', { order: o, customerChatId: null, adminAlerts: true, holdMinutes: 10 });
+  const topicOf = (name: string) => ctx.telegram.topicsCreated.find((t) => t.name === name)?.threadId;
+  const ownerTexts = () => ctx.telegram.to(ADMIN_CHAT).map((m) => m.text);
+
+  beforeEach(async () => {
+    await resetDb();
+    ctx = makeApp();
+  });
+
+  it('a paid order no longer says it is waiting, and gets its next-step buttons', async () => {
+    const o = khqr();
+    await placed(o);
+    await send('payment.confirmed', {
+      order: { ...o, status: 'CONFIRMED', payment: { method: 'KHQR', status: 'PAID' } },
+      customerChatId: null,
+      adminAlerts: true,
+    });
+    const [u] = ctx.telegram.updated;
+    expect(u).toMatchObject({ chatId: ADMIN_CHAT, messageId: 1001, opts: { parseMode: 'HTML' } });
+    expect(u!.text).toContain(`New order ${o.number}`);
+    expect(u!.text.split('\n')[1]).toBe('✅ Status: Confirmed');
+    expect(u!.text).not.toContain('Waiting');
+    expect(keyboardTexts(u!.opts)).toEqual(['📦 Mark packed', '❌ Cancel']);
+  });
+
+  it('an order that was not paid in time says it is cancelled, has no buttons left, and the group is told', async () => {
+    const o = khqr();
+    await placed(o);
+    await send('payment.expired', {
+      order: { ...o, status: 'CANCELLED', payment: { method: 'KHQR', status: 'EXPIRED' } },
+      customerChatId: null,
+      holdMinutes: 10,
+      adminAlerts: true,
+    });
+    expect(ctx.telegram.updated).toHaveLength(1);
+    expect(ctx.telegram.updated[0]!.text.split('\n')[1]).toBe('❌ Status: Cancelled');
+    expect(keyboardTexts(ctx.telegram.updated[0]!.opts)).toEqual([]);
+    const alert = ctx.telegram.to(ADMIN_CHAT).at(-1)!;
+    expect(alert.text).toBe(`⏰ Order ${o.number} ($43.50) was not paid within 10 minutes. It is cancelled and its stock is back on sale.`);
+    expect(alert.opts?.threadId).toBe(topicOf('🛒 New orders'));
+  });
+
+  it('follows every step made on the website, in the order message and in the payment message', async () => {
+    const o = khqr();
+    const paid = { ...o, status: 'CONFIRMED', payment: { method: 'KHQR', status: 'PAID' } };
+    await placed(o);
+    await send('payment.confirmed', { order: paid, customerChatId: null, adminAlerts: true });
+    ctx.telegram.updated.length = 0;
+    for (const status of ['PACKED', 'SHIPPING', 'DELIVERED'])
+      await send('order.status_changed', { order: { ...paid, status }, customerChatId: null, adminAlerts: true });
+    const lines = (id: number) =>
+      ctx.telegram.updated.filter((u) => u.messageId === id).map((u) => /Status: (.*)/.exec(u.text)![1]);
+    expect(lines(1001)).toEqual(['Packed', 'On the way', 'Delivered']);
+    expect(lines(1002)).toEqual(['Packed', 'On the way', 'Delivered']);
+    expect(ctx.telegram.updated.filter((u) => u.messageId === 1002)[0]!.text).toContain('Payment received');
+    expect(ownerTexts()).toHaveLength(2); // the order and the payment: no extra message for ordinary steps
+  });
+
+  it('tells the group about a cancellation, and asks for a refund when the money already came in', async () => {
+    const cod = order();
+    const paid = khqr();
+    await send('order.status_changed', { order: { ...cod, status: 'CANCELLED' }, customerChatId: null, adminAlerts: true });
+    await send('order.status_changed', {
+      order: { ...paid, status: 'CANCELLED', payment: { method: 'KHQR', status: 'PAID' } },
+      customerChatId: null,
+      adminAlerts: true,
+    });
+    const [a, b] = ctx.telegram.to(ADMIN_CHAT);
+    expect(a!.text).toBe(`❌ Order ${cod.number} ($43.50) was cancelled.`);
+    expect(a!.opts?.threadId).toBe(topicOf('🛒 New orders'));
+    expect(b!.text).toBe(`⚠️ Order ${paid.number} was cancelled, but $43.50 was already paid via KHQR: please refund the customer.`);
+    expect(b!.opts?.threadId).toBe(topicOf('⚠️ Needs attention'));
+  });
+
+  it('tells the group a refund was recorded, in Payments', async () => {
+    const o = khqr({ status: 'CANCELLED', payment: { method: 'KHQR', status: 'REFUNDED' } });
+    await send('payment.refunded', { order: o, customerChatId: null, adminAlerts: true });
+    const [m] = ctx.telegram.to(ADMIN_CHAT);
+    expect(m!.text).toBe(`💸 Order ${o.number}: $43.50 marked as refunded.`);
+    expect(m!.opts?.threadId).toBe(topicOf('💳 Payments'));
+  });
+
+  it('with alerts off it adds no message, but still corrects the ones already there', async () => {
+    const o = khqr();
+    await placed(o);
+    await send('payment.expired', { order: { ...o, status: 'CANCELLED' }, customerChatId: null, holdMinutes: 10, adminAlerts: false });
+    expect(ownerTexts()).toHaveLength(1);
+    expect(ctx.telegram.updated).toHaveLength(1);
+  });
+
+  it('accepts an event queued before this existed (no adminAlerts): it corrects, and stays quiet', async () => {
+    const o = khqr();
+    await placed(o);
+    await send('payment.expired', { order: { ...o, status: 'CANCELLED' }, customerChatId: null, holdMinutes: 10 });
+    await send('order.status_changed', { order: order({ status: 'CANCELLED' }), customerChatId: null });
+    await send('payment.refunded', { order: order({ status: 'CANCELLED' }), customerChatId: null });
+    expect(ownerTexts()).toHaveLength(1);
+    expect(ctx.telegram.updated).toHaveLength(1);
+  });
+
+  it('an older change that arrives late does not put the message back', async () => {
+    const o = order();
+    await placed(o);
+    const at = (min: number) => ({ emittedAt: new Date(Date.UTC(2026, 10, 25, 8, min)).toISOString() });
+    await send('order.status_changed', { order: { ...o, status: 'SHIPPING' }, customerChatId: null }, at(5));
+    await send('order.status_changed', { order: { ...o, status: 'PACKED' }, customerChatId: null }, at(3));
+    expect(ctx.telegram.updated.map((u) => /Status: (.*)/.exec(u.text)![1])).toEqual(['On the way']);
+  });
+
+  it('never edits a message about an order it did not announce (the group changed, or it was long ago)', async () => {
+    await send('order.status_changed', { order: order({ status: 'PACKED' }), customerChatId: null });
+    expect(ctx.telegram.updated).toHaveLength(0);
+    expect((await pool.query("SELECT count(*)::int AS n FROM messages WHERE status <> 'SENT'")).rows[0].n).toBe(0);
+  });
+
+  it('sends the day’s numbers to their own topic, once per day', async () => {
+    const day = { date: '2026-11-25', orders: 5, revenueCents: 12050, cancelled: 1, newCustomers: 2, pending: 1, lowStock: 3, refundsDue: 1, adminAlerts: true };
+    await send('shop.daily_summary', day);
+    await send('shop.daily_summary', day);
+    const messages = ctx.telegram.to(ADMIN_CHAT);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.text).toBe(
+      [
+        '📊 Wednesday 25 November',
+        '',
+        '🛒 5 orders · $120.50',
+        '❌ 1 cancelled',
+        '👤 2 new customers',
+        '',
+        'To do now:',
+        '• 1 order waiting',
+        '• 1 refund to send',
+        '• 3 products low or sold out',
+      ].join('\n'),
+    );
+    expect(messages[0]!.opts?.threadId).toBe(topicOf('📊 Daily summary'));
+  });
+
+  it('keeps a quiet day short', async () => {
+    await send('shop.daily_summary', { date: '2026-11-26', orders: 0, revenueCents: 0, cancelled: 0, newCustomers: 0, pending: 0, lowStock: 0, refundsDue: 0, adminAlerts: true });
+    expect(ownerTexts()).toEqual(['📊 Thursday 26 November\n\nNo orders.']);
   });
 });
 

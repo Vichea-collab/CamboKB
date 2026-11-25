@@ -52,7 +52,7 @@ export async function loadSnapshot(
   };
 }
 
-const adminAlertsOn = async (db: Db) =>
+export const adminAlertsOn = async (db: Db) =>
   (await db.storeSetting.findUnique({ where: { id: 1 } }))?.telegramNotify ?? true;
 
 /**
@@ -85,7 +85,7 @@ export async function announceStatusChanged(db: Db, orderId: string) {
   await publishEvent(
     db,
     'order.status_changed',
-    { order, customerChatId },
+    { order, customerChatId, adminAlerts: await adminAlertsOn(db) },
     { dedupeKey: `order:${orderId}:status:${order.status}` },
   );
 }
@@ -120,7 +120,7 @@ export async function announcePaymentRefunded(db: Db, orderId: string) {
   await publishEvent(
     db,
     'payment.refunded',
-    { order, customerChatId },
+    { order, customerChatId, adminAlerts: await adminAlertsOn(db) },
     { dedupeKey: `order:${orderId}:refunded` },
   );
 }
@@ -143,7 +143,7 @@ export async function announcePaymentExpired(db: Db, orderId: string, holdMinute
   await publishEvent(
     db,
     'payment.expired',
-    { order, customerChatId, holdMinutes },
+    { order, customerChatId, holdMinutes, adminAlerts: await adminAlertsOn(db) },
     { dedupeKey: `order:${orderId}:expired` },
   );
 }

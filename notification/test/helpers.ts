@@ -72,6 +72,14 @@ export class FakeTelegramClient implements TelegramClient {
       throw new TelegramError('Telegram sendMessage failed: Bad Request: message thread not found', 400);
     if (this.failSends) throw new Error('telegram down');
     this.sent.push({ chatId, text, opts });
+    return this.sent.length + 1000;
+  }
+  /** Messages the outbox updated, and an error to answer those updates with. */
+  updated: { chatId: number | string; messageId: number; text: string; opts?: SendOptions }[] = [];
+  failEdits: Error | null = null;
+  async editMessage(chatId: number | string, messageId: number, text: string, opts?: SendOptions) {
+    if (this.failEdits) throw this.failEdits;
+    this.updated.push({ chatId, messageId, text, opts });
   }
   async answerCallbackQuery(id: string, text?: string, alert?: boolean) {
     this.answers.push({ id, text, alert });
