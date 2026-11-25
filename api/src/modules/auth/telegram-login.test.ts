@@ -108,7 +108,7 @@ describe('Continue with Telegram (login by deep link)', () => {
       await sendStart(ctx, 777, token);
       expect(lastText()).toContain('Log in to Cambo Keyboard Supply as Dara Sok?');
       expect(lastText()).toContain('Chrome on Android');
-      expect(lastText()).toContain(`Code: ${res.body.matchCode}`);
+      expect(lastText()).toContain(`\n\n<b>Code: ${res.body.matchCode}</b>\n\n`); // easy to compare: its own line, bold
       expect(lastText()).toContain('Only tap if you are doing this right now');
       expect(markupOf(said.at(-1))).toContain(`login:${requestId}:y`);
       expect(markupOf(said.at(-1))).toContain(`login:${requestId}:n`);

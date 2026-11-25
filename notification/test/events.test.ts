@@ -638,6 +638,24 @@ describe('the customer can open their order as a Telegram Mini App', () => {
     });
   });
 
+  it('an order waiting for KHQR has a Pay now button, straight to the code', () => {
+    const khqr = order({ payment: { method: 'KHQR', status: 'PENDING' } });
+    const msg = messagesFor('order.placed', { order: khqr, customerChatId: String(CUSTOMER), adminAlerts: false, holdMinutes: 10 } as never, { webOrigin: HTTPS })[0]!;
+    expect(msg.replyMarkup).toEqual({ inline_keyboard: [[{ text: '💳 Pay now', web_app: { url: `${HTTPS}/orders/${khqr.number}/pay` } }]] });
+    expect(customerOf('order.placed', HTTPS).replyMarkup).toMatchObject({ inline_keyboard: [[{ text: '📦 View my order' }]] }); // cash on delivery
+  });
+
+  it('says what was ordered, and keeps a long order short', () => {
+    const item = (i: number) => ({ productId: '8d7a0b3e-3c5a-4e0b-8f6a-0d9a8f1e2b34', name: `Mouse <${i}>`, quantity: i, priceCents: 100, lineTotalCents: 100 * i });
+    const text = (k: number) => {
+      const big = order({ items: Array.from({ length: k }, (_, i) => item(i + 1)) });
+      return messagesFor('order.placed', { order: big, customerChatId: String(CUSTOMER), adminAlerts: false, holdMinutes: 10 } as never, { webOrigin: HTTPS })[0]!.text;
+    };
+    expect(text(2)).toMatch(/shortly\.\n\n• 1 × Mouse <1>\n• 2 × Mouse <2>$/);
+    expect(text(8).split('\n').slice(-2)).toEqual(['• 5 × Mouse <5>', '• and 3 more']);
+    expect(customerOf('order.status_changed', HTTPS).text).not.toContain('×');
+  });
+
   it('does not repeat the link in the text when there is a button', () => {
     expect(customerOf('order.placed', HTTPS).text).not.toContain('https://');
   });

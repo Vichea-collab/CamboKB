@@ -6,9 +6,11 @@ import { announceCustomerSignedUp } from '../events/snapshot';
 import { kickEvents } from '../events/outbox';
 import {
   BOT_COMMANDS,
+  EMPTY_STORE_INFO,
   formatUsd,
   normalizePhone,
   PHNOM_PENH_OFFSET_MS,
+  storeInfoSchema,
   type BotAction,
 } from '@cambo/shared';
 import type { TgMessage, TgUpdate } from '../../integrations/telegram/types';
@@ -38,9 +40,9 @@ export const BOT_TEXT = {
     'That phone number belongs to an account linked to a different Telegram account. Please contact the shop.',
   logInButton: '✅ Log me in',
   notMeButton: '🚫 Not me',
-  noPending: 'Please open the sign-up link from the Cambo Keyboard Supply website first.',
-  unknownMessage:
-    'I only understand commands. Try /shop to open the store, /orders for your latest orders, or /help.',
+  unknownMessage: "Thanks for your message! I'm an automatic bot, so I can't answer questions.",
+  useCommands: 'Or use /shop to open the store, /orders for your latest orders, or /help.',
+  messageUsButton: '💬 Message us',
   invalidPhone: "That phone number doesn't look valid.",
   askLocation:
     "Tap the button below to share where we should deliver. You can also send any other spot from the 📎 menu → Location. (Telegram on a computer can't send a location: use your phone, or tap “Use my location” on the checkout page.)",
@@ -95,17 +97,43 @@ export async function handleTelegramUpdate(deps: AppDeps, update: TgUpdate): Pro
   return actions;
 }
 
+/** Bold and the like need HTML, so what people typed must not be read as tags. */
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** How to reach a person, as the shop filled it in (Admin → Settings). Only what is there. */
+async function contactDetails(deps: AppDeps) {
+  const row = await deps.prisma.storeSetting.findUnique({ where: { id: 1 } });
+  const info = storeInfoSchema.catch(EMPTY_STORE_INFO).parse(row?.info ?? {});
+  return {
+    lines: [
+      ...(info.telegram ? [`💬 Message us: @${info.telegram}`] : []),
+      ...(info.phone ? [`📞 Call: ${info.phone}`] : []),
+    ],
+    button: info.telegram
+      ? { inline_keyboard: [[{ text: BOT_TEXT.messageUsButton, url: `https://t.me/${info.telegram}` }]] }
+      : undefined,
+  };
+}
+
 /**
- * Anything that isn't a command. A customer who already has an account is pointed at the commands;
- * someone without one is pointed at sign-up.
+ * Anything that isn't a command: usually a question. The bot can't answer it, so it says how to reach the shop.
+ * Someone without an account can also sign up right there.
  */
 async function handleOther(deps: AppDeps, msg: TgMessage, say: Say) {
   const user = await deps.prisma.user.findUnique({
     where: { telegramUserId: BigInt(msg.from!.id) },
     select: { id: true },
   });
-  if (user) say(msg.chat.id, BOT_TEXT.unknownMessage);
-  else say(msg.chat.id, `${BOT_TEXT.noPending}\n${deps.config.webOrigin[0] ?? ''}`);
+  const { lines, button } = await contactDetails(deps);
+  const contact = lines.length ? ['', ...lines] : [];
+  if (user) {
+    say(msg.chat.id, [BOT_TEXT.unknownMessage, ...contact, '', BOT_TEXT.useCommands].join('\n'), { replyMarkup: button });
+    return;
+  }
+  // Telegram can't carry both keyboards in one message: signing up is the button, reaching the shop is in the text.
+  say(msg.chat.id, [BOT_TEXT.welcomeNew, ...(lines.length ? ['', 'Have a question?', ...lines] : [])].join('\n'), {
+    replyMarkup: shareKeyboard,
+  });
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -115,6 +143,15 @@ const STATUS_LABEL: Record<string, string> = {
   SHIPPING: 'On the way',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
+};
+
+const STATUS_ICON: Record<string, string> = {
+  PENDING: '🆕',
+  CONFIRMED: '✅',
+  PACKED: '📦',
+  SHIPPING: '🚚',
+  DELIVERED: '🎉',
+  CANCELLED: '❌',
 };
 
 const COMMANDS = BOT_COMMANDS;
@@ -206,6 +243,20 @@ async function handleOrders(deps: AppDeps, msg: TgMessage, say: Say) {
   const lines = orders.map(
     (o) => `${o.number} · ${STATUS_LABEL[o.status] ?? o.status} · ${formatUsd(o.totalCents)}`,
   );
+  // Telegram only opens Mini Apps from https links.
+  if (origin(deps).startsWith('https://')) {
+    say(msg.chat.id, 'Your latest orders. Tap one to open it:', {
+      replyMarkup: {
+        inline_keyboard: orders.map((o, i) => [
+          {
+            text: `${STATUS_ICON[o.status] ?? '📌'} ${lines[i]}`,
+            web_app: { url: `${origin(deps)}/account/orders/${encodeURIComponent(o.number)}` },
+          },
+        ]),
+      },
+    });
+    return;
+  }
   say(
     msg.chat.id,
     ['Your latest orders:', '', ...lines, '', `Details: ${origin(deps)}/account/orders`].join('\n'),
@@ -376,10 +427,10 @@ async function handleContact(deps: AppDeps, msg: TgMessage, say: Say) {
   reply(BOT_TEXT.verified);
 }
 
-/** "Chrome on Android at 14:05 (Cambodia time), code 42": lets the person recognise a login they started. */
+/** "Chrome on Android at 14:05 (Cambodia time)", and the code on its own line: lets the person recognise a login they started. HTML. */
 function loginContext(request: TelegramAuthRequest): string {
   const time = new Date(request.createdAt.getTime() + PHNOM_PENH_OFFSET_MS).toISOString().slice(11, 16);
-  return `Started from ${request.browser ?? 'a browser'} at ${time} (Cambodia time). Code: ${request.matchCode ?? '--'}`;
+  return `Started from ${escapeHtml(request.browser ?? 'a browser')} at ${time} (Cambodia time).\n\n<b>Code: ${request.matchCode ?? '--'}</b>`;
 }
 
 /**
@@ -412,18 +463,20 @@ async function handleLoginStart(
   if (!linked) {
     return void say(msg.chat.id, `${loginContext(bound)}\n\n${BOT_TEXT.loginAskPhone}`, {
       replyMarkup: shareKeyboard,
+      parseMode: 'HTML',
     });
   }
   say(
     msg.chat.id,
     [
-      `Log in to Cambo Keyboard Supply as ${linked.name}?`,
+      `Log in to Cambo Keyboard Supply as ${escapeHtml(linked.name)}?`,
       '',
       loginContext(bound),
       '',
       'Only tap if you are doing this right now.',
     ].join('\n'),
     {
+      parseMode: 'HTML',
       replyMarkup: {
         inline_keyboard: [
           [

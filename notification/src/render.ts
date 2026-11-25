@@ -111,6 +111,13 @@ const STATUS_MESSAGE: Record<string, string> = {
   CANCELLED: '❌ Your order {n} was cancelled. Message us if this is a surprise.',
 };
 
+const ITEMS_SHOWN = 5;
+/** What was ordered, a few lines at most. Plain text: customer messages are not HTML. */
+const itemLines = (o: OrderSnapshot) => [
+  ...o.items.slice(0, ITEMS_SHOWN).map((i) => `• ${i.quantity} × ${i.name}`),
+  ...(o.items.length > ITEMS_SHOWN ? [`• and ${o.items.length - ITEMS_SHOWN} more`] : []),
+];
+
 /** The customer's message for one thing that happened to their order. Internal admin notes are never included. */
 export function customerMessage(
   kind: CustomerKind,
@@ -134,7 +141,7 @@ export function customerMessage(
   else if (kind === 'tracking')
     text = "📮 Tracking number for order {n}: {tracking} ({carrier}). Use it on the carrier's app or website to follow your parcel.";
   else text = STATUS_MESSAGE[o.status] ?? '📌 Your order {n} is now {status}.';
-  const body = text
+  const filled = text
     .replace('{n}', o.number)
     .replace('{total}', formatUsd(o.totalCents))
     .replace('{hold}', String(ctx.holdMinutes ?? 10))
@@ -142,6 +149,7 @@ export function customerMessage(
     .replace('{mins}', `${ctx.minutesLeft ?? 1} ${ctx.minutesLeft === 1 || ctx.minutesLeft === undefined ? 'minute' : 'minutes'}`)
     .replace('{tracking}', o.trackingNumber ?? '')
     .replace('{carrier}', SERVICE[o.deliveryService]);
+  const body = kind === 'placed' ? [filled, '', ...itemLines(o)].join('\n') : filled;
   // With the button (https) the link would only repeat it.
   return canOpenInTelegram(ctx.webOrigin)
     ? body
@@ -154,7 +162,7 @@ export function customerKeyboard(kind: CustomerKind, o: OrderSnapshot, webOrigin
   const button =
     kind === 'expired'
       ? { text: '🛒 Order again', web_app: { url: webOrigin } }
-      : kind === 'reminder'
+      : kind === 'reminder' || (kind === 'placed' && awaitingKhqr(o))
         ? { text: '💳 Pay now', web_app: { url: payUrl(webOrigin, o.number) } }
         : { text: '📦 View my order', web_app: { url: orderUrl(webOrigin, o.number) } };
   return { inline_keyboard: [[button]] };
