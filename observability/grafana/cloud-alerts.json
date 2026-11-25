@@ -15,6 +15,6 @@
     "expr": "notification_outbox_failed", "summary": "Some Telegram messages were given up on (blocked users, bad chat id?)" },
   { "uid": "cambo-server-memory", "title": "ServerMemoryHigh", "for": "5m", "severity": "warning", "op": "gt", "value": 0.9,
     "expr": "1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes", "summary": "The server uses more than 90% of its memory" },
-  { "uid": "cambo-nginx-errors", "title": "NginxErrors", "for": "1m", "severity": "critical", "op": "gt", "value": 5, "source": "grafanacloud-logs",
+  { "uid": "cambo-nginx-errors", "title": "NginxErrors", "for": "6m", "severity": "critical", "op": "gt", "value": 5, "source": "grafanacloud-logs",
     "expr": "sum(count_over_time({service=\"web\"} |~ `\" 5[0-9][0-9] ` [5m]))", "summary": "Visitors are getting server errors from nginx (more than 5 in 5 minutes). A service may be unreachable from it." }
 ]
