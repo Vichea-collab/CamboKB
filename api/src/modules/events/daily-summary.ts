@@ -26,15 +26,19 @@ export async function sendDailySummary(deps: AppDeps, now = new Date()): Promise
 
   const { start, endExclusive } = phnomPenhDayRange(date, date);
   const createdAt = { gte: start, lt: endExclusive };
+  // A KHQR order counts once it is paid: not while it waits for the money, nor when the money never came.
+  const waitingForMoney = { status: 'PENDING', payment: { is: { method: 'KHQR', status: 'PENDING' } } } as const;
   const [sold, cancelled, newCustomers, pending, lowStock, refundsDue, adminAlerts] = await Promise.all([
     prisma.order.aggregate({
-      where: { createdAt, status: { not: 'CANCELLED' } },
+      where: { createdAt, status: { not: 'CANCELLED' }, NOT: waitingForMoney },
       _count: { _all: true },
       _sum: { totalCents: true },
     }),
-    prisma.order.count({ where: { createdAt, status: 'CANCELLED' } }),
+    prisma.order.count({
+      where: { createdAt, status: 'CANCELLED', NOT: { payment: { is: { status: 'EXPIRED' } } } },
+    }),
     prisma.user.count({ where: { createdAt, role: 'CUSTOMER' } }),
-    prisma.order.count({ where: { status: 'PENDING' } }),
+    prisma.order.count({ where: { status: 'PENDING', NOT: waitingForMoney } }),
     prisma.product.count({ where: { isActive: true, stock: { lte: LOW_STOCK_THRESHOLD } } }),
     prisma.payment.count({ where: { status: 'PAID', order: { status: 'CANCELLED' } } }),
     adminAlertsOn(prisma),

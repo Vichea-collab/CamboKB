@@ -89,7 +89,6 @@ export const eventDataSchemas = {
     order: orderSnapshotSchema,
     customerChatId: chat,
     holdMinutes: z.number().int().positive(),
-    adminAlerts: z.boolean().default(false),
   }),
   /** Yesterday's numbers and what waits to be done, sent to the owner each morning. */
   'shop.daily_summary': z.object({

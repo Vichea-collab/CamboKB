@@ -57,9 +57,6 @@ export const cancelledAlert = (o: OrderSnapshot) =>
     ? `⚠️ Order ${o.number} was cancelled, but ${formatUsd(o.totalCents)} was already paid via ${PAYMENT[o.payment.method]}: please refund the customer.`
     : `❌ Order ${o.number} (${formatUsd(o.totalCents)}) was cancelled.`;
 
-export const expiredAlert = (o: OrderSnapshot, holdMinutes: number) =>
-  `⏰ Order ${o.number} (${formatUsd(o.totalCents)}) was not paid within ${holdMinutes} minutes. It is cancelled and its stock is back on sale.`;
-
 export const refundedAlert = (o: OrderSnapshot) => `💸 Order ${o.number}: ${formatUsd(o.totalCents)} marked as refunded.`;
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

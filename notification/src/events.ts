@@ -14,7 +14,6 @@ import {
   customerKeyboard,
   customerMessage,
   dailySummary,
-  expiredAlert,
   lowStockAlert,
   newCustomerAlert,
   newOrderAlert,
@@ -77,6 +76,21 @@ export function messagesFor<T extends NotificationEvent>(
     o.status === 'PENDING' && o.payment?.method === 'KHQR' && o.payment.status === 'PENDING';
   const buttons = (o: OrderSnapshot) =>
     orderKeyboard({ id: o.id, status: o.status, awaitingPayment: awaiting(o) }, false, config.webOrigin);
+  /** An unpaid KHQR order is not an order yet: the group hears about it when the money arrives, or never. */
+  const unpaidKhqr = (o: OrderSnapshot) =>
+    o.payment?.method === 'KHQR' && o.payment.status !== 'PAID' && o.payment.status !== 'REFUNDED';
+  /** The order with every detail, in New orders. Once per order, whichever event comes first. */
+  const announce = (o: OrderSnapshot, on: boolean) =>
+    admin(
+      {
+        text: newOrderAlert(o, config.webOrigin),
+        parseMode: 'HTML',
+        replyMarkup: buttons(o),
+        dedupeKey: `order:${o.id}:admin:new`,
+      },
+      on,
+      'orders',
+    );
   /** Bring what the group already shows about this order up to date. Adds no message, so it ignores the alert switch. */
   const correct = (o: OrderSnapshot) => {
     if (!config.adminChatId) return;
@@ -98,23 +112,16 @@ export function messagesFor<T extends NotificationEvent>(
     case 'order.placed': {
       const d = data as EventData<'order.placed'>;
       customer(d.customerChatId, d.order, 'placed', d.holdMinutes);
-      admin(
-        {
-          text: newOrderAlert(d.order, config.webOrigin),
-          parseMode: 'HTML',
-          replyMarkup: buttons(d.order),
-          dedupeKey: `order:${d.order.id}:admin:new`,
-        },
-        d.adminAlerts,
-        'orders',
-      );
+      if (!awaiting(d.order)) announce(d.order, d.adminAlerts);
       break;
     }
     case 'order.status_changed': {
       const d = data as EventData<'order.status_changed'>;
       customer(d.customerChatId, d.order, 'status');
+      // A KHQR order the shop confirmed by hand was not announced when it was placed.
+      if (d.order.status === 'CONFIRMED' && d.order.payment?.method === 'KHQR') announce(d.order, d.adminAlerts);
       correct(d.order);
-      if (d.order.status === 'CANCELLED')
+      if (d.order.status === 'CANCELLED' && !unpaidKhqr(d.order))
         admin(
           { text: cancelledAlert(d.order), dedupeKey: `order:${d.order.id}:admin:cancelled` },
           d.adminAlerts,
@@ -130,6 +137,7 @@ export function messagesFor<T extends NotificationEvent>(
     case 'payment.confirmed': {
       const d = data as EventData<'payment.confirmed'>;
       customer(d.customerChatId, d.order, 'paid');
+      announce(d.order, d.adminAlerts);
       admin(
         {
           text: paymentReceivedAlert(d.order),
@@ -161,11 +169,6 @@ export function messagesFor<T extends NotificationEvent>(
       const d = data as EventData<'payment.expired'>;
       customer(d.customerChatId, d.order, 'expired', d.holdMinutes);
       correct(d.order);
-      admin(
-        { text: expiredAlert(d.order, d.holdMinutes), dedupeKey: `order:${d.order.id}:admin:expired` },
-        d.adminAlerts,
-        'orders',
-      );
       break;
     }
     case 'shop.daily_summary': {
@@ -232,10 +235,14 @@ export async function handleEvent(
       await db.query('ROLLBACK');
       return 'duplicate';
     }
+    // A message queued by this very event is up to date already: only older ones need correcting.
+    const fresh = new Set<string>();
     for (const m of messages) {
+      if (m.edits && fresh.has(m.edits)) continue;
       // Alerts carry the api's own dedupe key so a re-sent alert is not shown twice.
       const dedupe = m.dedupeKey ?? (dedupeKey ? `alert:${dedupeKey}` : undefined);
-      await deps.outbox.save({ ...m, dedupeKey: dedupe, requestId, sourceEventId: id }, db);
+      const saved = await deps.outbox.save({ ...m, dedupeKey: dedupe, requestId, sourceEventId: id }, db);
+      if (saved && dedupe) fresh.add(dedupe);
     }
     await db.query('COMMIT');
   } catch (err) {

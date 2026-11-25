@@ -143,7 +143,7 @@ export async function announcePaymentExpired(db: Db, orderId: string, holdMinute
   await publishEvent(
     db,
     'payment.expired',
-    { order, customerChatId, holdMinutes, adminAlerts: await adminAlertsOn(db) },
+    { order, customerChatId, holdMinutes },
     { dedupeKey: `order:${orderId}:expired` },
   );
 }

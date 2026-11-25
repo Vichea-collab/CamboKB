@@ -76,6 +76,17 @@ describe('daily summary', () => {
     ]);
   });
 
+  it('leaves out KHQR orders that are waiting for money, or never got it', async () => {
+    const waiting = await placeOrder(at('2026-11-25T05:00:00Z'));
+    const expired = await placeOrder(at('2026-11-25T06:00:00Z'), { status: 'CANCELLED' });
+    await placeOrder(at('2026-11-25T07:00:00Z'));
+    await ctx.prisma.payment.update({ where: { orderId: waiting.id }, data: { method: 'KHQR', status: 'PENDING' } });
+    await ctx.prisma.payment.update({ where: { orderId: expired.id }, data: { method: 'KHQR', status: 'EXPIRED' } });
+    await sendDailySummary(ctx.deps, MORNING_AFTER);
+    await eventsIdle();
+    expect(summaries()).toMatchObject([{ orders: 1, cancelled: 0, pending: 1 }]);
+  });
+
   it('follows the owner’s alert switch', async () => {
     await ctx.prisma.storeSetting.update({ where: { id: 1 }, data: { telegramNotify: false } });
     await sendDailySummary(ctx.deps, MORNING_AFTER);
