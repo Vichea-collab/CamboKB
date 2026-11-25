@@ -16,10 +16,10 @@ const mouse = card('m', 'Attack Shark X11');
 const other = card('n', 'Another mouse');
 
 /** `mice` answers the request for the other products of the category. */
-function open(mice: () => Promise<unknown>) {
+function open(mice: () => Promise<unknown>, stock = 5) {
   vi.mocked(api).mockImplementation(async (path: string) => {
     if (path === '/auth/session') return { user: null };
-    if (path === '/products/m') return { ...mouse, description: '', stock: 5, specs: [], images: [] };
+    if (path === '/products/m') return { ...mouse, description: '', stock, specs: [], images: [] };
     if (path.includes('category=mice')) return mice();
     if (path.startsWith('/products?')) return { items: [keyboard, mouse, other], total: 3 };
     if (path === '/store') return { storeName: 'Shop', info: {}, delivery: {}, payments: {} };
@@ -35,6 +35,17 @@ function open(mice: () => Promise<unknown>) {
     </QueryClientProvider>,
   );
 }
+
+describe('Product page: how many are left', () => {
+  it.each([
+    [1, 'Only 1 left'],
+    [3, 'Only 3 left'],
+    [4, 'In stock'],
+  ])('with %i in stock says "%s"', async (stock, label) => {
+    open(async () => ({ items: [mouse], total: 1 }), stock);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+});
 
 describe('Product page: more in the category', () => {
   it('shows card skeletons while it loads, never products of another category', async () => {

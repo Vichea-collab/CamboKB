@@ -197,12 +197,12 @@ describe('public catalog', () => {
 
   it('says how many are left only when stock is low, never the full inventory', async () => {
     await createProduct(ctx.prisma, { name: 'Plenty', slug: 'plenty', stock: 40 });
-    await createProduct(ctx.prisma, { name: 'Some', slug: 'some', stock: 2 });
-    await createProduct(ctx.prisma, { name: 'Last', slug: 'last', stock: 1 });
+    await createProduct(ctx.prisma, { name: 'Some', slug: 'some', stock: 4 });
+    await createProduct(ctx.prisma, { name: 'Last', slug: 'last', stock: 3 });
     await createProduct(ctx.prisma, { name: 'Gone', slug: 'gone', stock: 0 });
     const res = await request(ctx.app).get('/api/v1/products');
     const left = Object.fromEntries(res.body.items.map((p: { slug: string; lowStock: number | null }) => [p.slug, p.lowStock]));
-    expect(left).toEqual({ plenty: null, some: null, last: 1, gone: null });
+    expect(left).toEqual({ plenty: null, some: null, last: 3, gone: null });
     expect(res.body.items.find((p: { slug: string }) => p.slug === 'plenty')).not.toHaveProperty('stock');
   });
 });

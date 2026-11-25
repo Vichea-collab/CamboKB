@@ -1,3 +1,4 @@
+import { LOW_STOCK_THRESHOLD } from '@cambo/shared';
 import { currentLang } from './i18n';
 
 /**
@@ -94,7 +95,7 @@ const en = {
     added: (name: string) => `Added ${name}`,
     notFound: "This product isn't available any more.",
     backToShop: 'Back to the shop',
-    inStock: (n: number) => (n <= 1 ? `Only ${n} left` : 'In stock'),
+    inStock: (n: number) => (n <= LOW_STOCK_THRESHOLD ? `Only ${n} left` : 'In stock'),
     breadcrumb: 'Breadcrumb',
     shop: 'Shop',
     moreIn: (category: string) => `More in ${category}`,
@@ -476,7 +477,7 @@ const km: Strings = {
     added: (name) => `បានបន្ថែម ${name}`,
     notFound: 'ផលិតផលនេះលែងមានទៀតហើយ។',
     backToShop: 'ត្រឡប់ទៅហាង',
-    inStock: (n) => (n <= 3 ? `នៅសល់តែ ${n}` : 'មានក្នុងស្តុក'),
+    inStock: (n) => (n <= LOW_STOCK_THRESHOLD ? `នៅសល់តែ ${n}` : 'មានក្នុងស្តុក'),
     breadcrumb: 'ផ្លូវរុករក',
     shop: 'ហាង',
     moreIn: (category) => `ផលិតផលផ្សេងទៀតក្នុង ${category}`,

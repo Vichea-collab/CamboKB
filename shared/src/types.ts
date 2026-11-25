@@ -25,4 +25,4 @@ export type PublicUser = {
 };
 
 /** A product with this many left (or fewer) counts as low stock: the dashboard lists it and the owner is warned. */
-export const LOW_STOCK_THRESHOLD = 1;
+export const LOW_STOCK_THRESHOLD = 3;
