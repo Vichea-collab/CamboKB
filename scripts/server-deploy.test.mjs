@@ -40,7 +40,17 @@ beforeEach(() => {
     `#!/bin/sh
 echo "curl $*" >> "$LOG"
 case "$*" in
-  *api.github.com*) [ -e "$FAIL/not-main" ] && s=diverged || s=ahead; printf '{\\n  "status": "%s",\\n}\\n' "$s" ;;
+  *api.github.com*)
+    out=; while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    n=$(grep -c api.github.com "$LOG"); code=200
+    [ -e "$FAIL/github" ] && code=504
+    [ -e "$FAIL/github-twice" ] && [ "$n" -le 2 ] && code=504
+    [ -e "$FAIL/github-garbage" ] && [ "$n" -le 1 ] && { echo '<html>' > "$out"; printf 200; exit 0; }
+    [ -e "$FAIL/github-unreachable" ] && { printf 000; exit 28; }
+    [ -e "$FAIL/unknown" ] && code=404
+    [ -e "$FAIL/not-main" ] && s=diverged || s=ahead
+    if [ "$code" = 200 ]; then printf '{\\n  "status": "%s",\\n}\\n' "$s"; else echo '<html>504</html>'; fi > "$out"
+    printf '%s' "$code" ;;
   *codeload*) while [ "$1" != -o ]; do shift; done; cp "${dir}/src.tar.gz" "$2" ;;
   *shop.example*) [ ! -e "$FAIL/public-$(sed -n 's/^IMAGE_TAG=//p' "$CAMBO_APP/.env.production")" ] ;;
 esac
@@ -74,7 +84,7 @@ const fail = (...names) => names.forEach((n) => put(join(dir, 'fail', n), ''));
 const run = (request = `deploy ${SHA}`, viaArgs = false) => {
   const r = spawnSync('bash', viaArgs ? [SCRIPT, ...request.split(' ')] : [SCRIPT], {
     encoding: 'utf8',
-    env: { PATH: `${join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, LOG: join(dir, 'log'), FAIL: join(dir, 'fail'), CAMBO_APP: app, ...(viaArgs ? {} : { SSH_ORIGINAL_COMMAND: request }) },
+    env: { PATH: `${join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, LOG: join(dir, 'log'), FAIL: join(dir, 'fail'), CAMBO_APP: app, CAMBO_RETRY_DELAY: '0', ...(viaArgs ? {} : { SSH_ORIGINAL_COMMAND: request }) },
   });
   return { ...r, log: existsSync(join(dir, 'log')) ? readFileSync(join(dir, 'log'), 'utf8') : '' };
 };
@@ -117,6 +127,39 @@ for (const bad of ['', 'bash', 'deploy', 'deploy main', `deploy ${SHA}; rm -rf /
     assert.equal(r.status, 1);
     assert.match(r.stdout, /only "deploy <commit>" is allowed/);
     assert.equal(r.log, '', 'nothing was run');
+    untouched();
+  });
+
+const asked = (r) => r.log.split('\n').filter((l) => l.includes('api.github.com')).length;
+
+for (const [what, flag, times] of [['times out twice', 'github-twice', 3], ['answers with something that is not an answer', 'github-garbage', 2]])
+  test(`asks again when GitHub ${what}, then deploys`, () => {
+    fail(flag);
+    const r = run();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(asked(r), times);
+    assert.equal(tag(), NEW);
+  });
+
+for (const [what, flag, code] of [['keeps timing out', 'github', '504'], ['cannot be reached', 'github-unreachable', '000']])
+  test(`gives up without touching anything when GitHub ${what}, and says that that is why`, () => {
+    fail(flag);
+    const r = run();
+    assert.equal(r.status, 1);
+    assert.equal(asked(r), 6);
+    assert.match(r.stdout, new RegExp(`GitHub did not say whether .* is part of main \\(last answer: ${code}\\)`));
+    assert.doesNotMatch(r.stdout, /is not part of main/);
+    assert.doesNotMatch(r.log, /codeload|docker/);
+    untouched();
+  });
+
+for (const [what, flag] of [['a fork', 'not-main'], ['a commit GitHub does not know', 'unknown']])
+  test(`refuses ${what} at once, without asking again`, () => {
+    fail(flag);
+    const r = run();
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /is not part of main/);
+    assert.equal(asked(r), 1);
     untouched();
   });
 

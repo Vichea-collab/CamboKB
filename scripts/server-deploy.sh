@@ -44,12 +44,22 @@ old=$(current)
 say "now running $old, asked for $tag"
 
 # ---- is the commit really part of main? -----------------------------------------------------------------------
-# GitHub also serves commits of forks under this repository's address, so the id alone proves nothing.
-status=$(curl -fsS --max-time 30 "https://api.github.com/repos/$REPO/compare/$sha...main" | sed -n 's/^  "status": "\([a-z]*\)",$/\1/p' | head -1)
+# GitHub also serves commits of forks under this repository's address, so the id alone proves nothing. GitHub sometimes
+# times out: ask again for about a minute. Without an answer nothing is deployed.
+status=
+for try in 1 2 3 4 5 6; do
+  code=$(curl -sS --max-time 30 -o "$work/compare" -w '%{http_code}' "https://api.github.com/repos/$REPO/compare/$sha...main")
+  [ "$code" = 404 ] && die "commit $sha is not part of main (GitHub does not know it)"
+  [ "$code" = 200 ] && status=$(sed -n 's/^  "status": "\([a-z]*\)",$/\1/p' "$work/compare" | head -1)
+  [ -n "$status" ] && break
+  say "GitHub answered $code, not whether the commit is part of main (try $try of 6)"
+  [ "$try" = 6 ] || sleep "${CAMBO_RETRY_DELAY:-10}"
+done
+[ -n "$status" ] || die "GitHub did not say whether $sha is part of main (last answer: $code)"
 case "$status" in ahead | identical) ;; *) die "commit $sha is not part of main" ;; esac
 
 # ---- fetch and check everything before touching what runs -----------------------------------------------------
-curl -fsSL --max-time 120 "https://codeload.github.com/$REPO/tar.gz/$sha" -o "$work/src.tar.gz" || die "cannot download the commit"
+curl -fsSL --max-time 120 --retry 5 --retry-delay 5 --retry-all-errors "https://codeload.github.com/$REPO/tar.gz/$sha" -o "$work/src.tar.gz" || die "cannot download the commit"
 mkdir "$work/new" && tar -xzf "$work/src.tar.gz" -C "$work/new" --strip-components=1 --no-same-owner || die "bad download"
 for f in "${FILES[@]}"; do [ -e "$work/new/$f" ] || die "the commit has no $f"; done
 compose "$work/new" "$tag" config -q || die "the Compose files are not valid with this server's settings"
