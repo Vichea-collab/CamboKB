@@ -161,10 +161,13 @@ Set `WEB_PORT`, `GRAFANA_PORT`, `PROMETHEUS_PORT` or `DB_PORT` if a port is take
   and a job that starts the whole Compose stack and runs `scripts/smoke.sh`.
 - On pushes to `main` and `v*` tags it also **publishes five images** to GitHub Container Registry:
   `ghcr.io/<owner>/cambokb-api`, `-file`, `-report`, `-notification`, `-web`, tagged `sha-<commit>`, `latest` (main) and the version.
-- `deploy.yml` is **manual only** (Actions → Deploy → Run workflow). It uploads the Compose file to a server and runs
-  `docker compose pull && up -d`. It needs repository secrets that do not exist yet, so it can't run by accident.
+- `deploy.yml` calls the server's deploy script after successful CI on `main` when `DEPLOY_ENABLED=true`. It also supports
+  manual deployment of an earlier commit. The server checks the release and rolls back if a health check fails.
+- [Jenkins and Terraform](docs/jenkins-terraform.md) covers an alternative Jenkins pipeline for releases and Terraform
+  configuration for the DigitalOcean Droplet and Cloud Firewall.
 
-**Deploying is not done yet; everything is prepared**, for a DigitalOcean Droplet with Cloudflare in front (a Tunnel, nothing open to the internet) and optionally R2 for photos. The step-by-step, with the Droplet size, firewall and Cloudflare rules, is in [`docs/deployment.md`](docs/deployment.md).
+Deployment uses a DigitalOcean Droplet behind a Cloudflare Tunnel, with optional R2 storage for photos. The step-by-step,
+with the Droplet size, firewall and Cloudflare rules, is in [`docs/deployment.md`](docs/deployment.md).
 In short, on a server with Docker:
 
 ```bash

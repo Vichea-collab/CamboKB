@@ -1,0 +1,16 @@
+name: cambo-jenkins
+
+services:
+  controller:
+    image: jenkins/jenkins:lts-jdk21
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: -XX:MaxRAMPercentage=55
+    mem_limit: ${JENKINS_MEMORY_LIMIT:-512m}
+    cpus: ${JENKINS_CPUS:-0.50}
+    oom_score_adj: 500
+    ports: ['127.0.0.1:${JENKINS_HTTP_PORT:-8090}:8080']
+    volumes: [jenkins-home:/var/jenkins_home]
+
+volumes:
+  jenkins-home:

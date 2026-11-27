@@ -1,14 +1,14 @@
-# Deployment: ready, not deployed
+# Deployment
 
-Everything needed to deploy is prepared and tested locally. Nothing has been deployed. This is the order of work for when a
-server is chosen.
+This guide covers the DigitalOcean deployment. For provisioning with Terraform and running releases with Jenkins,
+see [Jenkins and Terraform](jenkins-terraform.md).
 
 ## 0. What is already done
 
 - [x] A Dockerfile for each service (`docker/*.Dockerfile`) and a Compose file for local use (`docker-compose.yml`)
       and for a server (`docker-compose.prod.yml`), each service with its own database.
 - [x] CI builds and tests everything on every push and publishes five images to GitHub Container Registry on `main` and `v*` tags.
-- [x] `deploy.yml`: a manual workflow that pulls the images on a server. Needs the secrets below.
+- [x] `deploy.yml`: deploys after successful CI on `main` when enabled and supports manual rollback.
 - [x] `scripts/smoke.sh` proves a running stack is wired up (also run by CI).
 - [x] Monitoring (Prometheus, Grafana, Loki, Alloy, cAdvisor) in the same Compose file, with dashboards and alert rules.
 - [x] Cloudflare: an optional Tunnel container, nginx reads the visitor's real address from Cloudflare's header (tested).
@@ -120,8 +120,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec api no
 Each service creates its own tables on start. The notification service registers the Telegram webhook at
 `PUBLIC_ORIGIN/telegram/webhook` by itself.
 
-Then run the smoke test against the real address from your laptop: `WEB=https://shop.example.com scripts/smoke.sh`
-(the parts that reach into Docker need to run on the server: `scripts/smoke.sh` there).
+Check the production catalog with `curl -fsS 'https://shop.example.com/api/v1/products?pageSize=1'`. Run
+`scripts/smoke.sh` on a local or CI Compose stack, where it can stop Redis and insert test events.
 
 ## 4a. On a 1 GB server
 
@@ -208,7 +208,7 @@ with the new Telegram account. Admin sessions last `ADMIN_SESSION_TTL_DAYS` days
 ## 5. Later deploys
 
 - By hand: `IMAGE_TAG=sha-1a2b3c4 docker compose -f docker-compose.prod.yml --env-file .env.production pull && … up -d`.
-- **Automatic deploys.** With the repository variable `DEPLOY_ENABLED` = `true`, every push to `main` that passes CI goes
+- **Automatic deploys.** With `DEPLOY_ENABLED=true` and `JENKINS_RELEASE_ENABLED` unset, every push to `main` that passes CI goes
   live: `deploy.yml` asks the server to update itself to that commit. `scripts/server-deploy.sh` (installed there as
   `/usr/local/bin/cambo-deploy`) makes sure the commit is part of `main`, pulls its images, backs up, switches, checks the
   home page, products, a photo, every service, Telegram's route and the public address, and goes back by itself if a

@@ -1,7 +1,7 @@
 name: CI
 
 # Pull requests: test and build every image (nothing is published).
-# Pushes to main and version tags (v1.2.3): the same, then publish the images to GitHub Container Registry.
+# Pushes to main and version tags (v1.2.3): also publish images unless Jenkins owns releases.
 
 on:
   push:
@@ -78,7 +78,7 @@ jobs:
       matrix:
         service: [api, file, report, notification, web]
     env:
-      PUBLISH: ${{ github.event_name != 'pull_request' }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && vars.JENKINS_RELEASE_ENABLED != 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Image name (lower case, as GHCR requires)

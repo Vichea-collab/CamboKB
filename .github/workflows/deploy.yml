@@ -28,11 +28,12 @@ concurrency:
 
 jobs:
   deploy:
-    # After CI: only when it passed on a push to main and a server is set up. By hand: always.
+    # After CI: only after a successful push to main when GitHub Actions owns releases. By hand: always.
     if: >-
       ${{ github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
+      vars.JENKINS_RELEASE_ENABLED != 'true' &&
       vars.DEPLOY_ENABLED == 'true') }}
     runs-on: ubuntu-latest
     environment: production
