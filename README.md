@@ -163,8 +163,7 @@ Set `WEB_PORT`, `GRAFANA_PORT`, `PROMETHEUS_PORT` or `DB_PORT` if a port is take
   `ghcr.io/<owner>/cambokb-api`, `-file`, `-report`, `-notification`, `-web`, tagged `sha-<commit>`, `latest` (main) and the version.
 - `deploy.yml` calls the server's deploy script after successful CI on `main` when `DEPLOY_ENABLED=true`. It also supports
   manual deployment of an earlier commit. The server checks the release and rolls back if a health check fails.
-- [Jenkins and Terraform](docs/jenkins-terraform.md) covers an alternative Jenkins pipeline for releases and Terraform
-  configuration for the DigitalOcean Droplet and Cloud Firewall.
+- [Jenkins](docs/jenkins.md) covers running CI with a Mac build agent and optionally using Jenkins for releases.
 
 Deployment uses a DigitalOcean Droplet behind a Cloudflare Tunnel, with optional R2 storage for photos. The step-by-step,
 with the Droplet size, firewall and Cloudflare rules, is in [`docs/deployment.md`](docs/deployment.md).

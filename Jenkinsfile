@@ -31,17 +31,6 @@ pipeline {
       }
     }
 
-    stage('Terraform') {
-      steps {
-        sh '''
-          set -eu
-          terraform -chdir=infra/terraform fmt -check -recursive
-          terraform -chdir=infra/terraform init -backend=false -lockfile=readonly -input=false
-          terraform -chdir=infra/terraform validate
-        '''
-      }
-    }
-
     stage('Lint, test, build and smoke') {
       steps {
         sh 'bash scripts/jenkins-checks.sh'

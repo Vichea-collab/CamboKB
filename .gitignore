@@ -18,14 +18,3 @@ cloudflared-credentials.json
 
 # Database backups (scripts/backup.sh)
 backups/
-
-# Terraform local state, input values, plans and CLI configuration
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-*.tfvars.json
-*.tfplan
-*.auto.tfvars*
-.terraformrc
-terraform.rc

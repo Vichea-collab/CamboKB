@@ -1,8 +1,0 @@
-droplet_name         = "cambo-supply"
-droplet_size         = "s-1vcpu-1gb"
-droplet_image        = "ubuntu-24-04-x64"
-region               = "sgp1"
-enable_backups       = false
-enable_ipv6          = false
-ssh_key_fingerprints = ["REPLACE_WITH_DIGITALOCEAN_KEY_FINGERPRINT"]
-ssh_source_cidrs     = ["203.0.113.10/32"]

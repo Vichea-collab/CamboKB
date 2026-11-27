@@ -11,6 +11,5 @@
 .superpowers
 scrape
 docs
-infra/terraform
 *.log
 .DS_Store

@@ -1,7 +1,6 @@
 # Deployment
 
-This guide covers the DigitalOcean deployment. For provisioning with Terraform and running releases with Jenkins,
-see [Jenkins and Terraform](jenkins-terraform.md).
+This guide covers the DigitalOcean deployment. See [Jenkins](jenkins.md) for running checks or releases with Jenkins.
 
 ## 0. What is already done
 
