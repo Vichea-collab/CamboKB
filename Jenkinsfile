@@ -70,7 +70,7 @@ pipeline {
             missing=''
             for service in api file report notification web; do
               image="ghcr.io/vichea-collab/cambokb-$service:$CAMBO_TAG"
-              if docker --config "$registry_config" buildx imagetools inspect "$image" >/dev/null 2>"$registry_config/inspect-error"; then
+              if docker --config "$registry_config" manifest inspect "$image" >/dev/null 2>"$registry_config/inspect-error"; then
                 echo "Reusing published image $image"
                 continue
               fi
